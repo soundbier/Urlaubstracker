@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="de" data-version="1.0.0">
+<head>
+<meta charset="utf-8">
+<title>Urlaubstracker</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Gemeinsame Urlaubskasse: eintragen was ihr eingezahlt habt, sehen was pro Tag drin ist, abends kurz die Ausgaben abhaken.">
+<meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Urlaubskasse">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icons/favicon-32.png" sizes="32x32">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div id="app" class="app">
+  <div class="view view--center"><div class="spinner" aria-label="Lädt"></div></div>
+</div>
+<noscript>
+  <p style="padding:2rem;text-align:center;font-family:system-ui">
+    Der Urlaubstracker rechnet im Browser — dafür muss JavaScript eingeschaltet sein.
+  </p>
+</noscript>
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
