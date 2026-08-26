@@ -1,0 +1,68 @@
+rules_version = '2';
+
+// Sicherheitsregeln für den Urlaubstracker.
+//
+// Grundgedanke: ein Trip gehört den Geräten, die in `memberUids` stehen. Wer
+// den Einladungscode kennt, darf sich selbst dazu eintragen — den Code kann
+// ein fremdes Gerät nicht lesen, deshalb schickt es ihn beim Beitreten als
+// `joinProof` mit, und der Vergleich passiert hier auf dem Server.
+//
+// Veröffentlichen:  firebase deploy --only firestore:rules
+// (oder in der Firebase-Konsole unter Firestore Database → Regeln einfügen)
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /trips/{tripId} {
+      function signedIn() {
+        return request.auth != null;
+      }
+
+      function members() {
+        return resource.data.memberUids;
+      }
+
+      function isMember() {
+        return signedIn() && request.auth.uid in members();
+      }
+
+      // Für die Unterordner: das Trip-Dokument nachschlagen.
+      function tripMembers() {
+        return get(/databases/$(database)/documents/trips/$(tripId)).data.memberUids;
+      }
+
+      // Anlegen darf jedes angemeldete Gerät — aber nur mit sich selbst als
+      // einzigem Mitglied und einem ausreichend langen Einladungscode.
+      allow create: if signedIn()
+                    && request.resource.data.memberUids == [request.auth.uid]
+                    && request.resource.data.inviteCode is string
+                    && request.resource.data.inviteCode.size() >= 8;
+
+      allow get: if isMember();
+      allow list: if false; // Trips lassen sich nicht durchsuchen, nur gezielt öffnen.
+
+      allow update: if
+        // Mitglieder pflegen den Trip. Sich selbst austragen ist erlaubt,
+        // die andere Person hinauswerfen nicht.
+        (isMember()
+         && request.resource.data.memberUids.hasAll(members().removeAll([request.auth.uid])))
+        ||
+        // Beitreten: nur mit dem richtigen Code, nur sich selbst hinzufügen,
+        // und ohne den Code dabei auszutauschen.
+        (signedIn()
+         && !(request.auth.uid in members())
+         && request.resource.data.joinProof == resource.data.inviteCode
+         && request.resource.data.inviteCode == resource.data.inviteCode
+         && request.resource.data.memberUids.hasAll(members())
+         && request.resource.data.memberUids.hasOnly(members().concat([request.auth.uid]))
+         && request.resource.data.memberUids.size() <= 8);
+
+      allow delete: if isMember();
+
+      // Einzahlungen und Ausgaben: für Mitglieder offen, für alle anderen zu.
+      match /{document=**} {
+        allow read, write: if signedIn() && request.auth.uid in tripMembers();
+      }
+    }
+  }
+}
