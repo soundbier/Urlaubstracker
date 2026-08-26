@@ -180,16 +180,17 @@ npm test      # Tests (node --test, ohne Abhängigkeiten)
 npm start     # lokaler Server auf http://localhost:8080
 ```
 
-Es gibt keinen Build-Schritt: der Browser lädt die ES-Module direkt. Nach
-Änderungen an Dateien, die der Service Worker vorhält, `CACHE_VERSION` in
-[`sw.js`](sw.js) hochzählen.
+Es gibt keinen Build-Schritt: der Browser lädt die ES-Module direkt. Auf
+`localhost` ist der Service Worker abgeschaltet — Änderungen sind sofort nach
+dem Neuladen da. Mit `http://localhost:8080/?sw=1` lässt er sich einschalten,
+um den Update-Ablauf auszuprobieren.
 
 ### Aufbau
 
 ```
 index.html            App-Hülle
 styles.css            komplettes Stylesheet, hell und dunkel
-sw.js                 Service Worker (Offline-Betrieb)
+sw.js                 Service Worker: Offline-Betrieb und Update-Steuerung
 manifest.webmanifest  Installation als App
 
 js/
@@ -204,7 +205,7 @@ js/
   ui/                 Sheets, Zahlentastatur, wiederkehrende Bausteine
   views/              die vier Bereiche plus Ersteinrichtung
 
-tests/                Tests der Rechenlogik und des Im-/Exports
+tests/                Rechenlogik, Im-/Export, Release-Invarianten
 tools/                Icon-Generator, Dev-Server, Firebase-Bündelung
 vendor/firebase.js    gebündeltes Firebase-SDK (kein CDN nötig)
 ```
@@ -212,6 +213,38 @@ vendor/firebase.js    gebündeltes Firebase-SDK (kein CDN nötig)
 Beträge liegen überall als **ganzzahlige Cent** vor, Datumsangaben als
 `YYYY-MM-DD` und werden als Kalendertage behandelt — nicht als Zeitpunkte.
 Deshalb stimmt die Rechnung auch über die Zeitumstellung hinweg.
+
+### Eine neue Fassung veröffentlichen
+
+`APP_VERSION` in [`sw.js`](sw.js) hochzählen und `data-version` in
+[`index.html`](index.html) sowie `version` in `package.json` mitziehen —
+`npm test` besteht nur, wenn alle drei übereinstimmen.
+
+Der Service Worker behandelt eine Fassung als geschlossenes Paket: er lädt sie
+vollständig in einen eigenen Cache und liefert ausschließlich von dort. Damit
+läuft nie halb die alte und halb die neue App, und die Nummer unter *Mehr →
+Über* stimmt mit dem, was tatsächlich läuft.
+
+Ohne Versionssprung ändert sich für die Nutzer nichts — auch dann nicht, wenn
+die Dateien auf dem Server längst neu sind. Das ist Absicht: so entscheidet die
+Versionsnummer, was ausgeliefert wird, und nicht der Zufall des Caches.
+
+### Wie Nutzer das Update bekommen
+
+Beim Start prüft die App, ob eine neue Fassung bereitliegt. Wenn ja, lädt der
+Browser sie im Hintergrund komplett herunter — die alte läuft dabei unverändert
+weiter. Erst danach fragt die App:
+
+> **Update auf Version 1.2.0** — Die neue Fassung ist bereits heruntergeladen …
+> *[Später]* *[Jetzt aktualisieren]*
+
+*Jetzt aktualisieren* startet die App einmal neu; Einträge bleiben, weil sie in
+`localStorage` bzw. Firestore liegen. *Später* lässt alles wie es ist — die
+Frage kommt beim nächsten Start wieder, nicht aber noch einmal in derselben
+Sitzung.
+
+Weil das Paket zum Zeitpunkt der Frage schon vollständig auf dem Gerät liegt,
+funktioniert das Aktualisieren auch ohne Empfang.
 
 ### Icons neu erzeugen
 

@@ -193,22 +193,89 @@ store.init().catch((err) => {
   toast(err?.message || 'Start fehlgeschlagen.', { type: 'error' });
 });
 
-// --------------------------------------------------------------- Offline-Hülle
+// ------------------------------------------------- Offline-Hülle und Updates
 
-if ('serviceWorker' in navigator) {
-  addEventListener('load', async () => {
+/**
+ * Beim Entwickeln steht der Service Worker im Weg: er liefert aus seinem
+ * Cache, und der wird erst bei einer neuen APP_VERSION ausgetauscht. Auf
+ * localhost bleibt er deshalb aus — mit `?sw=1` lässt er sich anschalten, um
+ * den Update-Ablauf auszuprobieren.
+ */
+function serviceWorkerWanted() {
+  if (!('serviceWorker' in navigator)) return false;
+  if (new URLSearchParams(location.search).has('sw')) return true;
+  return !['localhost', '127.0.0.1', '[::1]', ''].includes(location.hostname);
+}
+
+/**
+ * Fragt einen bestimmten Worker nach seiner Fassung. Über einen eigenen Kanal,
+ * damit die Antwort eindeutig von ihm kommt und nicht vom gerade laufenden.
+ * Antwortet er nicht (ältere Fassung ohne diesen Handler), geht es ohne Nummer
+ * weiter — daran soll das Update nicht scheitern.
+ */
+function askVersion(worker) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const giveUp = setTimeout(() => resolve(null), 1500);
+    channel.port1.onmessage = (e) => { clearTimeout(giveUp); resolve(e.data); };
     try {
-      const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
-      reg.addEventListener('updatefound', () => {
-        const sw = reg.installing;
-        sw?.addEventListener('statechange', () => {
-          if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-            toast('Neue Version verfügbar — App neu laden.', { duration: 8000 });
-          }
-        });
-      });
+      worker.postMessage({ type: 'VERSION' }, [channel.port2]);
     } catch {
-      // Ohne Service Worker läuft die App weiterhin, nur eben nicht offline.
+      clearTimeout(giveUp);
+      resolve(null);
     }
   });
 }
+
+async function setupServiceWorker() {
+  let reg;
+  try {
+    reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+  } catch {
+    return; // Ohne Service Worker läuft die App weiter, nur eben nicht offline.
+  }
+
+  // Nur nach bewusstem „Jetzt aktualisieren“ neu laden. Der Wechsel passiert
+  // auch beim allerersten Einrichten — da gibt es nichts neu zu laden.
+  let updating = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!updating) return;
+    updating = false;
+    location.reload();
+  });
+
+  // Einmal pro Start fragen. Wer „Später“ wählt, wird nicht weiter behelligt;
+  // beim nächsten Start steht das Update wieder da.
+  let asked = false;
+  const offerUpdate = async (worker) => {
+    if (asked || !worker) return;
+    asked = true;
+    const version = await askVersion(worker);
+    const ok = await confirmSheet({
+      title: version ? `Update auf Version ${version}` : 'Update verfügbar',
+      text: 'Die neue Fassung ist bereits heruntergeladen — das Aktualisieren geht auch ohne Netz. Die App startet dabei einmal neu, eure Einträge bleiben.',
+      confirmLabel: 'Jetzt aktualisieren',
+      cancelLabel: 'Später',
+    });
+    if (!ok) return;
+    updating = true;
+    worker.postMessage({ type: 'SKIP_WAITING' });
+  };
+
+  // Ein Update, das beim letzten Mal liegen geblieben ist.
+  if (reg.waiting && navigator.serviceWorker.controller) offerUpdate(reg.waiting);
+
+  // Und eines, das während dieser Sitzung fertig wird.
+  reg.addEventListener('updatefound', () => {
+    const sw = reg.installing;
+    sw?.addEventListener('statechange', () => {
+      if (sw.state === 'installed' && navigator.serviceWorker.controller) offerUpdate(sw);
+    });
+  });
+
+  // Nicht darauf verlassen, wann der Browser von sich aus nachsieht: bei jedem
+  // Start einmal nachfragen, damit „beim Neustart“ auch wirklich stimmt.
+  reg.update().catch(() => {});
+}
+
+if (serviceWorkerWanted()) addEventListener('load', setupServiceWorker);
