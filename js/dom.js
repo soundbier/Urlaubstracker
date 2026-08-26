@@ -116,8 +116,19 @@ const ICONS = {
   download: ['M12 4v10M8 12l4 4 4-4', 'M5 19h14'],
   upload: ['M12 16V6M8 10l4-4 4 4', 'M5 19h14'],
   wallet: ['M4 8a2 2 0 012-2h12a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z', 'M4 10h16M16 14h.01'],
-  pencil: ['M4 20l4-1 10-10-3-3L5 16l-1 4z'],
   people: ['M8 11a3 3 0 100-6 3 3 0 000 6z', 'M2 20a6 6 0 0112 0', 'M16 5.2a3 3 0 010 5.6M17 14.3A6 6 0 0122 20'],
+  person: ['M12 11.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z', 'M5 20a7 7 0 0114 0'],
   calendar: ['M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z', 'M8 3v4M16 3v4M4 11h16'],
   info: ['M12 21a9 9 0 100-18 9 9 0 000 18z', 'M12 11v5M12 8h.01'],
+
+  // Kategorien. Bewusst dieselbe Strichstärke wie der Rest — Emoji sähen auf
+  // jedem Gerät anders aus und passen farblich zu nichts.
+  food: ['M7.5 3v5a2.2 2.2 0 004.4 0V3', 'M9.7 10.2V21', 'M16.8 3c1.3 2.1 1.9 4.1 1.9 6.1 0 1.5-.7 2.4-1.9 2.4s-1.9-.9-1.9-2.4c0-2 .6-4 1.9-6.1z', 'M16.8 11.5V21'],
+  transport: ['M4 16v-3.6l1.8-4.1A2 2 0 017.6 7h8.8a2 2 0 011.8 1.3l1.8 4.1V16', 'M3 12.4h18', 'M7.5 15.4a1.6 1.6 0 100 3.2 1.6 1.6 0 000-3.2z', 'M16.5 15.4a1.6 1.6 0 100 3.2 1.6 1.6 0 000-3.2z'],
+  // Ein Bett, kein Zelt: die Zeltform ist bei 16 px von einem Warndreieck
+  // nicht zu unterscheiden.
+  stay: ['M3.2 19.5V7.5', 'M3.2 13.5h13.1a4.5 4.5 0 014.5 4.5v1.5', 'M8 12.4a2.1 2.1 0 100-4.2 2.1 2.1 0 000 4.2z'],
+  activity: ['M4 8.5A1.5 1.5 0 015.5 7h13A1.5 1.5 0 0120 8.5v1.6a2 2 0 000 3.8v1.6A1.5 1.5 0 0118.5 17h-13A1.5 1.5 0 014 15.5v-1.6a2 2 0 000-3.8V8.5z', 'M14 8.6v1.3M14 11.3v1.4M14 14.1v1.3'],
+  shopping: ['M5.2 8h13.6l-1.1 12.5H6.3L5.2 8z', 'M9 8V6a3 3 0 016 0v2'],
+  other: ['M6 12h.01M12 12h.01M18 12h.01'],
 };

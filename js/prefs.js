@@ -12,7 +12,6 @@ const DEFAULTS = {
   firebaseConfig: null, // { apiKey, authDomain, projectId, appId, … }
   tripRef: null,        // { mode: 'local' } | { mode: 'cloud', tripId, inviteCode }
   myPersonId: null,     // wer sitzt an diesem Gerät
-  reduceMotion: false,
 };
 
 function read() {

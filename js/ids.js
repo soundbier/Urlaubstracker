@@ -21,7 +21,3 @@ export function newInviteCode() {
   const s = newId(8);
   return `${s.slice(0, 4)}-${s.slice(4)}`;
 }
-
-export function normalizeInviteCode(code) {
-  return String(code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-}

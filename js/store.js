@@ -98,6 +98,9 @@ function sortByDate(rows) {
 async function useBackend(next) {
   if (backend) await backend.stop();
   backend = next;
+  // Der Fehler des alten Backends gilt für das neue nicht mehr. Wer danach
+  // trotzdem einen setzen will, tut das nach diesem Aufruf.
+  setSync({ error: null });
   await backend.start(handleChange, (s) => setSync(s));
 }
 
@@ -132,6 +135,7 @@ export async function init() {
   const prefs = getPrefs();
   set({ myPersonId: prefs.myPersonId });
 
+  let cloudProblem = null;
   if (prefs.tripRef?.mode === 'cloud' && prefs.firebaseConfig) {
     try {
       await useBackend(
@@ -144,11 +148,12 @@ export async function init() {
       return;
     } catch (err) {
       // Cloud kaputt? Lieber lokal weiterarbeiten als gar nicht.
-      setSync({ error: err?.message || String(err) });
+      cloudProblem = err?.message || String(err);
     }
   }
 
   await useBackend(new LocalBackend());
+  if (cloudProblem) setSync({ error: cloudProblem });
 }
 
 // -------------------------------------------------------------------- Aktionen

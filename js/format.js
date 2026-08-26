@@ -25,11 +25,6 @@ export function money(cents, currency = 'EUR', { decimals = 2 } = {}) {
   return moneyFormatter(currency, decimals).format((cents || 0) / 100).replace('-', '−');
 }
 
-/** Für große Zahlen im Überblick: ohne Cent, wenn es nicht drauf ankommt. */
-export function moneyRound(cents, currency = 'EUR') {
-  return money(Math.round((cents || 0) / 100) * 100, currency, { decimals: 0 });
-}
-
 /** Vorzeichen immer sichtbar — für Polster und Guthaben. */
 export function moneySigned(cents, currency = 'EUR') {
   const s = money(Math.abs(cents), currency);

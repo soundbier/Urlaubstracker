@@ -249,8 +249,10 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 }
 .tiles--flat .tile { background: var(--surface-2); border-color: transparent; }
 .tile__label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); }
-/* Schrumpft mit, damit auch „− 1.100,00 €“ noch in die Kachel passt. */
-.tile__value { font-size: clamp(0.84rem, 3.7vw, 1.02rem); font-weight: 660; font-variant-numeric: tabular-nums; letter-spacing: -0.015em; overflow-wrap: anywhere; }
+/* Schrumpft mit, damit auch „− 1.100,00 €“ in einer Zeile in die Kachel passt.
+   Umbrechen darf sie erst, wenn selbst das nicht mehr reicht — sonst steht das
+   Eurozeichen allein auf der zweiten Zeile. */
+.tile__value { font-size: clamp(0.72rem, 3.3vw, 1.02rem); font-weight: 660; font-variant-numeric: tabular-nums; letter-spacing: -0.015em; overflow-wrap: anywhere; }
 .tile__sub { font-size: 0.7rem; color: var(--text-muted); line-height: 1.25; }
 .tile--over .tile__value { color: var(--over); }
 
@@ -317,7 +319,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   display: grid; place-items: center;
   border-radius: 11px;
   background: var(--surface-2);
-  font-size: 1.05rem;
+  color: var(--text-muted);
 }
 .row__icon--person { color: #06202b; font-weight: 700; font-size: 0.95rem; }
 .row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
@@ -396,7 +398,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
 .catlist { display: flex; flex-direction: column; gap: 12px; }
 .cat { display: flex; align-items: center; gap: 12px; }
-.cat__icon { font-size: 1.1rem; width: 26px; text-align: center; }
+.cat__icon { width: 26px; display: grid; place-items: center; color: var(--text-faint); }
 .cat__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
 .cat__top { display: flex; justify-content: space-between; gap: 10px; font-size: 0.86rem; }
 .cat__label { color: var(--text-muted); }
@@ -548,7 +550,7 @@ select.field__input { background-image: none; }
   color: #fff;
 }
 @media (prefers-color-scheme: dark) { .chip.is-active { color: #04201d; } }
-.chip__icon { font-size: 0.95rem; }
+.chip .icon { margin-left: -2px; }
 .chip--date { position: relative; overflow: hidden; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 

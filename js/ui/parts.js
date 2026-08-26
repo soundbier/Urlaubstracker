@@ -1,7 +1,7 @@
 /** Bausteine, die in mehreren Ansichten vorkommen. */
 import { h, icon } from '../dom.js';
 import { CATEGORY_BY_ID, POT } from '../calc.js';
-import { money, moneySigned } from '../format.js';
+import { money } from '../format.js';
 
 export function tile(label, value, sub, { tone = '' } = {}) {
   return h('div.tile', { class: tone && `tile--${tone}` },
@@ -25,7 +25,7 @@ export function expenseRow(expense, trip, onClick) {
   const cat = CATEGORY_BY_ID[expense.category] || CATEGORY_BY_ID.other;
   const privatelyPaid = expense.payer !== POT;
   return h('button.row', { type: 'button', onclick: () => onClick(expense) },
-    h('span.row__icon', { 'aria-hidden': 'true' }, cat.icon),
+    h('span.row__icon', icon(cat.icon, 20)),
     h('span.row__main',
       h('span.row__title', expense.note || cat.label),
       h('span.row__sub', expense.note ? cat.label : '', privatelyPaid ? h('span.tag', payerLabel(trip, expense.payer)) : null),
@@ -61,5 +61,7 @@ export function bar(ratio, tone = 'good') {
 
 export function bufferLabel(buffer, currency) {
   if (buffer === 0) return 'genau im Plan';
-  return `${moneySigned(buffer, currency)} ${buffer > 0 ? 'gespart' : 'drüber'}`;
+  // Der Betrag steht ohne Vorzeichen da — „− 40 € drüber“ liest sich, als
+  // wären es 40 € zu wenig drüber.
+  return `${money(Math.abs(buffer), currency)} ${buffer > 0 ? 'gespart' : 'drüber'}`;
 }

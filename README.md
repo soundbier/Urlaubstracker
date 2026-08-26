@@ -65,8 +65,12 @@ Tasche** bezahlt hat. Fair wäre ihr Anteil an den Gesamtausgaben (Standard
 Guthaben — und die Summe aller Guthaben ist genau das, was noch auf dem
 gemeinsamen Konto liegt.
 
-Die App sagt dann konkret: *„Vom Konto zurück: Marie 682,30 €, Lukas 582,30 €“*
-oder *„Marie überweist 50,00 € an Lukas.“*
+Daraus wird eine Liste von Überweisungen: erst geht das Restgeld vom Konto an
+die Guthaben zurück, was dann noch offen ist, überweist man sich direkt.
+
+Ist vom Konto mehr abgegangen, als eingezahlt wurde, steht es im Minus — dann
+dreht sich der erste Schritt um: die Liste sagt, wer wie viel **nachzahlt**,
+bis das Konto wieder auf null ist.
 
 ---
 
@@ -172,7 +176,7 @@ npx firebase-tools deploy --only hosting,firestore:rules
 ## Entwickeln
 
 ```sh
-npm test      # Tests der Rechenlogik (node --test, ohne Abhängigkeiten)
+npm test      # Tests (node --test, ohne Abhängigkeiten)
 npm start     # lokaler Server auf http://localhost:8080
 ```
 
@@ -200,7 +204,7 @@ js/
   ui/                 Sheets, Zahlentastatur, wiederkehrende Bausteine
   views/              die vier Bereiche plus Ersteinrichtung
 
-tests/calc.test.js    Tests der Rechenlogik
+tests/                Tests der Rechenlogik und des Im-/Exports
 tools/                Icon-Generator, Dev-Server, Firebase-Bündelung
 vendor/firebase.js    gebündeltes Firebase-SDK (kein CDN nötig)
 ```

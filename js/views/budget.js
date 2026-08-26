@@ -26,7 +26,9 @@ export function renderBudget(state, actions) {
         ? h('p.card__note',
             b.buffer >= 0 ? icon('check', 16) : icon('info', 16),
             ` Ihr liegt ${bufferLabel(b.buffer, cur)}. `,
-            b.phase === 'during' ? `Hochgerechnet bleiben am Ende ${money(b.projectedLeftover, cur)} übrig.` : '',
+            // Aus einem oder zwei Tagen lässt sich nichts hochrechnen — der erste
+            // Tankstopp sagt noch nicht, wie der Urlaub ausgeht.
+            b.phase === 'during' && b.elapsedDays >= 3 ? projection(b.projectedLeftover, cur) : '',
           )
         : null,
     ),
@@ -50,6 +52,13 @@ export function renderBudget(state, actions) {
 
     h('section.section', sectionTitle('Endabrechnung'), settlement(trip, contributions, expenses, cur)),
   );
+}
+
+/** „bleiben −80 € übrig“ ist keine Aussage — bei Unterdeckung fehlt Geld. */
+function projection(leftover, cur) {
+  return leftover < 0
+    ? `Wenn es so weitergeht, fehlen am Ende ${money(-leftover, cur)}.`
+    : `Wenn es so weitergeht, bleiben am Ende ${money(leftover, cur)} übrig.`;
 }
 
 // ------------------------------------------------------------------- Verlauf
@@ -110,7 +119,7 @@ function categoryList(expenses, total, cur) {
   return h('div.catlist', ...rows.map((c) => {
     const share = total > 0 ? c.amount / total : 0;
     return h('div.cat',
-      h('span.cat__icon', c.icon),
+      h('span.cat__icon', icon(c.icon, 19)),
       h('div.cat__main',
         h('div.cat__top', h('span.cat__label', c.label), h('span.cat__amount', money(c.amount, cur))),
         bar(share, 'neutral'),
@@ -148,11 +157,16 @@ function settlement(trip, contributions, expenses, cur) {
     ),
   );
 
+  const names = (list) => list.map((p, i) => h('span', i ? ', ' : '', h('strong', p.name), ` ${money(p.amount, cur)}`));
+
   const actions = [];
   if (st.payouts.length && st.potBalance > 0) {
+    actions.push(h('li', `Vom gemeinsamen Konto (${money(st.potBalance, cur)}) zurück: `, ...names(st.payouts)));
+  }
+  if (st.topUps.length) {
     actions.push(h('li',
-      `Vom gemeinsamen Konto (${money(st.potBalance, cur)}) zurück: `,
-      ...st.payouts.map((p, i) => h('span', i ? ', ' : '', h('strong', p.name), ` ${money(p.amount, cur)}`)),
+      `Auf dem gemeinsamen Konto fehlen ${money(-st.potBalance, cur)} — nachzahlen: `,
+      ...names(st.topUps),
     ));
   }
   for (const t of st.transfers) {

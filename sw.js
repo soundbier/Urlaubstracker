@@ -7,7 +7,7 @@
  *
  * Beim Ändern von Dateien: CACHE_VERSION hochzählen.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE = `urlaubstracker-${CACHE_VERSION}`;
 
 const SHELL = [

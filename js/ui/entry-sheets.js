@@ -4,6 +4,13 @@ import { openSheet } from './sheet.js';
 import { CATEGORIES, POT, parseAmount, todayISO, addDays } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
+/** `1050` → `"10,50"`, `1000` → `"10"`, `0` → `""` — so, wie man es eintippen würde. */
+function centsToRaw(cents) {
+  if (!cents) return '';
+  const s = (Math.abs(cents) / 100).toFixed(2);
+  return s.endsWith('.00') ? s.slice(0, -3) : s.replace('.', ',');
+}
+
 /**
  * Zahlenfeld mit eigener Tastatur.
  *
@@ -12,7 +19,7 @@ import { money, dayLabel, fullDate } from '../format.js';
  * hier hat große Ziffern und genau eine Komma-Taste.
  */
 function amountField(initialCents, currency) {
-  let raw = initialCents ? String(initialCents / 100).replace('.', ',') : '';
+  let raw = centsToRaw(initialCents);
 
   const display = h('div.amount__value');
   const hint = h('div.amount__hint');
@@ -23,7 +30,9 @@ function amountField(initialCents, currency) {
     display.textContent = raw === '' ? '0' : raw.includes(',') ? `${grouped},${decPart}` : grouped;
     display.classList.toggle('is-empty', raw === '');
     const cents = parseAmount(raw);
-    hint.textContent = cents ? money(cents, currency) : 'Betrag eingeben';
+    hint.textContent = cents > 0 ? money(cents, currency) : 'Betrag eingeben';
+    // Wer nach der Fehlermeldung weitertippt, hat sie beantwortet.
+    hint.classList.remove('is-error');
   };
 
   const press = (key) => {
@@ -66,7 +75,7 @@ function chipRow(options, selectedId, onSelect) {
       selectedId = o.id;
       buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
       onSelect(o.id);
-    }, dataset: { id: o.id } }, o.icon ? h('span.chip__icon', o.icon) : null, o.label);
+    }, dataset: { id: o.id } }, o.icon ? icon(o.icon, 16) : null, o.label);
     b.classList.toggle('is-active', o.id === selectedId);
     return b;
   });
@@ -112,7 +121,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
   const amount = amountField(expense?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: expense?.note || '', placeholder: 'z. B. Abendessen am Hafen', maxlength: 120, enterkeyhint: 'done' });
 
-  const payers = [{ id: POT, label: 'Kasse', icon: '👛' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, icon: '👤' }))];
+  const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' }))];
 
   return openSheet({
     title: editing ? 'Ausgabe bearbeiten' : 'Was habt ihr ausgegeben?',
@@ -120,7 +129,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
     build: (close) => {
       const save = () => {
         const cents = amount.getCents();
-        if (!cents) {
+        if (!(cents > 0)) {
           amount.focusHint.textContent = 'Bitte einen Betrag eingeben';
           amount.focusHint.classList.add('is-error');
           return;
@@ -158,7 +167,7 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
     build: (close) => {
       const save = () => {
         const cents = amount.getCents();
-        if (!cents) {
+        if (!(cents > 0)) {
           amount.focusHint.textContent = 'Bitte einen Betrag eingeben';
           amount.focusHint.classList.add('is-error');
           return;
@@ -168,7 +177,7 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
-        field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, icon: '👤' })), personId, (id) => { personId = id; })),
+        field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' })), personId, (id) => { personId = id; })),
         field('Wann?', dateRow(date, (iso) => { date = iso; })),
         field('Notiz', note),
         h('div.entry__actions',

@@ -43,12 +43,12 @@ function inviteScreen(state) {
 function createScreen(state) {
   const today = todayISO();
   const values = {
-    name: 'Unser Urlaub',
+    name: '',
     startDate: today,
     endDate: addDays(today, 13),
     currency: 'EUR',
     budgetMode: 'dynamic',
-    peopleNames: ['Marie', 'Lukas'],
+    peopleNames: ['', ''],
     myIndex: 0,
   };
 
@@ -72,12 +72,18 @@ function createScreen(state) {
   } });
 
   const nameInputs = values.peopleNames.map((n, i) =>
-    h('input.field__input', { type: 'text', value: n, maxlength: 30, placeholder: `Name ${i + 1}`, onchange: (e) => { values.peopleNames[i] = e.target.value; renderMeChips(); } }));
+    h('input.field__input', {
+      type: 'text', value: n, maxlength: 30, autocomplete: 'off',
+      placeholder: i === 0 ? 'Dein Name' : 'Der andere Name',
+      // `input` statt `change`: die Auswahl darunter soll beim Tippen mitlaufen.
+      oninput: (e) => { values.peopleNames[i] = e.target.value; renderMeChips(); },
+    }));
 
   const meChips = h('div.chips');
   const renderMeChips = () => {
     meChips.replaceChildren(...values.peopleNames.map((n, i) =>
-      h('button.chip', { type: 'button', class: values.myIndex === i ? 'is-active' : '', onclick: () => { values.myIndex = i; renderMeChips(); } }, n.trim() || `Name ${i + 1}`)));
+      h('button.chip', { type: 'button', class: values.myIndex === i ? 'is-active' : '', onclick: () => { values.myIndex = i; renderMeChips(); } },
+        n.trim() || (i === 0 ? 'Die erste Person' : 'Die zweite Person'))));
   };
   renderMeChips();
 
@@ -90,6 +96,13 @@ function createScreen(state) {
       error.textContent = 'Bitte einen gültigen Zeitraum wählen.';
       return;
     }
+    if (values.peopleNames.some((n) => !n.trim())) {
+      // Ohne Namen steht in der Abrechnung später „Person 1“ und „Person 2“.
+      error.textContent = 'Bitte beide Namen eintragen.';
+      nameInputs[values.peopleNames.findIndex((n) => !n.trim())].focus();
+      return;
+    }
+    error.textContent = '';
     submit.disabled = true;
     try {
       await store.createTrip(values);
@@ -107,15 +120,15 @@ function createScreen(state) {
     ),
     h('form.card.card--plain', { onsubmit: onSubmit },
       h('label.field', h('span.field__label', 'Wie heißt der Urlaub?'),
-        h('input.field__input', { type: 'text', value: values.name, maxlength: 60, onchange: (e) => { values.name = e.target.value; } })),
+        h('input.field__input', { type: 'text', value: values.name, maxlength: 60, placeholder: 'Unser Urlaub', oninput: (e) => { values.name = e.target.value; } })),
       h('div.field__pair',
         h('label.field', h('span.field__label', 'Von'), startInput),
         h('label.field', h('span.field__label', 'Bis'), endInput),
       ),
       rangeNote,
-      h('div.field__pair',
-        h('label.field', h('span.field__label', 'Ihr beide'), nameInputs[0]),
-        h('label.field', h('span.field__label', ' '), nameInputs[1]),
+      h('div.field',
+        h('span.field__label', 'Ihr beide'),
+        h('div.field__pair', ...nameInputs),
       ),
       h('div.field', h('span.field__label', 'Wer sitzt an diesem Handy?'), meChips),
       error,
