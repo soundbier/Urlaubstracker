@@ -1,5 +1,5 @@
 /** Alle Ausgaben, nach Tagen gruppiert — die eigentliche Liste. */
-import { h } from '../dom.js';
+import { h, icon } from '../dom.js';
 import { computeBudget, groupByDay, todayISO, CATEGORY_BY_ID, CATEGORIES } from '../calc.js';
 import { money, dayLabel, plural } from '../format.js';
 import { expenseRow, emptyState, bar } from '../ui/parts.js';
@@ -21,7 +21,7 @@ export function renderExpenses(state, actions) {
   const shownTotal = shown.reduce((a, e) => a + e.amount, 0);
 
   const chips = h('div.chips.chips--scroll',
-    filterChip('all', 'Alles', '', actions),
+    filterChip('all', 'Alles', null, actions),
     ...usedCategories.map((c) => filterChip(c.id, c.short, c.icon, actions)),
   );
 
@@ -44,12 +44,12 @@ export function renderExpenses(state, actions) {
   );
 }
 
-function filterChip(id, label, iconText, actions) {
+function filterChip(id, label, iconName, actions) {
   return h('button.chip', {
     type: 'button',
     class: filter === id ? 'is-active' : '',
     onclick: () => { filter = id; actions.rerender(); },
-  }, iconText ? h('span.chip__icon', iconText) : null, label);
+  }, iconName ? icon(iconName, 16) : null, label);
 }
 
 /** Ein laufender Tag ist noch nicht „unter dem Schnitt“ — nur noch nicht drüber. */

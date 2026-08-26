@@ -138,7 +138,7 @@ function twoWaySplit(trip, save) {
 // --------------------------------------------------------------------- Sync
 
 function syncSection(state) {
-  const { sync, trip } = state;
+  const { sync } = state;
   const cloud = sync.mode === 'cloud';
   const invite = store.getInviteInfo();
 
@@ -155,7 +155,9 @@ function syncSection(state) {
               ? `${plural(sync.pending, 'Eintrag wartet', 'Einträge warten')} auf die Übertragung. Sie gehen nicht verloren.`
               : 'Eingaben werden gespeichert und übertragen, sobald wieder Netz da ist.',
           }
-    : { tone: 'muted', icon: 'cloudOff', title: 'Nur auf diesem Gerät', text: 'Deine Freundin sieht die Einträge noch nicht. Mit einem Firebase-Projekt teilt ihr euch denselben Trip.' };
+    : sync.error
+      ? { tone: 'over', icon: 'cloudOff', title: 'Nichts wird gespeichert', text: sync.error }
+      : { tone: 'muted', icon: 'cloudOff', title: 'Nur auf diesem Gerät', text: `${otherPersonName(state) || 'Das andere Handy'} sieht die Einträge noch nicht. Mit einem Firebase-Projekt teilt ihr euch denselben Trip.` };
 
   return h('section.section',
     sectionTitle('Gemeinsam nutzen'),
@@ -178,6 +180,12 @@ function syncSection(state) {
   );
 }
 
+/** Die andere Person im Trip — für Texte, die sonst raten müssten, wer das ist. */
+function otherPersonName({ trip, myPersonId }) {
+  const other = (trip.people || []).find((p) => p.id !== myPersonId);
+  return myPersonId && other ? other.name : '';
+}
+
 async function shareInvite(invite) {
   const url = buildInviteLink(invite);
   const text = `Unsere Urlaubskasse „${invite.tripName}“ — mit diesem Link kommst du rein:`;
@@ -195,7 +203,7 @@ async function shareInvite(invite) {
   } catch {
     openSheet({
       title: 'Einladungslink',
-      subtitle: 'Diesen Link an deine Freundin schicken.',
+      subtitle: 'Diesen Link an das andere Handy schicken.',
       build: () => h('div.stack', h('textarea.field__input.field__input--code', { readonly: true, rows: 5, value: url, onclick: (e) => e.target.select() })),
     });
   }

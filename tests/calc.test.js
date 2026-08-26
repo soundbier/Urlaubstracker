@@ -196,6 +196,48 @@ test('Abrechnung: wer zu wenig eingezahlt hat, überweist den Rest', () => {
   );
 });
 
+test('Abrechnung: ein überzogenes Konto meldet sich, statt „quitt“ zu sagen', () => {
+  // Vom gemeinsamen Konto wurde mehr bezahlt, als beide eingezahlt haben.
+  const s = settleUp({
+    trip: TRIP,
+    contributions: [{ id: 'c', personId: 'marie', amount: 120000, date: '2026-06-20' }],
+    expenses: [{ id: 'e', date: '2026-07-01', amount: 394500, category: 'stay', payer: POT }],
+  });
+
+  assert.equal(s.potBalance, -274500, 'das Konto steht im Minus');
+  assert.equal(s.rows[0].balance + s.rows[1].balance, s.potBalance, 'die Guthaben summieren sich weiterhin darauf');
+  assert.ok(s.rows.every((r) => r.balance < 0), 'hier ist niemand im Plus');
+
+  assert.equal(s.payouts.length, 0, 'von einem leeren Konto gibt es nichts zurück');
+  assert.equal(s.topUps.reduce((a, p) => a + p.amount, 0), 274500, 'das Loch wird vollständig gestopft');
+  assert.equal(s.leftInPot, 0);
+  // Hier deckt sich die Schuld beider genau mit dem Loch — danach ist nichts offen.
+  assert.equal(s.transfers.length, 0);
+});
+
+test('Abrechnung: überzogenes Konto und Privatauslagen zugleich', () => {
+  // Marie hat 300 € aus eigener Tasche gezahlt, Lukas nichts eingezahlt.
+  const s = settleUp({
+    trip: TRIP,
+    contributions: [{ id: 'c', personId: 'marie', amount: 10000, date: '2026-06-20' }],
+    expenses: [
+      { id: 'e1', date: '2026-07-01', amount: 40000, category: 'stay', payer: POT },
+      { id: 'e2', date: '2026-07-01', amount: 30000, category: 'food', payer: 'marie' },
+    ],
+  });
+
+  assert.equal(s.potBalance, -30000, '100 € drauf, 400 € runter');
+  const [marie, lukas] = s.rows;
+  assert.equal(marie.balance, 5000, 'Marie hat 400 € getragen bei 350 € Anteil');
+  assert.equal(lukas.balance, -35000);
+  assert.equal(marie.balance + lukas.balance, s.potBalance);
+
+  // Lukas stopft das Loch, der Rest geht direkt an Marie.
+  assert.deepEqual(s.topUps.map((p) => [p.name, p.amount]), [['Lukas', 30000]]);
+  assert.equal(s.leftInPot, 0);
+  assert.deepEqual(s.transfers.map((t) => [t.from, t.to, t.amount]), [['Lukas', 'Marie', 5000]]);
+});
+
 test('Abrechnung: ungleiche Quote wird berücksichtigt', () => {
   const trip = { ...TRIP, people: [{ id: 'marie', name: 'Marie', share: 2 }, { id: 'lukas', name: 'Lukas', share: 1 }] };
   const s = settleUp({ trip, contributions: CONTRIB, expenses: EXPENSES });

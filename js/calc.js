@@ -9,12 +9,13 @@
 
 export const CATEGORIES = [
   // `short` steht auf den Auswahl-Chips, `label` überall dort, wo Platz ist.
-  { id: 'food', label: 'Essen & Trinken', short: 'Essen', icon: '🍽️' },
-  { id: 'transport', label: 'Sprit & Transport', short: 'Sprit', icon: '⛽' },
-  { id: 'stay', label: 'Übernachtung', short: 'Schlafen', icon: '🏕️' },
-  { id: 'activity', label: 'Aktivitäten', short: 'Erleben', icon: '🎟️' },
-  { id: 'shopping', label: 'Einkaufen', short: 'Einkauf', icon: '🛍️' },
-  { id: 'other', label: 'Sonstiges', short: 'Sonstiges', icon: '✨' },
+  // `icon` ist ein Name aus dem Icon-Vorrat in `dom.js`.
+  { id: 'food', label: 'Essen & Trinken', short: 'Essen', icon: 'food' },
+  { id: 'transport', label: 'Sprit & Transport', short: 'Sprit', icon: 'transport' },
+  { id: 'stay', label: 'Übernachtung', short: 'Schlafen', icon: 'stay' },
+  { id: 'activity', label: 'Aktivitäten', short: 'Erleben', icon: 'activity' },
+  { id: 'shopping', label: 'Einkaufen', short: 'Einkauf', icon: 'shopping' },
+  { id: 'other', label: 'Sonstiges', short: 'Sonstiges', icon: 'other' },
 ];
 
 export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
@@ -289,6 +290,8 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
  * eigener Tasche bezahlt hat. Fair wäre ihr Anteil an den Gesamtausgaben
  * (Standard 50/50, über `person.share` änderbar). Die Differenz ist ihr
  * Guthaben — die Summe aller Guthaben ist genau das, was auf dem Konto liegt.
+ * Das gilt in beide Richtungen: steht das Konto im Minus, sind auch die
+ * Guthaben in der Summe negativ, und `topUps` sagt, wer wie viel nachlegt.
  */
 export function settleUp({ trip, contributions = [], expenses = [] }) {
   const people = trip.people || [];
@@ -314,17 +317,37 @@ export function settleUp({ trip, contributions = [], expenses = [] }) {
     };
   });
 
-  // Erst das Restgeld vom Konto an die Guthaben auszahlen …
   const payouts = [];
+  const topUps = [];
   let pot = potBalance;
   const owed = new Map(rows.map((r) => [r.personId, r.balance]));
-  for (const r of rows) {
-    if (pot <= 0) break;
-    const take = Math.min(pot, Math.max(0, owed.get(r.personId)));
-    if (take > 0) {
-      payouts.push({ personId: r.personId, name: r.name, amount: take });
-      owed.set(r.personId, owed.get(r.personId) - take);
-      pot -= take;
+
+  if (pot > 0) {
+    // Der Normalfall: es liegt noch Geld auf dem Konto. Das geht zuerst an die
+    // Guthaben zurück, bevor sich jemand privat etwas überweist.
+    for (const r of rows) {
+      if (pot <= 0) break;
+      const take = Math.min(pot, Math.max(0, owed.get(r.personId)));
+      if (take > 0) {
+        payouts.push({ personId: r.personId, name: r.name, amount: take });
+        owed.set(r.personId, owed.get(r.personId) - take);
+        pot -= take;
+      }
+    }
+  } else if (pot < 0) {
+    // Vom Konto ging mehr weg, als eingezahlt wurde — es steht im Minus. Das
+    // Loch stopfen die, die ohnehin zu wenig beigesteuert haben; erst danach
+    // bleibt überhaupt etwas übrig, das man sich untereinander überweisen kann.
+    let missing = -pot;
+    for (const r of rows) {
+      if (missing <= 0) break;
+      const give = Math.min(missing, Math.max(0, -owed.get(r.personId)));
+      if (give > 0) {
+        topUps.push({ personId: r.personId, name: r.name, amount: give });
+        owed.set(r.personId, owed.get(r.personId) + give);
+        missing -= give;
+        pot += give;
+      }
     }
   }
 
@@ -347,5 +370,5 @@ export function settleUp({ trip, contributions = [], expenses = [] }) {
     }
   }
 
-  return { rows, potBalance, totalSpent: spent, payouts, transfers, leftInPot: pot };
+  return { rows, potBalance, totalSpent: spent, payouts, topUps, transfers, leftInPot: pot };
 }

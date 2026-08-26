@@ -133,12 +133,12 @@ function header() {
     : b.phase === 'after' ? 'abgeschlossen'
     : `Tag ${number(b.elapsedDays)} von ${number(b.totalDays)}`;
 
-  const syncTone = sync.mode !== 'cloud' ? 'off' : sync.error ? 'error' : sync.connected ? 'on' : 'pending';
+  const syncTone = sync.error ? 'error' : sync.mode !== 'cloud' ? 'off' : sync.connected ? 'on' : 'pending';
   const syncTitle = {
     off: 'Nur auf diesem Gerät',
     on: 'Synchronisiert',
     pending: sync.online ? 'Verbindet …' : 'Offline — wird nachgereicht',
-    error: 'Synchronisierung stockt',
+    error: sync.mode === 'cloud' ? 'Synchronisierung stockt' : 'Wird nicht gespeichert',
   }[syncTone];
 
   return h('header.topbar',

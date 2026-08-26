@@ -28,6 +28,7 @@ export class LocalBackend {
     this.mode = 'local';
     this.data = load();
     this.onChange = null;
+    this.onStatus = null;
     this._onStorage = (e) => {
       // Zweiter Tab auf demselben Gerät hat geschrieben.
       if (e.key === KEY) {
@@ -39,6 +40,7 @@ export class LocalBackend {
 
   async start(onChange, onStatus) {
     this.onChange = onChange;
+    this.onStatus = onStatus;
     addEventListener('storage', this._onStorage);
     onStatus?.({ mode: 'local', connected: true, ready: true });
     this._emit();
@@ -47,6 +49,7 @@ export class LocalBackend {
   async stop() {
     removeEventListener('storage', this._onStorage);
     this.onChange = null;
+    this.onStatus = null;
   }
 
   _emit() {
@@ -56,9 +59,12 @@ export class LocalBackend {
   _persist() {
     try {
       localStorage.setItem(KEY, JSON.stringify(this.data));
-    } catch (err) {
-      // Speicher voll oder gesperrt: die Sitzung läuft weiter, aber wir sagen es.
-      this.onError?.(err);
+      this.onStatus?.({ error: null });
+    } catch {
+      // Speicher voll oder gesperrt (privates Fenster). Der Eintrag steht im
+      // Arbeitsspeicher und die Sitzung läuft weiter — beim nächsten Start
+      // wäre er aber weg, und genau das muss auf dem Schirm stehen.
+      this.onStatus?.({ error: 'Dieses Gerät speichert gerade nichts — Einträge sind nach einem Neustart weg. Am besten eine Sicherungskopie exportieren.' });
     }
     this._emit();
   }
@@ -99,11 +105,6 @@ export class LocalBackend {
   async removeExpense(id) { this._remove('expenses', id); }
   async putContribution(row) { this._put('contributions', row); }
   async removeContribution(id) { this._remove('contributions', id); }
-
-  /** Für den Umzug in die Cloud. */
-  snapshot() {
-    return JSON.parse(JSON.stringify(this.data));
-  }
 
   async replaceAll({ trip, contributions = [], expenses = [] }) {
     this.data = { trip, contributions, expenses };

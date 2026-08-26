@@ -6,6 +6,7 @@
  * Sicherheitsregeln), die Trip-Kennung und den Einladungscode. Er steht im
  * Fragment der URL — das schickt der Browser nie an einen Server.
  */
+import { CATEGORY_BY_ID, POT, isValidDate } from './calc.js';
 
 function toBase64Url(str) {
   const bytes = new TextEncoder().encode(str);
@@ -59,15 +60,50 @@ export function buildExport({ trip, contributions, expenses }) {
   );
 }
 
+/**
+ * Liest eine Sicherungskopie und prüft dabei, was die App danach voraussetzt:
+ * ein gültiger Zeitraum und mindestens eine Person. Eine halbe Datei durchzulassen
+ * hieße, den bestehenden Trip gegen einen zu tauschen, an dem die App beim
+ * nächsten Aufbau abbricht — und der alte Stand ist dann schon überschrieben.
+ */
 export function parseImport(text) {
   const data = JSON.parse(text);
-  if (data?.format !== 'urlaubstracker' || !data.trip) {
+  if (data?.format !== 'urlaubstracker' || !data.trip || typeof data.trip !== 'object') {
     throw new Error('Das ist keine Sicherungskopie des Urlaubstrackers.');
   }
+
+  const t = data.trip;
+  if (!isValidDate(t.startDate) || !isValidDate(t.endDate) || t.endDate < t.startDate) {
+    throw new Error('Der Zeitraum in der Datei fehlt oder ergibt keinen Sinn.');
+  }
+
+  const people = (Array.isArray(t.people) ? t.people : [])
+    .filter((p) => p && typeof p.id === 'string' && p.id)
+    .map((p, i) => ({ ...p, name: String(p.name || '').trim() || `Person ${i + 1}` }));
+  if (!people.length) throw new Error('In der Datei steht keine einzige Person.');
+
+  const knownPerson = new Set(people.map((p) => p.id));
+  // Beträge sind ganzzahlige Cent; alles andere würde sich durch die ganze
+  // Rechnung ziehen und dort als NaN wieder auftauchen.
+  const usableAmount = (v) => Number.isInteger(v) && v !== 0;
+  const rows = (list, extra) =>
+    (Array.isArray(list) ? list : []).filter((r) => r && typeof r.id === 'string' && usableAmount(r.amount) && isValidDate(r.date) && extra(r));
+
   return {
-    trip: data.trip,
-    contributions: Array.isArray(data.contributions) ? data.contributions : [],
-    expenses: Array.isArray(data.expenses) ? data.expenses : [],
+    trip: {
+      ...t,
+      name: String(t.name || '').trim() || 'Unser Urlaub',
+      currency: typeof t.currency === 'string' && t.currency ? t.currency : 'EUR',
+      budgetMode: t.budgetMode === 'fixed' ? 'fixed' : 'dynamic',
+      people,
+    },
+    // Einzahlungen ohne bekannte Person würden in der Abrechnung Geld erfinden.
+    contributions: rows(data.contributions, (c) => knownPerson.has(c.personId)),
+    expenses: rows(data.expenses, () => true).map((e) => ({
+      ...e,
+      category: CATEGORY_BY_ID[e.category] ? e.category : 'other',
+      payer: e.payer === POT || knownPerson.has(e.payer) ? e.payer : POT,
+    })),
   };
 }
 
@@ -75,15 +111,18 @@ export function parseImport(text) {
 export function buildCsv({ trip, expenses, contributions }) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const money = (cents) => (cents / 100).toFixed(2).replace('.', ',');
-  const personName = (id) => trip.people.find((p) => p.id === id)?.name || id;
+  const personName = (id) => trip.people.find((p) => p.id === id)?.name || 'Unbekannt';
+  // In der Tabelle stehen die Namen, die auch in der App stehen — nicht die
+  // internen Kennungen wie `food` oder `pot`.
+  const categoryLabel = (id) => (CATEGORY_BY_ID[id] || CATEGORY_BY_ID.other).label;
   const lines = [['Art', 'Datum', 'Betrag', 'Kategorie', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
 
   for (const c of [...contributions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     lines.push(['Einzahlung', c.date, money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const e of [...expenses].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    const payer = e.payer === 'pot' ? 'Gemeinsame Kasse' : personName(e.payer);
-    lines.push(['Ausgabe', e.date, money(e.amount), e.category, payer, e.note].map(esc).join(';'));
+    const payer = e.payer === POT ? 'Gemeinsame Kasse' : personName(e.payer);
+    lines.push(['Ausgabe', e.date, money(e.amount), categoryLabel(e.category), payer, e.note].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';
