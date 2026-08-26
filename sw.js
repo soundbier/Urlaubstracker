@@ -1,14 +1,21 @@
 /**
- * Service Worker: hält die App offline lauffähig.
+ * Service Worker: hält die App offline lauffähig und steuert Updates.
  *
- * Alles, was zur App gehört, liegt nach dem ersten Besuch im Cache. Anfragen
- * an Firestore laufen bewusst daran vorbei — dessen eigene Offline-Schicht
- * kümmert sich darum, und ein Cache dazwischen würde nur alte Stände liefern.
+ * Eine Fassung ist ein geschlossenes Paket: alles, was zur App gehört, liegt
+ * unter `APP_VERSION` im Cache und wird von dort ausgeliefert — nichts wird im
+ * Hintergrund einzeln ausgetauscht. Dadurch läuft nie halb die alte und halb
+ * die neue Fassung, und die Versionsnummer in den Einstellungen stimmt.
  *
- * Beim Ändern von Dateien: CACHE_VERSION hochzählen.
+ * Ein Update kommt deshalb nur über eine neue `APP_VERSION` zustande: der
+ * Browser bemerkt die geänderte Datei, lädt das Paket vollständig in einen
+ * neuen Cache und wartet dann. Übernommen wird es erst, wenn die App
+ * `SKIP_WAITING` schickt — also wenn jemand im Dialog zugestimmt hat.
+ *
+ * Beim Veröffentlichen: APP_VERSION hochzählen (und `data-version` in
+ * index.html mitziehen, `npm test` prüft das).
  */
-const CACHE_VERSION = 'v2';
-const CACHE = `urlaubstracker-${CACHE_VERSION}`;
+const APP_VERSION = '1.1.0';
+const CACHE = `urlaubstracker-${APP_VERSION}`;
 
 const SHELL = [
   './',
@@ -42,14 +49,11 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(CACHE);
-      // Einzeln, damit eine fehlende Datei nicht die ganze Installation kippt.
-      await Promise.all(SHELL.map((url) => cache.add(url).catch(() => {})));
-      await self.skipWaiting();
-    })(),
-  );
+  // `addAll` bricht ab, sobald eine Datei fehlt. Genau so soll es sein: eine
+  // unvollständige Fassung darf gar nicht erst als Update angeboten werden —
+  // dann bleibt die alte, funktionierende in Betrieb.
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  // Kein skipWaiting(): der neue Worker wartet, bis jemand zugestimmt hat.
 });
 
 self.addEventListener('activate', (event) => {
@@ -62,6 +66,17 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (data?.type === 'SKIP_WAITING') {
+    // Der Nutzer hat im Dialog zugestimmt.
+    self.skipWaiting();
+  } else if (data?.type === 'VERSION') {
+    // Die Seite fragt einen bestimmten Worker, welche Fassung er mitbringt.
+    event.ports?.[0]?.postMessage(APP_VERSION);
+  }
+});
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -69,32 +84,22 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // Firestore & Co. selbst regeln lassen
 
-  // Seitenaufrufe: immer die App-Hülle ausliefern, damit auch #/budget offline geht.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      (async () => {
-        try {
-          return await fetch(request);
-        } catch {
-          return (await caches.match('./index.html')) || (await caches.match('./')) || Response.error();
-        }
-      })(),
-    );
-    return;
-  }
-
-  // Alles andere aus dem Cache, im Hintergrund auffrischen.
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      const cached = await cache.match(request);
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok && response.type === 'basic') cache.put(request, response.clone());
-          return response;
-        })
-        .catch(() => null);
-      return cached || (await network) || Response.error();
+
+      // Seitenaufrufe landen immer auf der App-Hülle, damit auch #/budget geht.
+      const cached = await cache.match(request.mode === 'navigate' ? './index.html' : request);
+      if (cached) return cached;
+
+      // Nicht im Paket (neue Datei, fremder Pfad): direkt aus dem Netz.
+      try {
+        const response = await fetch(request);
+        if (response.ok && response.type === 'basic') cache.put(request, response.clone());
+        return response;
+      } catch {
+        return Response.error();
+      }
     })(),
   );
 });
