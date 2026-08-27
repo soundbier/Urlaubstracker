@@ -4,6 +4,18 @@ import { openSheet } from './sheet.js';
 import { CATEGORIES, POT, parseAmount, todayISO, addDays } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
+/**
+ * Der zuletzt gewählte Zahler — nur für diese Sitzung, bewusst nicht in den
+ * Einstellungen.
+ *
+ * Wer am Markt drei Sachen hintereinander aus der eigenen Tasche zahlt, soll
+ * das nicht dreimal umstellen müssen. Über einen App-Neustart hinaus darf sich
+ * das aber nicht merken: ein stehengebliebenes „Anna“ vom Vortag würde die
+ * Endabrechnung still verfälschen, ohne dass jemand es bemerkt. Deshalb steht
+ * die Wahl auch immer in der Zusammenfassung der Detailzeile.
+ */
+let lastPayer = POT;
+
 /** `1050` → `"10,50"`, `1000` → `"10"`, `0` → `""` — so, wie man es eintippen würde. */
 function centsToRaw(cents) {
   if (!cents) return '';
@@ -68,6 +80,30 @@ function amountField(initialCents, currency) {
   };
 }
 
+/**
+ * Die sechs Kategorien als festes 3×2-Raster.
+ *
+ * Als frei umbrechende Chips ergaben sie drei ungleich lange Reihen: viel
+ * Platz für wenig Inhalt, und die Zeilen sprangen je nach Wortlänge. Gleich
+ * breite Felder sind ruhiger, immer an derselben Stelle — man trifft „Essen“
+ * irgendwann ohne hinzusehen — und sparen die Höhe, die es braucht, damit die
+ * Detailzeile darunter noch anstupst.
+ */
+function categoryGrid(selectedId, onSelect) {
+  const grid = h('div.catgrid');
+  const buttons = CATEGORIES.map((c) => {
+    const b = h('button.chip.catgrid__item', { type: 'button', dataset: { id: c.id }, onclick: () => {
+      selectedId = c.id;
+      buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
+      onSelect(c.id);
+    } }, icon(c.icon, 16), c.short);
+    b.classList.toggle('is-active', c.id === selectedId);
+    return b;
+  });
+  grid.append(...buttons);
+  return grid;
+}
+
 function chipRow(options, selectedId, onSelect) {
   const row = h('div.chips');
   const buttons = options.map((o) => {
@@ -117,7 +153,12 @@ function dateRow(value, onChange, { withTomorrow = false } = {}) {
 
   return {
     el: h('div.daterow',
-      h('div.chips', ...chips, h('label.chip.chip--date', icon('calendar', 17), 'Datum', input)),
+      // Feste Spalten statt umbrechender Chips: sonst rutschte die Datumswahl
+      // auf eine eigene Zeile und schob alles darunter aus dem Bild. Sie steht
+      // hier nur als Kalendersymbol — das Wort „Datum“ passte daneben in keiner
+      // Handybreite und wurde überall abgeschnitten.
+      h('div.daterow__quick', ...chips,
+        h('label.chip.chip--date', { title: 'Anderes Datum', 'aria-label': 'Anderes Datum' }, icon('calendar', 18), input)),
       label,
     ),
     set,
@@ -129,32 +170,63 @@ function field(labelText, control) {
 }
 
 /**
+ * Aufklappbare Zeile für alles, was man selten anfasst.
+ *
+ * Die Zusammenfassung rechts ist der Preis dafür, dass hier etwas versteckt
+ * wird: was drinsteht, muss auch zugeklappt ablesbar sein — sonst trägt man
+ * eine Ausgabe auf den falschen Namen ein und merkt es erst bei der
+ * Abrechnung. `<details>` statt eigener Knopflogik, damit Tastatur und
+ * Screenreader ohne Zutun funktionieren.
+ */
+function disclosure(title, summaryEl, ...body) {
+  return h('details.disclosure',
+    h('summary.disclosure__head',
+      h('span.disclosure__title', title),
+      summaryEl,
+      icon('chevron', 18),
+    ),
+    h('div.disclosure__body', ...body),
+  );
+}
+
+/**
  * Ausgabe anlegen oder bearbeiten.
  * Gibt `{ action: 'save', values }`, `{ action: 'delete' }` oder `undefined` zurück.
+ *
+ * Die Reihenfolge folgt der Häufigkeit, nicht der Datenstruktur: Betrag,
+ * Kategorie, Datum stehen offen da, alles Übrige liegt hinter „Details“. Damit
+ * passt der Normalfall auf einen Handyschirm — vorher lag der Speichern-Knopf
+ * gut 350 px unterhalb des Randes, und das für den einen Handgriff, den man
+ * mehrmals am Tag macht.
  *
  * Eine Ausgabe kann „schon bezahlt“ oder „verplant“ sein. Verplant heißt: das
  * Geld ist fest eingeplant, aber noch nicht weg — es wird vom Tagesbudget
  * abgezogen, taucht aber weder in der Tagesausgabe noch in der Abrechnung auf.
  * Wer ein Datum in der Zukunft wählt, meint fast immer genau das; deshalb
  * springt die Umschaltung von allein um, solange man sie nicht selbst angefasst
- * hat.
+ * hat — und die Detailzeile klappt dabei auf, damit die Umschaltung nicht
+ * ungesehen passiert.
  */
 export function expenseSheet({ trip, expense = null, defaults = {} }) {
   const editing = Boolean(expense);
   const today = todayISO();
   let category = expense?.category || defaults.category || 'food';
   let date = expense?.date || defaults.date || todayISO();
-  let payer = expense?.payer || defaults.payer || POT;
+  // Beim Bearbeiten zählt, was am Eintrag steht; nur beim Neuanlegen springt
+  // der zuletzt gewählte Zahler ein.
+  let payer = expense?.payer || defaults.payer || (editing ? POT : lastPayer);
   let planned = expense ? expense.planned === true : defaults.planned === true || date > today;
   let plannedTouched = editing || defaults.planned !== undefined;
   const amount = amountField(expense?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: expense?.note || '', placeholder: 'z. B. Abendessen am Hafen', maxlength: 120, enterkeyhint: 'done' });
 
   const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' }))];
+  const payerName = (id) => payers.find((p) => p.id === id)?.label || 'Kasse';
 
   return openSheet({
     title: editing ? 'Eintrag bearbeiten' : 'Was kostet euch das?',
     fullHeight: true,
+    bodyClass: 'sheet__body--entry',
     build: (close) => {
       const save = () => {
         const cents = amount.getCents();
@@ -163,6 +235,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
           amount.focusHint.classList.add('is-error');
           return;
         }
+        if (!editing) lastPayer = payer;
         close({
           action: 'save',
           values: {
@@ -178,11 +251,15 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
       const dateLabel = h('span.field__label');
       const payerLabelEl = h('span.field__label');
       const kindNote = h('p.field__note');
+      const detailSummary = h('span.disclosure__summary');
       const when = dateRow(date, (iso) => {
         date = iso;
         // Ein künftiges Datum meint eine Vormerkung — außer man hat die
         // Umschaltung schon selbst bedient.
-        if (!plannedTouched && iso > today !== planned) setPlanned(iso > today);
+        if (!plannedTouched && iso > today !== planned) {
+          setPlanned(iso > today);
+          details.open = true;
+        }
         syncKind();
       }, { withTomorrow: true });
 
@@ -190,6 +267,16 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         h('button.segmented__btn', { type: 'button', onclick: () => { plannedTouched = true; setPlanned(false); } }, 'Schon bezahlt'),
         h('button.segmented__btn', { type: 'button', onclick: () => { plannedTouched = true; setPlanned(true); } }, 'Verplant'),
       ];
+
+      const details = disclosure('Details', detailSummary,
+        h('div.field',
+          h('span.field__label', 'Status'),
+          h('div.segmented', ...kindButtons),
+          kindNote,
+        ),
+        h('label.field', payerLabelEl, chipRow(payers, payer, (id) => { payer = id; syncKind(); })),
+        field('Notiz', note),
+      );
 
       function setPlanned(next) {
         planned = next;
@@ -207,21 +294,21 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         kindNote.textContent = planned
           ? 'Wird vom verfügbaren Geld abgezogen, zählt aber erst als Ausgabe, wenn ihr sie als bezahlt eintragt.'
           : 'Ist bezahlt und zählt sofort zu den Ausgaben.';
+        // Zugeklappt muss ablesbar bleiben, was drinsteht.
+        detailSummary.textContent = planned ? `verplant · ${payerName(payer)}` : payerName(payer);
         submit.replaceChildren(icon('check', 20), editing ? 'Speichern' : planned ? 'Vormerken' : 'Eintragen');
       }
       syncKind();
 
+      // Aufgeklappt startet die Zeile nur, wenn dort etwas steht, das jemanden
+      // überraschen könnte — ein gemerkter Zahler, eine Vormerkung, eine Notiz.
+      details.open = planned || payer !== POT || Boolean(note.value);
+
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
-        h('div.field',
-          h('span.field__label', 'Status'),
-          h('div.segmented', ...kindButtons),
-          kindNote,
-        ),
-        field('Wofür?', chipRow(CATEGORIES.map((c) => ({ id: c.id, label: c.short, icon: c.icon })), category, (id) => { category = id; })),
+        field('Wofür?', categoryGrid(category, (id) => { category = id; })),
         h('label.field', dateLabel, when.el),
-        h('label.field', payerLabelEl, chipRow(payers, payer, (id) => { payer = id; })),
-        field('Notiz', note),
+        details,
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
           submit,
@@ -243,6 +330,7 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
     title: editing ? 'Einzahlung bearbeiten' : 'Geld eingezahlt',
     subtitle: 'Was ist auf das gemeinsame Urlaubskonto gegangen?',
     fullHeight: true,
+    bodyClass: 'sheet__body--entry',
     build: (close) => {
       const save = () => {
         const cents = amount.getCents();

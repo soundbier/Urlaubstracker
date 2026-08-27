@@ -23,9 +23,14 @@ Läuft offline, auf beiden Handys, ohne Abo.
 Weitere Kleinigkeiten:
 
 - **Eigene Zahlentastatur** — große Tasten, eine Komma-Taste, keine Systemtastatur,
-  die das halbe Sheet verdeckt.
+  die das halbe Sheet verdeckt. Betrag, Kategorie, Tag und der Speichern-Knopf
+  passen zusammen auf einen Handyschirm; alles Seltenere liegt unter *Details*.
+- **Rückgängig** — nach jedem Eintrag steht kurz ein „Rückgängig“ daneben. Ein
+  Vertipper kostet damit einen Tipp statt vier.
 - **Bezahlt von** — aus der gemeinsamen Kasse oder aus eigener Tasche. Beides
-  zählt in der Endabrechnung richtig.
+  zählt in der Endabrechnung richtig. Wer mehrmals hintereinander privat zahlt,
+  stellt das nur einmal um: die Wahl bleibt bis zum nächsten App-Start stehen
+  und steht immer sichtbar in der Detailzeile.
 - **Verplant** — Ausgaben, die feststehen, aber noch nicht bezahlt sind (Hotel,
   Mietwagen, Bootstour). Sie werden vom Tagesbudget abgezogen, bevor geteilt
   wird. Ein Tipp auf den Haken macht daraus eine bezahlte Ausgabe.
@@ -94,7 +99,9 @@ Zeitraum, eure Namen). Sie läuft dann erst mal nur auf diesem Gerät.
   Installationshinweis, der von selbst auftaucht).
 - **iPhone/Safari:** Teilen-Symbol → *Zum Home-Bildschirm*.
 
-Danach startet sie wie eine normale App, im Vollbild und ohne Adresszeile.
+Danach startet sie wie eine normale App, im Vollbild und ohne Adresszeile. Ein
+langer Druck auf das Symbol bietet *Ausgabe eintragen* an — das öffnet direkt
+die Zahlentastatur.
 
 ---
 

@@ -77,18 +77,25 @@ function dayGroup(group, trip, budget, today, actions) {
   // Teil des Tagesbudgets und würde den Tag sonst haltlos rot färben.
   const everydayTotal = everydayOnly(group.items).reduce((a, e) => a + e.amount, 0);
   // Vergleichsmaßstab ist das Plan-Tagesbudget: dieselbe Linie an jedem Tag.
-  const ratio = budget.planPerDay > 0 ? everydayTotal / budget.planPerDay : 0;
+  // Nur eben nicht an Tagen, die gar nicht zum Urlaub gehören — die Anzahlung
+  // zwei Tage vor der Abfahrt liegt nicht „unter dem Schnitt“, sie hat gar
+  // keinen Schnitt, gegen den sie liegen könnte.
+  const inTrip = group.date >= trip.startDate && group.date <= trip.endDate;
+  const compare = inTrip && budget.planPerDay > 0;
+  const ratio = compare ? everydayTotal / budget.planPerDay : 0;
   const tone = ratio > 1 ? 'over' : ratio > 0.85 ? 'warn' : 'good';
 
   return h('section.daygroup',
     h('header.daygroup__head',
       h('div',
         h('h3.daygroup__title', dayLabel(group.date, today)),
-        budget.planPerDay > 0 ? h('p.daygroup__sub', dayNote(everydayTotal, budget, group.date, today, cur)) : null,
+        compare
+          ? h('p.daygroup__sub', dayNote(everydayTotal, budget, group.date, today, cur))
+          : inTrip ? null : h('p.daygroup__sub', 'außerhalb des Urlaubs'),
       ),
       h('p.daygroup__total', money(group.total, cur)),
     ),
-    budget.planPerDay > 0 ? bar(ratio, tone) : null,
+    compare ? bar(ratio, tone) : null,
     h('div.list', ...group.items.map((e) => expenseRow(e, trip, actions.editExpense))),
   );
 }

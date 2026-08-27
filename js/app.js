@@ -2,7 +2,7 @@
 import { h, icon, replace, $ } from './dom.js';
 import * as store from './store.js';
 import { computeBudget, todayISO } from './calc.js';
-import { number, days } from './format.js';
+import { money, number, days } from './format.js';
 import { toast, confirmSheet } from './ui/sheet.js';
 import { expenseSheet, contributionSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
@@ -33,9 +33,46 @@ function goto(tab) {
   location.hash = `#/${tab}`;
 }
 
-addEventListener('hashchange', () => render());
+/**
+ * `#/neu` ist keine Ansicht, sondern ein Auftrag: „Ausgabe eintragen“.
+ *
+ * Daran hängt die App-Verknüpfung aus dem Manifest. Bisher führte sie nur auf
+ * „Heute“ — man musste den Knopf trotzdem noch suchen. Die Adresse wird sofort
+ * wieder auf `#/heute` gesetzt: damit ist der Auftrag verbraucht, der
+ * Zurück-Knopf bleibt sauber, und ein erneuter Tipp auf die Verknüpfung wirkt
+ * wieder.
+ */
+function consumeQuickAdd() {
+  if (!/^#\/neu(?:$|[/?&])/.test(location.hash)) return;
+  // Beim Kaltstart ist der Trip noch nicht da — dann gleich noch einmal.
+  if (state.phase === 'loading') return;
+  history.replaceState(null, '', `${location.pathname}${location.search}#/heute`);
+  if (state.phase === 'ready' && state.trip) actions.addExpense();
+}
+
+addEventListener('hashchange', () => { render(); consumeQuickAdd(); });
 
 // ------------------------------------------------------------------ Aktionen
+
+/**
+ * Rückmeldung mit einem Weg zurück.
+ *
+ * Ohne sie war ein Vertipper teuer: Zeile suchen, öffnen, löschen, bestätigen —
+ * vier Schritte für etwas, das gerade eben passiert ist. Und ganz ohne
+ * Rückmeldung bleibt offen, ob überhaupt etwas angekommen ist; zu zweit trägt
+ * dann schnell jemand dieselbe Runde ein zweites Mal ein.
+ */
+function undoable(message, undo) {
+  toast(message, {
+    type: 'success',
+    action: {
+      label: 'Rückgängig',
+      onClick: () => {
+        Promise.resolve(undo()).catch((err) => toast(err?.message || 'Ging nicht.', { type: 'error' }));
+      },
+    },
+  });
+}
 
 const actions = {
   goto,
@@ -49,8 +86,12 @@ const actions = {
     const result = await expenseSheet({ trip: state.trip, defaults });
     if (result?.action !== 'save') return;
     try {
-      await store.addExpense(result.values);
+      const row = await store.addExpense(result.values);
       if (currentTab() === 'mehr') goto('heute');
+      undoable(
+        `${money(row.amount, state.trip.currency)} ${row.planned ? 'vorgemerkt' : 'eingetragen'}`,
+        () => store.deleteExpense(row.id),
+      );
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
@@ -58,9 +99,12 @@ const actions = {
 
   /** Aus einer Vormerkung wird eine bezahlte Ausgabe — ein Tipp auf den Haken. */
   async markExpensePaid(expense) {
+    // Der Haken sitzt direkt neben der Zeile und ist schnell mal daneben
+    // getippt. Was `markExpensePaid` ändert, wird hier vorher festgehalten.
+    const before = { planned: true, fromPlan: false, date: expense.date };
     try {
       await store.markExpensePaid(expense.id);
-      toast('Als bezahlt eingetragen.');
+      undoable('Als bezahlt eingetragen.', () => store.updateExpense(expense.id, before));
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
@@ -85,7 +129,8 @@ const actions = {
     const result = await contributionSheet({ trip: state.trip, defaults });
     if (result?.action !== 'save') return;
     try {
-      await store.addContribution(result.values);
+      const row = await store.addContribution(result.values);
+      undoable(`${money(row.amount, state.trip.currency)} eingezahlt`, () => store.deleteContribution(row.id));
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
@@ -196,6 +241,7 @@ store.subscribe((next) => {
   state = next;
   render();
   if (cameFromOnboarding && currentTab() !== 'heute') goto('heute');
+  consumeQuickAdd();
 });
 
 store.init().catch((err) => {

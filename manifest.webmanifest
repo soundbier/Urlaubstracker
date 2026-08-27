@@ -10,7 +10,7 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#f4f6f8",
-  "theme_color": "#0f766e",
+  "theme_color": "#f4f6f8",
   "categories": ["finance", "travel", "productivity"],
   "icons": [
     { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
@@ -18,7 +18,7 @@
     { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Ausgabe eintragen", "short_name": "Ausgabe", "url": "./#/heute" },
+    { "name": "Ausgabe eintragen", "short_name": "Ausgabe", "url": "./#/neu" },
     { "name": "Budget ansehen", "short_name": "Budget", "url": "./#/budget" }
   ]
 }

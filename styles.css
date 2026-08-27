@@ -317,7 +317,18 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 }
 .row__icon--person { color: #06202b; font-weight: 700; font-size: 0.95rem; }
 .row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.row__title { font-size: 0.95rem; font-weight: 560; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Zwei Zeilen statt einer Ellipse: „Ferienwohnung Anz…“ und „Mietwagen Rest…“
+   waren auf einem 390-px-Schirm nicht mehr auseinanderzuhalten. */
+.row__title {
+  font-size: 0.95rem;
+  font-weight: 560;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+}
 .row__sub { font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
 .row__amount { font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .row__amount--in { color: var(--in); }
@@ -486,7 +497,12 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .field__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .field__input--code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; line-height: 1.5; resize: vertical; }
 select.field__input { background-image: none; }
+/* `min-width: 0` ist Pflicht: Rasterzellen sind sonst mindestens so breit wie
+   ihr Inhalt, und `input[type=date]` bringt eine feste Mindestbreite mit —
+   damit stand die Seite 29 px über dem Rand und ließ sich seitwärts schieben. */
 .field__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field__pair > * { min-width: 0; }
+.field__pair .field__input { min-width: 0; }
 .field__note { font-size: 0.76rem; color: var(--text-muted); }
 .field__error { font-size: 0.83rem; color: var(--over); min-height: 1.1em; }
 
@@ -559,6 +575,21 @@ select.field__input { background-image: none; }
 }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* Kategorien im Eingabe-Sheet: gleich breite Felder, feste Plätze. */
+.catgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+/* Doppelt benannt, weil `.chip` weiter unten steht: bei gleicher Spezifität
+   gewinnt sonst die spätere Regel und das Raster bekäme die Chip-Maße. */
+/* 44 px, nicht die 39, die aus der kleineren Schrift fielen: das hier wird
+   im Gehen, einhändig und mit dem Daumen getroffen. */
+.chip.catgrid__item { justify-content: center; gap: 5px; min-width: 0; min-height: 44px; padding-inline: 5px; font-size: 0.82rem; }
+.chip.catgrid__item .icon { margin-left: 0; }
+/* Auf sehr schmalen Geräten passt „Sonstiges“ mit Icon sonst nicht in die
+   Zelle und wird abgeschnitten. */
+@media (max-width: 359px) {
+  .chip.catgrid__item { font-size: 0.75rem; gap: 4px; }
+  .chip.catgrid__item .icon { width: 14px; height: 14px; }
+}
 .chips--scroll {
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -590,6 +621,8 @@ select.field__input { background-image: none; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 
 .daterow { display: flex; flex-direction: column; gap: 6px; }
+.daterow__quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 48px; gap: 8px; }
+.daterow__quick > .chip { justify-content: center; min-width: 0; min-height: 44px; padding-inline: 6px; }
 .daterow__label { font-size: 0.76rem; color: var(--text-muted); }
 
 /* ------------------------------------------------------------ Zahlenfeld */
@@ -609,7 +642,7 @@ select.field__input { background-image: none; }
 
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
 .key {
-  padding: 12px 0;
+  padding: 10px 0;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface-2);
@@ -659,8 +692,76 @@ select.field__input { background-image: none; }
 .sheet__body { overflow-y: auto; padding: 10px 18px 20px; -webkit-overflow-scrolling: touch; }
 
 .entry { display: flex; flex-direction: column; gap: 18px; }
-.entry__actions { display: flex; gap: 10px; align-items: center; padding-top: 4px; }
+
+/* Der Speichern-Knopf bleibt stehen.
+   Vorher lag er bei einer neuen Ausgabe rund 350 px unterhalb des Randes: für
+   den häufigsten Handgriff der App musste man erst scrollen. Das eigene
+   Polster wandert dafür von der Sheet-Fläche in die Leiste, damit sie unten
+   bündig klebt statt über einem Streifen Luft zu schweben. */
+.sheet__body--entry { padding-bottom: 0; }
+.entry__actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0 18px;
+  background: var(--bg);
+}
+/* Weicher Übergang nach oben, damit Inhalt nicht an einer Kante abgeschnitten
+   wirkt, wenn er darunter durchscrollt. */
+.entry__actions::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 100%;
+  height: 20px;
+  background: linear-gradient(to top, var(--bg), transparent);
+  pointer-events: none;
+}
 .entry__actions .btn--wide { flex: 1; }
+
+/* --------------------------------------------------------- Detailzeile */
+
+.disclosure {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.disclosure__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: var(--radius-sm);
+}
+.disclosure__head::-webkit-details-marker { display: none; }
+.disclosure__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.disclosure__title { font-size: 0.88rem; font-weight: 600; }
+/* Was zugeklappt drinsteht, muss man trotzdem sehen können — sonst trägt man
+   still auf den falschen Namen ein. */
+.disclosure__summary {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.disclosure__head .icon { color: var(--text-faint); transition: transform 0.18s ease; }
+.disclosure[open] > .disclosure__head .icon { transform: rotate(180deg); }
+.disclosure__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 14px 16px;
+  border-top: 1px solid var(--border);
+  margin-top: -1px;
+}
 
 .confirm { display: flex; flex-direction: column; gap: 18px; }
 .confirm__text { font-size: 0.92rem; color: var(--text-muted); }
@@ -702,7 +803,11 @@ select.field__input { background-image: none; }
   bottom: calc(var(--nav-h) + var(--safe-b) + 84px);
   transform: translate(-50%, 12px);
   z-index: 80;
+  width: max-content;
   max-width: min(420px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 12px 18px;
   border-radius: 999px;
   background: #101828;
@@ -715,8 +820,25 @@ select.field__input { background-image: none; }
   transition: opacity 0.2s, transform 0.2s;
 }
 .toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+.toast__text { min-width: 0; flex: 1; }
+/* Der Toast selbst fängt keine Tipps ab — der Knopf darin schon. */
+.toast__action {
+  pointer-events: auto;
+  flex: none;
+  margin: -6px -8px -6px 4px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.toast__action:active { opacity: 0.7; }
 .toast--error { background: var(--over); color: #fff; }
-.toast--success { background: var(--good); color: #04201d; }
+.toast--success { background: var(--good); color: #fff; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
