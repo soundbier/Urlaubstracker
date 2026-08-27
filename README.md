@@ -225,6 +225,16 @@ vollständig in einen eigenen Cache und liefert ausschließlich von dort. Damit
 läuft nie halb die alte und halb die neue App, und die Nummer unter *Mehr →
 Über* stimmt mit dem, was tatsächlich läuft.
 
+> **Vorsicht bei Weiterleitungen.** Firebase Hosting normalisiert
+> `/index.html` auf `/` und schickt dafür eine 301. Eine Antwort, die über eine
+> Weiterleitung kam, darf ein Service Worker für Seitenaufrufe nicht
+> ausliefern — der Browser bricht sonst mit *„Response served by service worker
+> has redirections"* ab, und die App startet gar nicht mehr. `sw.js` legt
+> solche Antworten deshalb nur als bereinigte Kopie ab. Ein Gerät, auf dem noch
+> eine kaputte Fassung liegt, repariert sich beim übernächsten Start von
+> selbst: die neue Fassung erkennt den beschädigten Cache und übernimmt sofort,
+> statt auf eine Zustimmung zu warten, die niemand mehr geben könnte.
+
 Ohne Versionssprung ändert sich für die Nutzer nichts — auch dann nicht, wenn
 die Dateien auf dem Server längst neu sind. Das ist Absicht: so entscheidet die
 Versionsnummer, was ausgeliefert wird, und nicht der Zufall des Caches.
