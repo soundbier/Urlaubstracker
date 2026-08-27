@@ -152,7 +152,8 @@ export function bar(ratio, tone = 'good') {
 
 export function bufferLabel(buffer, currency) {
   if (buffer === 0) return 'genau im Plan';
-  // Der Betrag steht ohne Vorzeichen da — „− 40 € drüber“ liest sich, als
-  // wären es 40 € zu wenig drüber.
-  return `${money(Math.abs(buffer), currency)} ${buffer > 0 ? 'gespart' : 'drüber'}`;
+  // Der Betrag steht ohne Vorzeichen da — „− 40 € über dem Plan“ liest sich,
+  // als wären es 40 € zu wenig drüber. Dieselben Worte wie auf der
+  // Polster-Kachel, damit nicht zwei Formulierungen dieselbe Zahl beschreiben.
+  return `${money(Math.abs(buffer), currency)} ${buffer > 0 ? 'unter' : 'über'} dem Plan`;
 }

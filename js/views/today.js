@@ -16,7 +16,10 @@ export function renderToday(state, actions) {
   const b = computeBudget({ trip, contributions, expenses, today });
   const cur = trip.currency;
   const todays = expenses.filter((e) => e.date === today && !e.planned);
-  const planned = plannedOnly(expenses);
+  // Fällig heißt: das Datum ist erreicht, der Haken fehlt noch. Alles, was
+  // erst nächste Woche dran ist, steht unter „Ausgaben“ — hier wäre es eine
+  // zweite Kopie derselben Liste und nichts, was heute jemand anfassen müsste.
+  const due = plannedOnly(expenses).filter((e) => e.date <= today);
   const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
 
   return h('div.view',
@@ -30,7 +33,11 @@ export function renderToday(state, actions) {
       // Kachel lieber, wofür es weg ist.
       b.phase === 'after'
         ? tile('Ausgegeben', money(b.spent, cur), `über ${days(b.totalDays)}`)
-        : tile('Verfügbar', money(b.free, cur), `von ${money(b.total, cur)} in der Kasse`, { tone: b.free < 0 ? 'over' : '' }),
+        // Untertexte bleiben einzeilig, sonst stehen die drei Kacheln
+        // unterschiedlich hoch nebeneinander. Ist etwas verplant, ist das die
+        // Antwort auf „warum ist verfügbar weniger als die Kasse?“ — sonst
+        // sagt der Kassenstand mehr.
+        : tile('Verfügbar', money(b.free, cur), b.planned ? `${money(b.planned, cur)} verplant` : `von ${money(b.total, cur)}`, { tone: b.free < 0 ? 'over' : '' }),
       tile(
         b.phase === 'after' ? 'Urlaub' : 'Noch',
         b.phase === 'after' ? 'vorbei' : b.phase === 'before' ? days(b.daysUntilStart) : days(b.daysLeft),
@@ -43,15 +50,11 @@ export function renderToday(state, actions) {
         { tone: b.elapsedDays && b.buffer < 0 ? 'over' : '' },
       ),
     ),
-    planned.length
+    due.length
       ? h('section.section',
-          sectionTitle('Verplant', h('span.section__meta', money(b.planned, cur))),
-          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
-          h('p.section__note',
-            b.plannedOverdue
-              ? `${money(b.plannedOverdue, cur)} davon sind fällig — tippt den Haken, sobald bezahlt ist.`
-              : 'Dieses Geld ist reserviert und schon vom Tagesbudget abgezogen.',
-          ),
+          sectionTitle('Fällig', h('span.section__meta', money(due.reduce((a, e) => a + e.amount, 0), cur))),
+          h('div.list.list--planned', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
+          h('p.section__note', 'Tippt den Haken, sobald bezahlt ist.'),
         )
       : null,
 
