@@ -1,5 +1,5 @@
 /** Bottom-Sheets, Rückfragen und kurze Meldungen. */
-import { h, icon, $, $$ } from '../dom.js';
+import { h, icon, replace, $, $$ } from '../dom.js';
 
 let openCount = 0;
 
@@ -14,7 +14,7 @@ function focusableIn(root) {
  * Öffnet ein Sheet von unten. `build(close)` liefert den Inhalt; `close(wert)`
  * schließt es und löst das zurückgegebene Promise mit `wert` auf.
  */
-export function openSheet({ title, subtitle, build, fullHeight = false }) {
+export function openSheet({ title, subtitle, build, fullHeight = false, bodyClass = '' }) {
   return new Promise((resolve) => {
     let done = false;
     const opener = document.activeElement;
@@ -73,7 +73,7 @@ export function openSheet({ title, subtitle, build, fullHeight = false }) {
         h('div', h('h2.sheet__title', title || ''), subtitle ? h('p.sheet__sub', subtitle) : null),
         h('button.icon-btn', { type: 'button', 'aria-label': 'Schließen', onclick: () => close(undefined) }, icon('close', 22)),
       ),
-      h('div.sheet__body', build(close)),
+      h('div.sheet__body', { class: bodyClass }, build(close)),
     );
 
     const overlay = h('div.overlay', {
@@ -115,15 +115,40 @@ export function confirmSheet({ title, text, confirmLabel = 'Ja, machen', cancelL
 
 let toastTimer = null;
 
-export function toast(message, { type = 'info', duration = 3200 } = {}) {
+/**
+ * Kurze Meldung am unteren Rand.
+ *
+ * `action` hängt einen Knopf daneben — gedacht für „Rückgängig“. Damit
+ * kostet ein Vertipper einen Tipp statt: Zeile suchen, öffnen, löschen,
+ * bestätigen. Mit Knopf steht die Meldung länger, sonst ist sie weg, bevor
+ * man sie gelesen hat.
+ */
+export function toast(message, { type = 'info', duration = null, action = null } = {}) {
   let host = $('#toast');
   if (!host) {
     // Die Kennung gehört in die Attribute: `h` kennt nur Klassen im Tag-Namen.
     host = h('div.toast', { id: 'toast', role: 'status', 'aria-live': 'polite' });
     document.body.append(host);
   }
+  const hide = () => host.classList.remove('is-visible');
+
   host.className = `toast toast--${type} is-visible`;
-  host.textContent = message;
+  // `replace` statt `replaceChildren`: es wirft leere Kinder weg, statt aus
+  // einem fehlenden Knopf das Wort „null“ zu machen.
+  replace(host,
+    h('span.toast__text', message),
+    action
+      ? h('button.toast__action', {
+          type: 'button',
+          onclick: () => {
+            clearTimeout(toastTimer);
+            hide();
+            action.onClick();
+          },
+        }, action.label)
+      : null,
+  );
+
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => host.classList.remove('is-visible'), duration);
+  toastTimer = setTimeout(hide, duration ?? (action ? 6000 : 3200));
 }

@@ -24,16 +24,20 @@ export function payerLabel(trip, payer) {
 export function expenseRow(expense, trip, onClick) {
   const cat = CATEGORY_BY_ID[expense.category] || CATEGORY_BY_ID.other;
   const privatelyPaid = expense.payer !== POT;
+  // Ohne Notiz steht die Kategorie schon in der Titelzeile — dann bleibt die
+  // Unterzeile ganz weg, statt als leere Zeile Höhe zu belegen.
+  const sub = [
+    expense.note ? cat.label : null,
+    privatelyPaid ? h('span.tag', payerLabel(trip, expense.payer)) : null,
+    // War vorgemerkt: zählt zu den Ausgaben, aber nicht zum Tagesbudget.
+    isFromPlan(expense) ? h('span.tag.tag--plan', 'war verplant') : null,
+  ].filter(Boolean);
+
   return h('button.row', { type: 'button', onclick: () => onClick(expense) },
     h('span.row__icon', icon(cat.icon, 20)),
     h('span.row__main',
       h('span.row__title', expense.note || cat.label),
-      h('span.row__sub',
-        expense.note ? cat.label : '',
-        privatelyPaid ? h('span.tag', payerLabel(trip, expense.payer)) : null,
-        // War vorgemerkt: zählt zu den Ausgaben, aber nicht zum Tagesbudget.
-        isFromPlan(expense) ? h('span.tag.tag--plan', 'war verplant') : null,
-      ),
+      sub.length ? h('span.row__sub', ...sub) : null,
     ),
     h('span.row__amount', money(expense.amount, trip.currency)),
   );
