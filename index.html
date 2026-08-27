@@ -1,12 +1,24 @@
 <!doctype html>
-<html lang="de" data-version="1.4.0">
+<html lang="de" data-version="1.5.0">
 <head>
 <meta charset="utf-8">
 <title>Urlaubstracker</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Gemeinsame Urlaubskasse: eintragen was ihr eingezahlt habt, sehen was pro Tag drin ist, abends kurz die Ausgaben abhaken.">
 <meta name="theme-color" content="#f4f6f8">
-<meta name="color-scheme" content="light">
+<meta name="color-scheme" content="light dark">
+<script>
+  /* Hell oder dunkel entscheidet sich, bevor das Stylesheet da ist — sonst
+     blitzt abends erst eine weiße Seite auf. Denselben Schlüssel liest später
+     js/prefs.js; hier steht bewusst nur diese eine Zeile Logik. */
+  try {
+    var t = (JSON.parse(localStorage.getItem('urlaubstracker.prefs.v1') || '{}') || {}).theme;
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  } catch (e) {
+    document.documentElement.dataset.theme = 'light';
+  }
+</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Urlaubskasse">

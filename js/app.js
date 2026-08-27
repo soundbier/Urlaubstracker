@@ -2,6 +2,7 @@
 import { h, icon, replace, $ } from './dom.js';
 import * as store from './store.js';
 import { computeBudget, todayISO } from './calc.js';
+import { applyTheme } from './prefs.js';
 import { money, number, days } from './format.js';
 import { toast, confirmSheet } from './ui/sheet.js';
 import { expenseSheet, contributionSheet } from './ui/entry-sheets.js';
@@ -92,6 +93,30 @@ const actions = {
         `${money(row.amount, state.trip.currency)} ${row.planned ? 'vorgemerkt' : 'eingetragen'}`,
         () => store.deleteExpense(row.id),
       );
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  /**
+   * Dieselbe Ausgabe noch einmal, mit dem heutigen Datum.
+   *
+   * Kaffee, Parken, Maut: derselbe Betrag, dieselbe Kategorie, zweimal am Tag.
+   * Über die Eingabemaske sind das jedes Mal vier Handgriffe für etwas, das
+   * schon dasteht. Der Knopf trägt sofort ein statt die Maske vorauszufüllen —
+   * das ist der ganze Sinn — und der Rückgängig-Knopf im Toast fängt den
+   * Fehlgriff auf.
+   */
+  async repeatExpense(expense) {
+    try {
+      const row = await store.addExpense({
+        amount: expense.amount,
+        category: expense.category,
+        note: expense.note,
+        payer: expense.payer,
+        date: todayISO(),
+      });
+      undoable(`${money(row.amount, state.trip.currency)} nochmal eingetragen`, () => store.deleteExpense(row.id));
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
@@ -232,6 +257,10 @@ function nav(activeId) {
 }
 
 // -------------------------------------------------------------------- Start
+
+// Die Farbwahl steht schon als `data-theme` am <html> (siehe index.html) —
+// hier zieht nur noch die Adressleiste nach.
+applyTheme();
 
 store.subscribe((next) => {
   // Nur nach dem Anlegen bzw. Beitreten auf „Heute“ springen. Beim Kaltstart

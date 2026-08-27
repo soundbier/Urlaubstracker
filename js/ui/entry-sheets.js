@@ -1,6 +1,7 @@
 /** Die beiden Eingabemasken: Ausgabe erfassen und Einzahlung eintragen. */
 import { h, icon } from '../dom.js';
 import { openSheet } from './sheet.js';
+import { disclosure } from './parts.js';
 import { CATEGORIES, POT, parseAmount, todayISO, addDays } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
@@ -167,26 +168,6 @@ function dateRow(value, onChange, { withTomorrow = false } = {}) {
 
 function field(labelText, control) {
   return h('label.field', h('span.field__label', labelText), control);
-}
-
-/**
- * Aufklappbare Zeile für alles, was man selten anfasst.
- *
- * Die Zusammenfassung rechts ist der Preis dafür, dass hier etwas versteckt
- * wird: was drinsteht, muss auch zugeklappt ablesbar sein — sonst trägt man
- * eine Ausgabe auf den falschen Namen ein und merkt es erst bei der
- * Abrechnung. `<details>` statt eigener Knopflogik, damit Tastatur und
- * Screenreader ohne Zutun funktionieren.
- */
-function disclosure(title, summaryEl, ...body) {
-  return h('details.disclosure',
-    h('summary.disclosure__head',
-      h('span.disclosure__title', title),
-      summaryEl,
-      icon('chevron', 18),
-    ),
-    h('div.disclosure__body', ...body),
-  );
 }
 
 /**

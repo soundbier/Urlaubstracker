@@ -2,8 +2,9 @@
  * Geräteeigene Einstellungen im localStorage.
  *
  * Hier landet nur, was zum Gerät gehört: welcher Trip geöffnet ist, wer an
- * diesem Handy sitzt, und — falls eingerichtet — die Firebase-Zugangsdaten.
- * Die Urlaubsdaten selbst liegen im Backend (lokal oder Firestore).
+ * diesem Handy sitzt, wie hell es aussehen soll, und — falls eingerichtet —
+ * die Firebase-Zugangsdaten. Die Urlaubsdaten selbst liegen im Backend (lokal
+ * oder Firestore).
  */
 
 const KEY = 'urlaubstracker.prefs.v1';
@@ -12,6 +13,7 @@ const DEFAULTS = {
   firebaseConfig: null, // { apiKey, authDomain, projectId, appId, … }
   tripRef: null,        // { mode: 'local' } | { mode: 'cloud', tripId, inviteCode }
   myPersonId: null,     // wer sitzt an diesem Gerät
+  theme: 'auto',        // auto | light | dark
 };
 
 function read() {
@@ -46,6 +48,45 @@ export function clearPrefs() {
     /* egal */
   }
 }
+
+// ------------------------------------------------------------------ Aussehen
+
+/**
+ * Hell oder dunkel — die Wahl gehört aufs Gerät, nicht in den Trip: das eine
+ * Handy liegt abends auf dem Nachttisch, das andere am Pool.
+ *
+ * `auto` folgt dem System. Aufgelöst wird das hier und nicht im Stylesheet:
+ * am <html> steht danach immer `light` oder `dark`, und die dunklen Farben
+ * müssen nur einmal dastehen statt zweimal — einmal für die Medienabfrage,
+ * einmal für die bewusste Wahl.
+ */
+const darkMedia = typeof matchMedia === 'function' ? matchMedia('(prefers-color-scheme: dark)') : null;
+
+export function resolveTheme(theme = cache.theme) {
+  if (theme === 'dark' || theme === 'light') return theme;
+  return darkMedia?.matches ? 'dark' : 'light';
+}
+
+export function applyTheme(theme = cache.theme) {
+  const resolved = resolveTheme(theme);
+  document.documentElement.dataset.theme = resolved;
+  // Die Adressleiste färbt sich mit: sonst steht über der dunklen App ein
+  // heller Streifen, der beim Scrollen mitwandert.
+  const meta = document.querySelector('meta[name="theme-color"]');
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  if (meta && bg) meta.setAttribute('content', bg);
+  return resolved;
+}
+
+export function setTheme(theme) {
+  setPrefs({ theme: theme === 'dark' || theme === 'light' ? theme : 'auto' });
+  return applyTheme();
+}
+
+// Wer „Automatisch“ stehen lässt, soll abends nicht die App neu starten müssen.
+darkMedia?.addEventListener?.('change', () => {
+  if (cache.theme === 'auto') applyTheme();
+});
 
 /** Prüft, ob eine Firebase-Konfiguration die Felder hat, die wir brauchen. */
 export function validateFirebaseConfig(cfg) {
