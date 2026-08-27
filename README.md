@@ -178,25 +178,59 @@ braucht — einfach per Nachricht schicken. Ein Tipp darauf, *Beitreten*, fertig
 
 ---
 
-## Veröffentlichen
+## Veröffentlichen (Cloudflare Pages)
 
-Eine PWA braucht HTTPS. Zwei Wege, beide kostenlos:
+Der Code liegt auf GitHub, ausgeliefert wird über **Cloudflare Pages**, die
+Daten liegen in **Firebase Firestore**. Cloudflare hängt direkt am Repository:
+jeder Push auf `main` wird von selbst gebaut und veröffentlicht — HTTPS
+inklusive, was eine PWA ohnehin braucht.
 
-### GitHub Pages
+### Einmalig einrichten
 
-Ist schon eingerichtet: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
-testet bei jedem Push und veröffentlicht `main`. Einmalig in den
-Repository-Einstellungen unter *Pages* als Quelle **GitHub Actions** wählen.
+In *Cloudflare Dashboard → Workers & Pages → Create → Pages → Connect to Git*
+das Repository auswählen und einstellen:
 
-### Firebase Hosting
+| Feld | Wert |
+| --- | --- |
+| Production branch | `main` |
+| Build command | `npm test` |
+| Build output directory | `/` |
 
-Wenn ohnehin ein Firebase-Projekt da ist:
+Es gibt keinen Build-Schritt — der Browser lädt die ES-Module direkt, das
+Ausgabeverzeichnis ist deshalb die Wurzel. `npm test` als Build-Befehl ist kein
+Bauen, sondern eine Bremse: schlägt ein Test fehl, bricht Cloudflare ab und die
+bisherige Fassung bleibt online.
+
+Ausgeliefert wird damit auch, was nur zur Entwicklung gehört (`tests/`,
+`tools/`, `package.json`). Das ist harmlos — es steht ohnehin öffentlich auf
+GitHub.
+
+### Kopfzeilen
+
+[`_headers`](_headers) sorgt dafür, dass `sw.js`, die App-Hülle und das
+Manifest nicht aus einem Zwischenspeicher kommen. Ohne das könnte Cloudflare
+eine alte `sw.js` ausliefern — und dann bemerkt niemand, dass es eine neue
+Fassung gibt.
+
+Eine `_redirects`-Datei gibt es bewusst **nicht**. Die App routet über das
+Fragment (`#/budget`), es wird also nie ein anderer Pfad als `/` angefragt. Ein
+Auffang-Rewrite `/* → /index.html` würde nur Schaden anrichten: eine fehlende
+JavaScript-Datei käme dann als HTML mit Status 200 zurück, und der Service
+Worker legte sie in dieser Form in den Cache, statt die Installation abzubrechen.
+
+### Firestore-Regeln
+
+Die Regeln liegen nicht bei Cloudflare, sondern bei Firebase, und werden von
+Hand veröffentlicht — entweder in der Konsole oder mit:
 
 ```sh
-npx firebase-tools login
-npx firebase-tools use --add        # das eigene Projekt auswählen
-npx firebase-tools deploy --only hosting,firestore:rules
+npx firebase-tools deploy --only firestore:rules
 ```
+
+### Tests
+
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) prüft bei jedem Push und
+Pull Request. Veröffentlicht wird dort nichts mehr; das macht Cloudflare.
 
 ---
 
@@ -219,6 +253,8 @@ index.html            App-Hülle
 styles.css            komplettes Stylesheet, helle und dunkle Farbwerte
 sw.js                 Service Worker: Offline-Betrieb und Update-Steuerung
 manifest.webmanifest  Installation als App
+_headers              Kopfzeilen für Cloudflare Pages
+firestore.rules       Zugriffsregeln für Firestore
 
 js/
   app.js              Kopfzeile, Navigation, Schnelleingabe
@@ -252,8 +288,9 @@ vollständig in einen eigenen Cache und liefert ausschließlich von dort. Damit
 läuft nie halb die alte und halb die neue App, und die Nummer unter *Mehr →
 Über* stimmt mit dem, was tatsächlich läuft.
 
-> **Vorsicht bei Weiterleitungen.** Firebase Hosting normalisiert
-> `/index.html` auf `/` und schickt dafür eine 301. Eine Antwort, die über eine
+> **Vorsicht bei Weiterleitungen.** Cloudflare Pages normalisiert
+> `/index.html` auf `/` und schickt dafür eine 308 (Firebase Hosting tut
+> dasselbe mit einer 301). Eine Antwort, die über eine
 > Weiterleitung kam, darf ein Service Worker für Seitenaufrufe nicht
 > ausliefern — der Browser bricht sonst mit *„Response served by service worker
 > has redirections"* ab, und die App startet gar nicht mehr. `sw.js` legt
@@ -305,3 +342,6 @@ verlässt das Handy.
 Mit Firebase: in eurem eigenen Firestore-Projekt. Es gibt keinen Server von
 uns dazwischen, keine Konten, keine Auswertung. Über **Mehr → Sicherungskopie
 speichern** kommt jederzeit alles als JSON-Datei heraus.
+
+Cloudflare liefert nur die Dateien der App aus und bekommt von den Einträgen
+nichts mit: die Geräte sprechen direkt mit Firestore, an Cloudflare vorbei.

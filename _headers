@@ -1,0 +1,25 @@
+# Kopfzeilen für Cloudflare Pages.
+#
+# Drei Dateien entscheiden, ob ein Update überhaupt bemerkt wird, und dürfen
+# deshalb nicht aus einem Zwischenspeicher kommen:
+#
+#   sw.js      Daran erkennt der Browser, dass es eine neue Fassung gibt. Käme
+#              er hier an eine alte Kopie, bliebe das Update unsichtbar.
+#   /, index.html  Die App-Hülle, aus der die Versionsnummer stammt.
+#   manifest   Name, Symbole und Verknüpfungen der installierten App.
+#
+# Alles andere (js/, styles.css, icons/, vendor/) darf Cloudflare ruhig lange
+# vorhalten: der Service Worker holt es beim Installieren einer neuen Fassung
+# mit `cache: 'reload'` und geht dabei an jedem HTTP-Cache vorbei.
+
+/sw.js
+  Cache-Control: no-cache, max-age=0
+
+/
+  Cache-Control: no-cache, max-age=0
+
+/index.html
+  Cache-Control: no-cache, max-age=0
+
+/manifest.webmanifest
+  Cache-Control: no-cache, max-age=0

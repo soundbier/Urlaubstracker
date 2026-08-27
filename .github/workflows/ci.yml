@@ -1,4 +1,9 @@
-name: Tests & Deploy
+# Veröffentlicht wird nicht hier: Cloudflare Pages hängt am Repository und
+# baut jeden Push auf `main` selbst. Dieser Workflow prüft nur — und weil
+# Cloudflare unabhängig davon ausliefert, ist ein roter Lauf hier kein
+# Deployment-Stopp. Wer das will, trägt in den Pages-Einstellungen `npm test`
+# als Build-Befehl ein; dann bricht auch dort ein fehlgeschlagener Test ab.
+name: Tests
 
 on:
   push:
@@ -10,12 +15,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: pages-${{ github.ref }}
+  group: tests-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   test:
-    name: Rechenlogik testen
+    name: Rechenlogik und Release-Invarianten
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,24 +28,3 @@ jobs:
         with:
           node-version: '22'
       - run: npm test
-
-  deploy:
-    name: Auf GitHub Pages veröffentlichen
-    needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: '.'
-      - id: deployment
-        uses: actions/deploy-pages@v4

@@ -57,3 +57,37 @@ test('jedes ausgelieferte Modul steht im Paket', async () => {
     assert.ok(shell.has(m), `${m} fehlt in SHELL in sw.js`);
   }
 });
+
+/**
+ * `_headers` in seine Blöcke zerlegen: eine Zeile ohne Einrückung ist ein
+ * Pfad, die eingerückten darunter sind seine Kopfzeilen. Ein Regex über die
+ * ganze Datei taugt hier nicht — er findet das `no-cache` des nächsten Blocks
+ * und meldet Erfolg, wo keiner ist.
+ */
+function headerBlocks(text) {
+  const blocks = new Map();
+  let path = null;
+  for (const raw of text.split('\n')) {
+    const line = raw.replace(/#.*$/, '');
+    if (!line.trim()) continue;
+    if (/^\s/.test(line)) blocks.get(path)?.push(line.trim());
+    else blocks.set((path = line.trim()), []);
+  }
+  return blocks;
+}
+
+test('_headers nimmt die Steuerdateien vom Zwischenspeichern aus', async () => {
+  const blocks = headerBlocks(await read('_headers'));
+  // Der stillste Fehler, den dieses Projekt haben kann: Cloudflare liefert
+  // eine alte sw.js aus, der Browser sieht keine Änderung, und kein Gerät
+  // erfährt je, dass es eine neue Fassung gibt. Nichts stürzt ab — es kommt
+  // nur nie wieder ein Update an.
+  for (const path of ['/sw.js', '/', '/index.html', '/manifest.webmanifest']) {
+    const lines = blocks.get(path);
+    assert.ok(lines, `${path} fehlt in _headers`);
+    assert.ok(
+      lines.some((l) => /^Cache-Control:.*\bno-cache\b/i.test(l)),
+      `${path} braucht eine Cache-Control-Zeile mit no-cache, hat aber: ${lines.join(' | ') || '(nichts)'}`,
+    );
+  }
+});
