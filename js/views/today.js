@@ -17,12 +17,20 @@ export function renderToday(state, actions) {
   const cur = trip.currency;
   const todays = expenses.filter((e) => e.date === today && !e.planned);
   const planned = plannedOnly(expenses);
+  const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
 
   return h('div.view',
     hero(b, cur, actions),
     knowsMe ? null : whoAmI(trip, actions),
+    // Die drei Kacheln beantworten, was die große Zahl offenlässt: wie viel
+    // insgesamt noch da ist, wie lange es reichen muss, und ob ihr vor oder
+    // hinter dem Plan liegt. Jede Zahl steht genau einmal auf dieser Seite.
     h('div.tiles',
-      tile('Ausgegeben', money(b.spent, cur), `von ${money(b.total, cur)}`),
+      // Nach dem Urlaub steht das übrige Geld schon groß oben — dann sagt die
+      // Kachel lieber, wofür es weg ist.
+      b.phase === 'after'
+        ? tile('Ausgegeben', money(b.spent, cur), `über ${days(b.totalDays)}`)
+        : tile('Verfügbar', money(b.free, cur), `von ${money(b.total, cur)} in der Kasse`, { tone: b.free < 0 ? 'over' : '' }),
       tile(
         b.phase === 'after' ? 'Urlaub' : 'Noch',
         b.phase === 'after' ? 'vorbei' : b.phase === 'before' ? days(b.daysUntilStart) : days(b.daysLeft),
@@ -38,7 +46,7 @@ export function renderToday(state, actions) {
     planned.length
       ? h('section.section',
           sectionTitle('Verplant', h('span.section__meta', money(b.planned, cur))),
-          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid }))),
+          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
           h('p.section__note',
             b.plannedOverdue
               ? `${money(b.plannedOverdue, cur)} davon sind fällig — tippt den Haken, sobald bezahlt ist.`
@@ -53,7 +61,7 @@ export function renderToday(state, actions) {
         todays.length ? h('span.section__meta', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
       ),
       todays.length
-        ? h('div.list', ...todays.map((e) => expenseRow(e, trip, actions.editExpense)))
+        ? h('div.list', ...todays.map((e) => expenseRow(e, trip, rowOpts)))
         : emptyState('Heute noch nichts eingetragen.', 'Ausgabe eintragen', actions.addExpense),
     ),
     b.phase === 'after' ? h('div.callout',
@@ -77,6 +85,15 @@ function whoAmI(trip, actions) {
   );
 }
 
+/**
+ * Eine große Zahl, eine Zeile Zusammenhang, der Balken — mehr nicht.
+ *
+ * Hier standen einmal sechs Beträge übereinander: Tagesrest, Tagessatz, heute
+ * ausgegeben, verplant, verfügbar, Kassenstand. Wer sechs Zahlen liest, liest
+ * keine, und die halbe Reihe stand ohnehin gleich darunter noch einmal. Was
+ * insgesamt verfügbar ist, steht jetzt in der Kachelreihe; was heute schon
+ * ausgegeben und was verplant ist, steht in den beiden Abschnitten darunter.
+ */
 function hero(b, cur, actions) {
   if (b.status === 'empty') {
     return h('div.hero.hero--muted',
@@ -91,9 +108,7 @@ function hero(b, cur, actions) {
     return h('div.hero.hero--soon',
       h('p.hero__label', b.daysUntilStart === 0 ? 'Morgen geht es los' : `Losgeht's in ${days(b.daysUntilStart)}`),
       h('p.hero__amount', money(b.planPerDay, cur)),
-      h('p.hero__sub', `pro Tag — ${money(b.budgetBase, cur)} auf ${days(b.totalDays)}`),
-      b.planned ? h('p.hero__foot', `${money(b.planned, cur)} sind schon verplant und bleiben außen vor`) : null,
-      heroTotal(b, cur),
+      h('p.hero__sub', `pro Tag über ${days(b.totalDays)}`),
     );
   }
 
@@ -101,7 +116,7 @@ function hero(b, cur, actions) {
     return h('div.hero', { class: b.remaining < 0 ? 'hero--over' : 'hero--good' },
       h('p.hero__label', b.remaining < 0 ? 'Am Ende gefehlt' : 'Übrig geblieben'),
       h('p.hero__amount', money(Math.abs(b.remaining), cur)),
-      h('p.hero__sub', `${money(b.spent, cur)} ausgegeben von ${money(b.total, cur)}`),
+      h('p.hero__sub', `von ${money(b.total, cur)} in der Kasse`),
     );
   }
 
@@ -113,24 +128,5 @@ function hero(b, cur, actions) {
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),
     h('p.hero__sub', `von ${money(b.perDayToday, cur)} für heute`),
     bar(usedRatio, tone),
-    h('p.hero__foot',
-      b.spentToday ? `${money(b.spentToday, cur)} heute schon ausgegeben` : 'heute noch nichts ausgegeben',
-      b.planned ? ` · ${money(b.planned, cur)} verplant` : '',
-    ),
-    heroTotal(b, cur),
-  );
-}
-
-/**
- * Die Tageszahl beantwortet „was geht heute noch?“ — nicht „wie viel ist
- * überhaupt noch da?“. Dafür stand bisher nur die Kachel weiter unten; hier
- * steht die Summe direkt unter der großen Zahl, abgesetzt durch eine Linie,
- * damit sie ihr nicht die Aufmerksamkeit klaut.
- */
-function heroTotal(b, cur) {
-  return h('div.hero__total', { class: b.free < 0 ? 'hero__total--over' : '' },
-    h('span.hero__total-label', 'Insgesamt verfügbar'),
-    h('span.hero__total-value', money(b.free, cur)),
-    h('span.hero__total-note', `von ${money(b.total, cur)} in der Kasse`),
   );
 }

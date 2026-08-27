@@ -2,7 +2,7 @@
 import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
 import { sectionTitle } from '../ui/parts.js';
-import { parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
+import { getPrefs, setTheme, resolveTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
 import { buildInviteLink, readInviteFromLocation, buildExport, buildCsv, parseImport } from '../link.js';
 import { daysInclusive, isValidDate } from '../calc.js';
 import { days, fullDate, plural } from '../format.js';
@@ -15,12 +15,13 @@ const CURRENCIES = [
   ['HRK', 'Kuna'], ['TRY', 'Türkische Lira'], ['THB', 'Thai-Baht'],
 ];
 
-export function renderSettings(state) {
-  const { trip, sync } = state;
+export function renderSettings(state, actions) {
+  const { sync } = state;
 
   return h('div.view',
     tripSection(state),
     peopleSection(state),
+    appearanceSection(actions),
     syncSection(state),
     dataSection(state),
     h('section.section',
@@ -80,6 +81,47 @@ function tripSection(state) {
 
 function modeButton(mode, label, current, save) {
   return h('button.segmented__btn', { type: 'button', class: current === mode ? 'is-active' : '', onclick: () => save({ budgetMode: mode }) }, label);
+}
+
+// ----------------------------------------------------------------- Aussehen
+
+const THEMES = [
+  ['auto', 'Automatisch'],
+  ['light', 'Hell'],
+  ['dark', 'Dunkel'],
+];
+
+/**
+ * Hell oder dunkel. Die App wird abends am Tisch aufgemacht, wenn abgerechnet
+ * wird, wer heute was bezahlt hat — und dann leuchtet ein weißer Schirm dem
+ * ganzen Tisch ins Gesicht.
+ *
+ * Die Wahl gilt nur für dieses Gerät und wandert deshalb nicht in den Trip:
+ * sonst würde das eine Handy dem anderen die Helligkeit umstellen.
+ */
+function appearanceSection(actions) {
+  const current = getPrefs().theme || 'auto';
+
+  return h('section.section',
+    sectionTitle('Aussehen'),
+    h('div.card.card--plain',
+      h('div.field',
+        h('span.field__label', 'Farben'),
+        h('div.segmented.segmented--3',
+          ...THEMES.map(([id, label]) =>
+            h('button.segmented__btn', {
+              type: 'button',
+              class: current === id ? 'is-active' : '',
+              onclick: () => { setTheme(id); actions.rerender(); },
+            }, label),
+          ),
+        ),
+        h('p.field__note', current === 'auto'
+          ? `Folgt dem Handy — gerade ${resolveTheme('auto') === 'dark' ? 'dunkel' : 'hell'}.`
+          : 'Bleibt so, egal was das Handy sonst macht.'),
+      ),
+    ),
+  );
 }
 
 // ------------------------------------------------------------------ Personen

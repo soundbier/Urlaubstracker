@@ -30,9 +30,58 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --page: min(560px, 100%);
 
-  /* Die App läuft immer hell: eine Fassung, die überall gleich aussieht und
-     bei der Beträge auf Papierweiß stehen statt auf getöntem Nachtblau. */
+  /* Schrift auf gefüllten Flächen (Accent, Warnung, Fehler). Ein Wert für
+     alle drei: hell sind sie dunkel genug für Weiß, dunkel hell genug für
+     Tinte. */
+  --on-accent: #ffffff;
+  --toast-bg: #101828;
+  --toast-text: #f8fafc;
+  --toast-border: transparent;
+  --scrim: rgb(2 6 23 / 45%);
+
   color-scheme: light;
+}
+
+/*
+ * Dunkle Fassung — dieselbe App, andere Farben.
+ *
+ * Welche gilt, steht als `data-theme` am <html>: gesetzt vom Startschnipsel in
+ * index.html, noch bevor das Stylesheet geladen ist, damit abends nicht erst
+ * eine weiße Seite aufblitzt. „Automatisch“ löst dort schon zu `light` oder
+ * `dark` auf — hier steht deshalb nur ein Block statt zweier gleicher.
+ */
+:root[data-theme='dark'] {
+  --bg: #10151b;
+  --surface: #171e26;
+  --surface-2: #212a35;
+  --border: #2c3743;
+  --text: #e6ecf3;
+  --text-muted: #97a6b6;
+  --text-faint: #7d8ea0;
+
+  --accent: #2dd4bf;
+  --accent-soft: #14312e;
+  --good: #34d399;
+  --good-soft: #14312a;
+  --warn: #fbbf24;
+  --warn-soft: #362a10;
+  --over: #fb7185;
+  --over-soft: #3a1a24;
+  --in: #4ade80;
+
+  /* Auf hellem Türkis, hellem Bernstein und hellem Rosé liest sich Weiß
+     nicht mehr — dort steht jetzt Tinte. */
+  --on-accent: #06201d;
+  --toast-bg: #2b3644;
+  --toast-text: #f1f5f9;
+  --toast-border: #3d4a5a;
+  --scrim: rgb(0 0 0 / 62%);
+
+  /* Schatten tragen im Dunkeln nicht; die Kanten machen die Ränder. */
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 26px -18px rgb(0 0 0 / 70%);
+  --shadow-lift: 0 10px 32px -10px rgb(0 0 0 / 75%);
+
+  color-scheme: dark;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -170,7 +219,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   border: 0;
   border-radius: 999px;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 620;
   box-shadow: var(--shadow-lift);
 }
@@ -206,26 +255,8 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 }
 .hero--over .hero__amount { color: var(--over); }
 .hero__sub { font-size: 0.88rem; color: var(--text-muted); }
-.hero__foot { font-size: 0.76rem; color: var(--text-faint); margin-top: 2px; }
 .hero .bar { margin-top: 12px; }
 .hero .btn { margin-top: 12px; align-self: center; }
-
-/* Die Gesamtsumme unter dem Strich: die Tageszahl bleibt die Hauptsache,
-   aber wie viel überhaupt noch da ist, will man ohne Weiterblättern sehen. */
-.hero__total {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.hero__total-label { font-size: 0.8rem; color: var(--text-muted); }
-.hero__total-value { font-size: 1.15rem; font-weight: 680; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.hero__total-note { font-size: 0.76rem; color: var(--text-faint); flex-basis: 100%; }
-.hero__total--over .hero__total-value { color: var(--over); }
 
 /* -------------------------------------------------------------- Kacheln */
 
@@ -270,7 +301,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .summary { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .summary__label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
 .summary__value { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.summary__meta { font-size: 0.8rem; color: var(--text-muted); text-align: right; }
+.summary__meta { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.8rem; color: var(--text-muted); text-align: right; }
 
 .callout {
   border-radius: var(--radius-sm);
@@ -329,9 +360,40 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   line-clamp: 2;
   overflow-wrap: anywhere;
 }
-.row__sub { font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; }
+.row__sub { font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .row__amount { font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .row__amount--in { color: var(--in); }
+/* Wer den Eintrag getippt hat — auf dem anderen Handy die Antwort auf „hat das
+   schon jemand eingetragen?“. */
+.row__by { display: inline-flex; align-items: center; gap: 5px; color: var(--text-faint); }
+
+/* Bezahlte Ausgaben: antippen bearbeitet, der Knopf rechts trägt dieselbe
+   Ausgabe noch einmal ein. Bewusst blasser als der Haken bei den Vormerkungen —
+   das hier ist eine Abkürzung, keine Aufgabe. */
+.erow {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--border);
+}
+.erow:first-child { border-top: 0; }
+.erow > .row {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  border-top: 0;
+  padding-right: 4px;
+}
+.erow__again {
+  flex: none;
+  width: 52px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--text-faint);
+}
+.erow__again:active { background: var(--surface-2); color: var(--accent); }
 
 /* Vorgemerkte Ausgaben: die Zeile trägt zwei Knöpfe — antippen zum Bearbeiten,
    der Haken rechts trägt sie als bezahlt ein. */
@@ -479,6 +541,8 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .settle__balance.is-negative { color: var(--over); }
 .settle__todo { display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem; color: var(--text); }
 .settle__todo li { line-height: 1.4; }
+/* Mitten im Urlaub ist die Liste eine Momentaufnahme, keine Anweisung. */
+.settle__hint { font-size: 0.82rem; color: var(--text-muted); }
 
 /* -------------------------------------------------------------- Formulare */
 
@@ -529,6 +593,7 @@ select.field__input { background-image: none; }
 .slider { width: 100%; accent-color: var(--accent); }
 
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.segmented--3 { grid-template-columns: repeat(3, 1fr); }
 .segmented__btn { padding: 9px 8px; border: 0; border-radius: 9px; background: none; color: var(--text-muted); font-size: 0.88rem; font-weight: 600; }
 .segmented__btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
 
@@ -558,10 +623,10 @@ select.field__input { background-image: none; }
 }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.55; }
-.btn--primary { background: var(--accent); color: #fff; }
+.btn--primary { background: var(--accent); color: var(--on-accent); }
 .btn--ghost { background: transparent; border-color: var(--border); color: var(--text-muted); }
 .btn--danger { color: var(--over); border-color: color-mix(in srgb, var(--over) 35%, var(--border)); }
-.btn--primary.btn--danger { background: var(--over); color: #fff; border-color: transparent; }
+.btn--primary.btn--danger { background: var(--over); color: var(--on-accent); border-color: transparent; }
 .btn--wide { width: 100%; }
 .btn--small { padding: 7px 12px; font-size: 0.82rem; border-radius: 9px; }
 
@@ -614,7 +679,7 @@ select.field__input { background-image: none; }
 .chip.is-active {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
 }
 .chip .icon { margin-left: -2px; }
 .chip--date { position: relative; overflow: hidden; }
@@ -664,7 +729,7 @@ select.field__input { background-image: none; }
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: rgb(2 6 23 / 45%);
+  background: var(--scrim);
   opacity: 0;
   transition: opacity 0.2s ease;
 }
@@ -728,6 +793,9 @@ select.field__input { background-image: none; }
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
+/* In einer Karte steht sonst ein weißer Kasten auf weißem Grund. */
+.card > .disclosure { background: var(--surface-2); border-color: transparent; }
+.card > .disclosure .disclosure__body { border-top-color: var(--border); }
 .disclosure__head {
   display: flex;
   align-items: center;
@@ -776,7 +844,7 @@ select.field__input { background-image: none; }
   border-radius: 18px;
   display: grid; place-items: center;
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 2rem;
   font-weight: 700;
   box-shadow: var(--shadow-lift);
@@ -810,8 +878,9 @@ select.field__input { background-image: none; }
   gap: 4px;
   padding: 12px 18px;
   border-radius: 999px;
-  background: #101828;
-  color: #f8fafc;
+  background: var(--toast-bg);
+  color: var(--toast-text);
+  border: 1px solid var(--toast-border);
   font-size: 0.88rem;
   font-weight: 550;
   box-shadow: var(--shadow-lift);
@@ -837,8 +906,8 @@ select.field__input { background-image: none; }
   text-underline-offset: 3px;
 }
 .toast__action:active { opacity: 0.7; }
-.toast--error { background: var(--over); color: #fff; }
-.toast--success { background: var(--good); color: #fff; }
+.toast--error { background: var(--over); color: var(--on-accent); border-color: transparent; }
+.toast--success { background: var(--good); color: var(--on-accent); border-color: transparent; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }

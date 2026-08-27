@@ -15,7 +15,7 @@ Läuft offline, auf beiden Handys, ohne Abo.
 
 | Bereich | Was ihr dort tut |
 | --- | --- |
-| **Heute** | Eine große Zahl: was heute noch übrig ist. Darunter die Einträge des Tages. |
+| **Heute** | Eine große Zahl: was heute noch übrig ist. Darunter drei Kacheln — verfügbar, Resttage, Polster — und die Einträge des Tages. |
 | **Ausgaben** | Alles nach Tagen gruppiert, mit Filter nach Kategorie. Antippen zum Ändern. |
 | **Budget** | Einzahlungen, Verlauf über den Urlaub, Aufteilung nach Kategorie, Endabrechnung. |
 | **Mehr** | Zeitraum, Währung, Namen, Kostenaufteilung, Synchronisierung, Export. |
@@ -27,6 +27,13 @@ Weitere Kleinigkeiten:
   passen zusammen auf einen Handyschirm; alles Seltenere liegt unter *Details*.
 - **Rückgängig** — nach jedem Eintrag steht kurz ein „Rückgängig“ daneben. Ein
   Vertipper kostet damit einen Tipp statt vier.
+- **Nochmal** — neben jeder Ausgabe sitzt ein Knopf, der sie mit dem heutigen
+  Datum noch einmal einträgt: gleicher Betrag, gleiche Kategorie. Kaffee,
+  Parken und Maut sind Wiederholungstäter.
+- **Von wem** — zu zweit steht an jedem Eintrag, wer ihn getippt hat. Damit
+  landet die Runde nach dem Abendessen nicht zweimal in der Liste.
+- **Hell oder dunkel** — unter *Mehr → Aussehen*. Standard ist „Automatisch“:
+  die App folgt dem Handy.
 - **Bezahlt von** — aus der gemeinsamen Kasse oder aus eigener Tasche. Beides
   zählt in der Endabrechnung richtig. Wer mehrmals hintereinander privat zahlt,
   stellt das nur einmal um: die Wahl bleibt bis zum nächsten App-Start stehen
@@ -81,6 +88,10 @@ gemeinsamen Konto liegt.
 
 Daraus wird eine Liste von Überweisungen: erst geht das Restgeld vom Konto an
 die Guthaben zurück, was dann noch offen ist, überweist man sich direkt.
+
+Solange der Urlaub läuft, ist das ein Zwischenstand und keine Anweisung —
+deshalb steht die Liste bis zum letzten Urlaubstag zugeklappt unter
+*Zwischenstand ansehen* und ist als **Stand jetzt** gekennzeichnet.
 
 Ist vom Konto mehr abgegangen, als eingezahlt wurde, steht es im Minus — dann
 dreht sich der erste Schritt um: die Liste sagt, wer wie viel **nachzahlt**,
@@ -205,7 +216,7 @@ um den Update-Ablauf auszuprobieren.
 
 ```
 index.html            App-Hülle
-styles.css            komplettes Stylesheet, helles Design
+styles.css            komplettes Stylesheet, helle und dunkle Farbwerte
 sw.js                 Service Worker: Offline-Betrieb und Update-Steuerung
 manifest.webmanifest  Installation als App
 
@@ -215,7 +226,7 @@ js/
   store.js            Zustand und Schreibvorgänge
   backend-local.js    Speicherung im Gerät
   backend-firestore.js  Synchronisierung zu zweit
-  prefs.js            geräteeigene Einstellungen
+  prefs.js            geräteeigene Einstellungen (auch hell/dunkel)
   link.js             Einladungslinks, CSV- und JSON-Export
   dom.js  format.js   kleine Helfer
   ui/                 Sheets, Zahlentastatur, wiederkehrende Bausteine

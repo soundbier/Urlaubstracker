@@ -26,6 +26,8 @@ export function renderExpenses(state, actions) {
   const groups = groupByDay(shown);
   const shownTotal = shown.reduce((a, e) => a + e.amount, 0);
 
+  const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
+
   const chips = h('div.chips.chips--scroll',
     filterChip('all', 'Alles', null, actions),
     ...usedCategories.map((c) => filterChip(c.id, c.short, c.icon, actions)),
@@ -43,11 +45,11 @@ export function renderExpenses(state, actions) {
     planned.length
       ? h('section.section',
           sectionTitle('Verplant', h('span.section__meta', money(planned.reduce((a, e) => a + e.amount, 0), cur))),
-          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid }))),
+          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
         )
       : null,
     groups.length
-      ? h('div.daygroups', ...groups.map((g) => dayGroup(g, trip, b, today, actions)))
+      ? h('div.daygroups', ...groups.map((g) => dayGroup(g, trip, b, today, rowOpts)))
       : emptyState(
           filter === 'all' ? 'Noch keine Ausgaben eingetragen.' : 'In dieser Kategorie ist noch nichts eingetragen.',
           'Ausgabe eintragen',
@@ -71,7 +73,7 @@ function dayNote(everydayTotal, budget, date, today, cur) {
   return date === today ? `noch ${money(diff, cur)} bis zum Schnitt` : `${money(diff, cur)} unter dem Schnitt`;
 }
 
-function dayGroup(group, trip, budget, today, actions) {
+function dayGroup(group, trip, budget, today, rowOpts) {
   const cur = trip.currency;
   // Verglichen wird nur das tägliche Geld. Eine bezahlte Vormerkung war nie
   // Teil des Tagesbudgets und würde den Tag sonst haltlos rot färben.
@@ -96,6 +98,6 @@ function dayGroup(group, trip, budget, today, actions) {
       h('p.daygroup__total', money(group.total, cur)),
     ),
     compare ? bar(ratio, tone) : null,
-    h('div.list', ...group.items.map((e) => expenseRow(e, trip, actions.editExpense))),
+    h('div.list', ...group.items.map((e) => expenseRow(e, trip, rowOpts))),
   );
 }

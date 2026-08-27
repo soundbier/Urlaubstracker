@@ -2,7 +2,7 @@
 import { h, s, icon } from '../dom.js';
 import { computeBudget, dailySeries, settleUp, spentByCategory, todayISO } from '../calc.js';
 import { money, moneySigned, days, dayMonthShort, number } from '../format.js';
-import { tile, sectionTitle, contributionRow, emptyState, bar, bufferLabel } from '../ui/parts.js';
+import { tile, sectionTitle, contributionRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
 
 export function renderBudget(state, actions) {
   const { trip, expenses, contributions } = state;
@@ -14,27 +14,20 @@ export function renderBudget(state, actions) {
     h('div.card',
       h('div.card__head',
         h('div', h('p.summary__label', 'In der Kasse'), h('p.summary__value', money(b.remaining, cur))),
-        h('p.summary__meta', potMeta(b, cur)),
+        potMeta(b, cur),
       ),
       bar(b.spentRatio, b.remaining < 0 ? 'over' : b.spentRatio > 0.85 ? 'warn' : 'good'),
-      b.planned
-        ? h('p.card__note', icon('calendar', 16),
-            ` Davon sind ${money(b.planned, cur)} verplant — frei verfügbar sind ${money(b.free, cur)}. Das Tagesbudget teilt nur ${money(b.budgetBase, cur)} auf.`)
-        : null,
       h('div.tiles.tiles--flat',
-        tile('Pro Tag', money(b.planPerDay, cur), `${money(b.budgetBase, cur)} ÷ ${days(b.totalDays)}`),
+        tile('Pro Tag', money(b.planPerDay, cur), `auf ${days(b.totalDays)}`),
         tile('Heute', b.phase === 'after' ? '—' : money(b.perDayToday, cur), trip.budgetMode === 'fixed' ? 'fester Satz' : 'Rest ÷ Resttage'),
         tile('Ø bisher', b.elapsedDays ? money(b.pace, cur) : '—', b.elapsedDays ? `über ${days(b.elapsedDays)}` : 'noch nichts'),
       ),
       b.elapsedDays && b.total
         ? h('p.card__note',
             b.buffer >= 0 ? icon('check', 16) : icon('info', 16),
-            ` Ihr liegt ${bufferLabel(b.buffer, cur)}. `,
-            // Aus einem oder zwei Tagen lässt sich nichts hochrechnen — der erste
-            // Tankstopp sagt noch nicht, wie der Urlaub ausgeht.
-            b.phase === 'during' && b.elapsedDays >= 3 ? projection(b.projectedLeftover, cur) : '',
-          )
+            ` Ihr liegt ${bufferLabel(b.buffer, cur)}.`)
         : null,
+      howItWorks(b, trip, cur),
     ),
 
     b.total ? h('section.section', sectionTitle('Verlauf'), trendChart(trip, contributions, expenses, today, b)) : null,
@@ -54,7 +47,45 @@ export function renderBudget(state, actions) {
 
     expenses.length ? h('section.section', sectionTitle('Wofür ging das Geld?'), categoryList(expenses, b.spent, cur)) : null,
 
-    h('section.section', sectionTitle('Endabrechnung'), settlement(trip, contributions, expenses, cur)),
+    h('section.section',
+      sectionTitle('Endabrechnung'),
+      // An Tag 6 von 14 ist das keine Anweisung, sondern ein Zwischenstand —
+      // und der ändert sich mit jeder Ausgabe wieder. Aufgeklappt steht er
+      // erst da, wenn er auch gilt.
+      b.phase === 'after'
+        ? settlement(trip, contributions, expenses, cur, b.phase)
+        : disclosure('Zwischenstand ansehen', h('span.disclosure__summary', 'Stand jetzt'),
+            settlement(trip, contributions, expenses, cur, b.phase)),
+    ),
+  );
+}
+
+/**
+ * Wie aus der Kasse ein Tagesbudget wird.
+ *
+ * Steht zugeklappt da, weil es die Frage beantwortet, die man einmal stellt
+ * und dann nicht mehr. Offen liegen die Zahlen, offen liegt auch die
+ * Erklärung — dann sind es aber elf Zahlen auf einer Karte, und keine davon
+ * bleibt hängen.
+ */
+function howItWorks(b, trip, cur) {
+  return disclosure('Wie wird gerechnet?', null,
+    h('div.stack',
+      b.planned
+        ? h('p.field__note', `Von den ${money(b.remaining, cur)} in der Kasse sind ${money(b.planned, cur)} verplant — die sind vergeben, aber noch nicht bezahlt. Frei verfügbar sind ${money(b.free, cur)}.`)
+        : null,
+      h('p.field__note', trip.budgetMode === 'fixed'
+        ? `Fester Satz: ${money(b.budgetBase, cur)} geteilt durch ${days(b.totalDays)} macht ${money(b.planPerDay, cur)} pro Tag — jeden Tag denselben Betrag.`
+        : `${money(b.budgetBase, cur)} verteilen sich auf ${days(b.totalDays)}: ${money(b.planPerDay, cur)} pro Tag im Plan. Was heute drin ist, wird jeden Morgen neu gerechnet — Restgeld geteilt durch die verbleibenden Tage.`),
+      b.reserved
+        ? h('p.field__note', 'Verplantes Geld läuft am Tagesbudget vorbei, auch nachdem es bezahlt ist: sonst spränge das Tagesbudget genau dann nach oben, wenn das Hotel abgebucht wird.')
+        : null,
+      // Aus einem oder zwei Tagen lässt sich nichts hochrechnen — der erste
+      // Tankstopp sagt noch nicht, wie der Urlaub ausgeht.
+      b.phase === 'during' && b.elapsedDays >= 3
+        ? h('p.field__note', projection(b.projectedLeftover, cur))
+        : null,
+    ),
   );
 }
 
@@ -65,10 +96,16 @@ function projection(leftover, cur) {
     : `Wenn es so weitergeht, bleiben am Ende ${money(leftover, cur)} übrig.`;
 }
 
-/** „In der Kasse“ zeigt Bargeld; verplant ist davon schon vergeben. */
+/**
+ * „In der Kasse“ zeigt Bargeld; verplant ist davon schon vergeben. Zwei Zeilen
+ * statt einer umbrechenden: neben einer großen Zahl liest sich ein Satz, der
+ * mitten im Betrag umbricht, wie ein dritter Wert.
+ */
 function potMeta(b, cur) {
-  const base = `${money(b.spent, cur)} von ${money(b.total, cur)} ausgegeben`;
-  return b.planned ? `${base} · ${money(b.planned, cur)} verplant` : base;
+  return h('div.summary__meta',
+    h('span', `${money(b.spent, cur)} von ${money(b.total, cur)} ausgegeben`),
+    b.planned ? h('span', `davon ${money(b.planned, cur)} verplant`) : null,
+  );
 }
 
 // ------------------------------------------------------------------- Verlauf
@@ -146,8 +183,9 @@ function categoryList(expenses, total, cur) {
  * privat Bezahltes zählen gleich viel; der Rest auf dem Konto wird an die
  * Guthaben ausgezahlt, und was dann noch offen ist, überweist man sich direkt.
  */
-function settlement(trip, contributions, expenses, cur) {
+function settlement(trip, contributions, expenses, cur, phase = 'after') {
   const st = settleUp({ trip, contributions, expenses });
+  const done = phase === 'after';
 
   if (!st.totalSpent && !st.potBalance) {
     return emptyState('Sobald Geld eingezahlt oder ausgegeben ist, steht hier, wer wem was schuldet.');
@@ -186,6 +224,10 @@ function settlement(trip, contributions, expenses, cur) {
 
   return h('div',
     table,
-    h('div.callout.callout--soft', h('p.callout__title', 'Zum Ausgleich'), h('ul.settle__todo', ...actions)),
+    h('div.callout.callout--soft',
+      h('p.callout__title', done ? 'Zum Ausgleich' : 'Stand jetzt'),
+      done ? null : h('p.settle__hint', 'Würdet ihr heute abrechnen:'),
+      h('ul.settle__todo', ...actions),
+    ),
   );
 }
