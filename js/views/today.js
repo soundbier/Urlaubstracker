@@ -22,9 +22,7 @@ export function renderToday(state, actions) {
     hero(b, cur, actions),
     knowsMe ? null : whoAmI(trip, actions),
     h('div.tiles',
-      b.planned
-        ? tile('Frei', money(b.free, cur), `${money(b.planned, cur)} verplant`, { tone: b.free < 0 ? 'over' : '' })
-        : tile('Übrig', money(b.remaining, cur), `von ${money(b.total, cur)}`, { tone: b.remaining < 0 ? 'over' : '' }),
+      tile('Ausgegeben', money(b.spent, cur), `von ${money(b.total, cur)}`),
       tile(
         b.phase === 'after' ? 'Urlaub' : 'Noch',
         b.phase === 'after' ? 'vorbei' : b.phase === 'before' ? days(b.daysUntilStart) : days(b.daysLeft),
@@ -95,6 +93,7 @@ function hero(b, cur, actions) {
       h('p.hero__amount', money(b.planPerDay, cur)),
       h('p.hero__sub', `pro Tag — ${money(b.budgetBase, cur)} auf ${days(b.totalDays)}`),
       b.planned ? h('p.hero__foot', `${money(b.planned, cur)} sind schon verplant und bleiben außen vor`) : null,
+      heroTotal(b, cur),
     );
   }
 
@@ -118,5 +117,20 @@ function hero(b, cur, actions) {
       b.spentToday ? `${money(b.spentToday, cur)} heute schon ausgegeben` : 'heute noch nichts ausgegeben',
       b.planned ? ` · ${money(b.planned, cur)} verplant` : '',
     ),
+    heroTotal(b, cur),
+  );
+}
+
+/**
+ * Die Tageszahl beantwortet „was geht heute noch?“ — nicht „wie viel ist
+ * überhaupt noch da?“. Dafür stand bisher nur die Kachel weiter unten; hier
+ * steht die Summe direkt unter der großen Zahl, abgesetzt durch eine Linie,
+ * damit sie ihr nicht die Aufmerksamkeit klaut.
+ */
+function heroTotal(b, cur) {
+  return h('div.hero__total', { class: b.free < 0 ? 'hero__total--over' : '' },
+    h('span.hero__total-label', 'Insgesamt verfügbar'),
+    h('span.hero__total-value', money(b.free, cur)),
+    h('span.hero__total-note', `von ${money(b.total, cur)} in der Kasse`),
   );
 }

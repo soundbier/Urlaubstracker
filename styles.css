@@ -1,4 +1,4 @@
-/* Urlaubstracker — mobil zuerst, hell und dunkel, große Tippflächen. */
+/* Urlaubstracker — mobil zuerst, helles Design, große Tippflächen. */
 
 /* ------------------------------------------------------------ Grundlagen */
 
@@ -30,32 +30,9 @@
   --safe-b: env(safe-area-inset-bottom, 0px);
   --page: min(560px, 100%);
 
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0b1220;
-    --surface: #141d2e;
-    --surface-2: #1c2739;
-    --border: #26334a;
-    --text: #e8eef7;
-    --text-muted: #94a3b8;
-    --text-faint: #64748b;
-
-    --accent: #2dd4bf;
-    --accent-soft: #123a3a;
-    --good: #34d399;
-    --good-soft: #10352c;
-    --warn: #fbbf24;
-    --warn-soft: #3a2f10;
-    --over: #fb7185;
-    --over-soft: #3d1520;
-    --in: #4ade80;
-
-    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 12px 28px -18px rgb(0 0 0 / 80%);
-    --shadow-lift: 0 10px 34px -10px rgb(0 0 0 / 70%);
-  }
+  /* Die App läuft immer hell: eine Fassung, die überall gleich aussieht und
+     bei der Beträge auf Papierweiß stehen statt auf getöntem Nachtblau. */
+  color-scheme: light;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -197,7 +174,6 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   font-weight: 620;
   box-shadow: var(--shadow-lift);
 }
-@media (prefers-color-scheme: dark) { .fab { color: #04201d; } }
 .fab:active { transform: translateY(1px); }
 .fab__label { font-size: 0.92rem; }
 
@@ -214,10 +190,11 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   gap: 6px;
   text-align: center;
 }
-.hero--good { background: linear-gradient(170deg, var(--good-soft), var(--surface) 72%); border-color: color-mix(in srgb, var(--good) 22%, var(--border)); }
-.hero--warn { background: linear-gradient(170deg, var(--warn-soft), var(--surface) 72%); border-color: color-mix(in srgb, var(--warn) 26%, var(--border)); }
-.hero--over { background: linear-gradient(170deg, var(--over-soft), var(--surface) 72%); border-color: color-mix(in srgb, var(--over) 28%, var(--border)); }
-.hero--soon { background: linear-gradient(170deg, var(--accent-soft), var(--surface) 72%); }
+/* Eine Tönung, kein Verlauf: die große Zahl soll auffallen, nicht der Karton. */
+.hero--good { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 22%, var(--border)); }
+.hero--warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 26%, var(--border)); }
+.hero--over { background: var(--over-soft); border-color: color-mix(in srgb, var(--over) 28%, var(--border)); }
+.hero--soon { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
 
 .hero__label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
 .hero__amount {
@@ -232,6 +209,23 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .hero__foot { font-size: 0.76rem; color: var(--text-faint); margin-top: 2px; }
 .hero .bar { margin-top: 12px; }
 .hero .btn { margin-top: 12px; align-self: center; }
+
+/* Die Gesamtsumme unter dem Strich: die Tageszahl bleibt die Hauptsache,
+   aber wie viel überhaupt noch da ist, will man ohne Weiterblättern sehen. */
+.hero__total {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.hero__total-label { font-size: 0.8rem; color: var(--text-muted); }
+.hero__total-value { font-size: 1.15rem; font-weight: 680; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.hero__total-note { font-size: 0.76rem; color: var(--text-faint); flex-basis: 100%; }
+.hero__total--over .hero__total-value { color: var(--over); }
 
 /* -------------------------------------------------------------- Kacheln */
 
@@ -549,7 +543,6 @@ select.field__input { background-image: none; }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.55; }
 .btn--primary { background: var(--accent); color: #fff; }
-@media (prefers-color-scheme: dark) { .btn--primary { color: #04201d; } }
 .btn--ghost { background: transparent; border-color: var(--border); color: var(--text-muted); }
 .btn--danger { color: var(--over); border-color: color-mix(in srgb, var(--over) 35%, var(--border)); }
 .btn--primary.btn--danger { background: var(--over); color: #fff; border-color: transparent; }
@@ -592,7 +585,6 @@ select.field__input { background-image: none; }
   border-color: var(--accent);
   color: #fff;
 }
-@media (prefers-color-scheme: dark) { .chip.is-active { color: #04201d; } }
 .chip .icon { margin-left: -2px; }
 .chip--date { position: relative; overflow: hidden; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
@@ -682,7 +674,7 @@ select.field__input { background-image: none; }
   width: 62px; height: 62px;
   border-radius: 18px;
   display: grid; place-items: center;
-  background: linear-gradient(160deg, #14b8a6, #0e74d2);
+  background: var(--accent);
   color: #fff;
   font-size: 2rem;
   font-weight: 700;
