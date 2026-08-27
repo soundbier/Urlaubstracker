@@ -118,7 +118,8 @@ let toastTimer = null;
 export function toast(message, { type = 'info', duration = 3200 } = {}) {
   let host = $('#toast');
   if (!host) {
-    host = h('div#toast.toast', { role: 'status', 'aria-live': 'polite' });
+    // Die Kennung gehört in die Attribute: `h` kennt nur Klassen im Tag-Namen.
+    host = h('div.toast', { id: 'toast', role: 'status', 'aria-live': 'polite' });
     document.body.append(host);
   }
   host.className = `toast toast--${type} is-visible`;

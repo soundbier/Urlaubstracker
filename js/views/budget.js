@@ -14,11 +14,15 @@ export function renderBudget(state, actions) {
     h('div.card',
       h('div.card__head',
         h('div', h('p.summary__label', 'In der Kasse'), h('p.summary__value', money(b.remaining, cur))),
-        h('p.summary__meta', `${money(b.spent, cur)} von ${money(b.total, cur)} ausgegeben`),
+        h('p.summary__meta', potMeta(b, cur)),
       ),
       bar(b.spentRatio, b.remaining < 0 ? 'over' : b.spentRatio > 0.85 ? 'warn' : 'good'),
+      b.planned
+        ? h('p.card__note', icon('calendar', 16),
+            ` Davon sind ${money(b.planned, cur)} verplant — frei verfügbar sind ${money(b.free, cur)}. Das Tagesbudget teilt nur ${money(b.budgetBase, cur)} auf.`)
+        : null,
       h('div.tiles.tiles--flat',
-        tile('Pro Tag', money(b.planPerDay, cur), `${money(b.total, cur)} ÷ ${days(b.totalDays)}`),
+        tile('Pro Tag', money(b.planPerDay, cur), `${money(b.budgetBase, cur)} ÷ ${days(b.totalDays)}`),
         tile('Heute', b.phase === 'after' ? '—' : money(b.perDayToday, cur), trip.budgetMode === 'fixed' ? 'fester Satz' : 'Rest ÷ Resttage'),
         tile('Ø bisher', b.elapsedDays ? money(b.pace, cur) : '—', b.elapsedDays ? `über ${days(b.elapsedDays)}` : 'noch nichts'),
       ),
@@ -59,6 +63,12 @@ function projection(leftover, cur) {
   return leftover < 0
     ? `Wenn es so weitergeht, fehlen am Ende ${money(-leftover, cur)}.`
     : `Wenn es so weitergeht, bleiben am Ende ${money(leftover, cur)} übrig.`;
+}
+
+/** „In der Kasse“ zeigt Bargeld; verplant ist davon schon vergeben. */
+function potMeta(b, cur) {
+  const base = `${money(b.spent, cur)} von ${money(b.total, cur)} ausgegeben`;
+  return b.planned ? `${base} · ${money(b.planned, cur)} verplant` : base;
 }
 
 // ------------------------------------------------------------------- Verlauf

@@ -26,6 +26,9 @@ Weitere Kleinigkeiten:
   die das halbe Sheet verdeckt.
 - **Bezahlt von** — aus der gemeinsamen Kasse oder aus eigener Tasche. Beides
   zählt in der Endabrechnung richtig.
+- **Verplant** — Ausgaben, die feststehen, aber noch nicht bezahlt sind (Hotel,
+  Mietwagen, Bootstour). Sie werden vom Tagesbudget abgezogen, bevor geteilt
+  wird. Ein Tipp auf den Haken macht daraus eine bezahlte Ausgabe.
 - **Offline** — die App startet ohne Netz, Eingaben werden nachgereicht.
 - **Export** — CSV für Excel, JSON als Sicherungskopie.
 
@@ -35,10 +38,16 @@ Weitere Kleinigkeiten:
 
 Es gibt zwei Modi (umstellbar unter *Mehr → Tagesbudget*):
 
+Verplantes Geld ist in beiden Modi vorab abgezogen: es steht zwar noch auf dem
+Konto, ist aber schon vergeben. Aus 2000 € Kasse mit 250 € Verplantem werden
+also 1750 €, die sich auf die Urlaubstage verteilen. Wird die Vormerkung bezahlt,
+bleibt das Tagesbudget stehen — das Geld war ja nie Teil davon.
+
 **Mitwachsend** (Standard)
 
 ```
-Tagesbudget heute = (Gesamtbudget − alles vor heute Ausgegebene) ÷ verbleibende Tage
+Verfügbar        = Gesamtbudget − Verplantes
+Tagesbudget heute = (Verfügbar − alles vor heute Ausgegebene) ÷ verbleibende Tage
 ```
 
 Jeden Morgen neu gerechnet. Ein teurer Tag baut keine Schuld auf, er verteilt
@@ -48,7 +57,7 @@ sich still auf den Rest. Das ist der entspannte Modus: ihr müsst nichts
 **Fester Satz**
 
 ```
-Tagesbudget = Gesamtbudget ÷ Urlaubstage
+Tagesbudget = (Gesamtbudget − Verplantes) ÷ Urlaubstage
 ```
 
 Jeden Tag derselbe Betrag. Ob ihr insgesamt vor oder hinter dem Plan liegt,

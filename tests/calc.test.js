@@ -5,6 +5,7 @@ import {
   parseAmount, splitCents, allocateByShares,
   addDays, daysInclusive, dateRange, todayISO, isValidDate,
   computeBudget, dailySeries, settleUp, spentByCategory, groupByDay,
+  totalSpent, totalPlanned, plannedOnly, paidOnly,
   tripPhase, POT,
 } from '../js/calc.js';
 
@@ -92,6 +93,73 @@ test('Budget: Grundzahlen an Tag 3', () => {
   assert.equal(b.leftToday, 11000);
   assert.equal(b.buffer, 11000, 'liegen 110 € unter der Soll-Linie');
   assert.equal(b.status, 'good');
+});
+
+// Der Fall aus dem Alltag: 2000 € Kasse, 250 € sind vorher schon verplant.
+test('Budget: Verplantes wird abgezogen, bevor geteilt wird', () => {
+  const trip = { ...TRIP, startDate: '2026-07-01', endDate: '2026-07-10' };
+  const contrib = [{ id: 'c', personId: 'marie', amount: 200000, date: '2026-06-01' }];
+  const geplant = [{ id: 'p1', date: '2026-07-05', amount: 25000, category: 'stay', payer: POT, planned: true }];
+
+  const b = computeBudget({ trip, contributions: contrib, expenses: geplant, today: '2026-06-28' });
+  assert.equal(b.total, 200000);
+  assert.equal(b.spent, 0, 'vorgemerkt ist nicht ausgegeben');
+  assert.equal(b.planned, 25000);
+  assert.equal(b.free, 175000);
+  assert.equal(b.budgetBase, 175000);
+  assert.equal(b.planPerDay, 17500, '1750 € auf 10 Tage statt 2000 €');
+  assert.equal(b.perDayToday, 17500);
+  assert.equal(b.plannedAhead, 25000);
+});
+
+test('Budget: aus verplant wird bezahlt, ohne dass sich die Kasse verrechnet', () => {
+  const trip = { ...TRIP, startDate: '2026-07-01', endDate: '2026-07-10' };
+  const contrib = [{ id: 'c', personId: 'marie', amount: 200000, date: '2026-06-01' }];
+  const row = { id: 'p1', date: '2026-07-03', amount: 25000, category: 'stay', payer: POT };
+
+  // So, wie `markExpensePaid` es schreibt: die Marke wechselt, das Geld bleibt reserviert.
+  const vorher = computeBudget({ trip, contributions: contrib, expenses: [{ ...row, planned: true }], today: '2026-07-03' });
+  const nachher = computeBudget({ trip, contributions: contrib, expenses: [{ ...row, planned: false, fromPlan: true }], today: '2026-07-03' });
+
+  assert.equal(vorher.free, nachher.remaining, 'das frei verfügbare Geld bleibt gleich');
+  assert.equal(vorher.planPerDay, nachher.planPerDay, 'auch das geplante Tagesbudget');
+  assert.equal(vorher.perDayToday, nachher.perDayToday, 'und das von heute');
+  assert.equal(nachher.spent, 25000, 'bezahlt ist bezahlt');
+  assert.equal(vorher.spentToday, 0);
+  assert.equal(nachher.spentToday, 0, 'die Vormerkung frisst nicht das Tagesbudget');
+  assert.equal(nachher.reserved, 25000);
+});
+
+test('Verplantes zählt weder als Ausgabe noch in der Abrechnung', () => {
+  const geplant = [...EXPENSES, { id: 'p1', date: '2026-07-08', amount: 12000, category: 'activity', payer: 'marie', planned: true }];
+  assert.equal(totalSpent(geplant), 34000);
+  assert.equal(totalPlanned(geplant), 12000);
+  assert.equal(paidOnly(geplant).length, 3);
+  assert.equal(plannedOnly(geplant).length, 1);
+
+  const ohne = settleUp({ trip: TRIP, contributions: CONTRIB, expenses: EXPENSES });
+  const mit = settleUp({ trip: TRIP, contributions: CONTRIB, expenses: geplant });
+  assert.deepEqual(mit.rows, ohne.rows, 'die Abrechnung bleibt unberührt');
+  assert.equal(mit.totalSpent, ohne.totalSpent);
+
+  assert.deepEqual(groupByDay(geplant).map((g) => g.date), groupByDay(EXPENSES).map((g) => g.date));
+  assert.deepEqual(spentByCategory(geplant), spentByCategory(EXPENSES));
+  assert.deepEqual(
+    dailySeries({ trip: TRIP, contributions: CONTRIB, expenses: geplant, today: TODAY }).map((d) => d.actual),
+    dailySeries({ trip: TRIP, contributions: CONTRIB, expenses: EXPENSES, today: TODAY }).map((d) => d.actual),
+  );
+});
+
+test('Budget: mehr verplant als da ist, wird als Überziehung gemeldet', () => {
+  const b = computeBudget({
+    trip: TRIP,
+    contributions: CONTRIB,
+    expenses: [{ id: 'p', date: '2026-07-09', amount: 200000, category: 'stay', payer: POT, planned: true }],
+    today: TODAY,
+  });
+  assert.equal(b.spent, 0);
+  assert.equal(b.free, -50000);
+  assert.equal(b.status, 'over');
 });
 
 test('Budget: das Tagesbudget schrumpft nicht, während man Ausgaben einträgt', () => {

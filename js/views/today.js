@@ -3,9 +3,9 @@
  * Sekunden erledigt hat und wieder Urlaub machen kann.
  */
 import { h, icon } from '../dom.js';
-import { computeBudget, todayISO } from '../calc.js';
+import { computeBudget, plannedOnly, todayISO } from '../calc.js';
 import { money, moneySigned, days, compactDate } from '../format.js';
-import { tile, sectionTitle, expenseRow, emptyState, bar } from '../ui/parts.js';
+import { tile, sectionTitle, expenseRow, plannedRow, emptyState, bar } from '../ui/parts.js';
 
 const TONE = { good: 'good', tight: 'warn', over: 'over', empty: 'muted' };
 
@@ -15,13 +15,16 @@ export function renderToday(state, actions) {
   const today = todayISO();
   const b = computeBudget({ trip, contributions, expenses, today });
   const cur = trip.currency;
-  const todays = expenses.filter((e) => e.date === today);
+  const todays = expenses.filter((e) => e.date === today && !e.planned);
+  const planned = plannedOnly(expenses);
 
   return h('div.view',
     hero(b, cur, actions),
     knowsMe ? null : whoAmI(trip, actions),
     h('div.tiles',
-      tile('Übrig', money(b.remaining, cur), `von ${money(b.total, cur)}`, { tone: b.remaining < 0 ? 'over' : '' }),
+      b.planned
+        ? tile('Frei', money(b.free, cur), `${money(b.planned, cur)} verplant`, { tone: b.free < 0 ? 'over' : '' })
+        : tile('Übrig', money(b.remaining, cur), `von ${money(b.total, cur)}`, { tone: b.remaining < 0 ? 'over' : '' }),
       tile(
         b.phase === 'after' ? 'Urlaub' : 'Noch',
         b.phase === 'after' ? 'vorbei' : b.phase === 'before' ? days(b.daysUntilStart) : days(b.daysLeft),
@@ -34,10 +37,22 @@ export function renderToday(state, actions) {
         { tone: b.elapsedDays && b.buffer < 0 ? 'over' : '' },
       ),
     ),
+    planned.length
+      ? h('section.section',
+          sectionTitle('Verplant', h('span.section__meta', money(b.planned, cur))),
+          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid }))),
+          h('p.section__note',
+            b.plannedOverdue
+              ? `${money(b.plannedOverdue, cur)} davon sind fällig — tippt den Haken, sobald bezahlt ist.`
+              : 'Dieses Geld ist reserviert und schon vom Tagesbudget abgezogen.',
+          ),
+        )
+      : null,
+
     h('section.section',
       sectionTitle(
         'Heute eingetragen',
-        todays.length ? h('span.section__meta', money(b.spentToday, cur)) : null,
+        todays.length ? h('span.section__meta', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
       ),
       todays.length
         ? h('div.list', ...todays.map((e) => expenseRow(e, trip, actions.editExpense)))
@@ -78,7 +93,8 @@ function hero(b, cur, actions) {
     return h('div.hero.hero--soon',
       h('p.hero__label', b.daysUntilStart === 0 ? 'Morgen geht es los' : `Losgeht's in ${days(b.daysUntilStart)}`),
       h('p.hero__amount', money(b.planPerDay, cur)),
-      h('p.hero__sub', `pro Tag — ${money(b.total, cur)} auf ${days(b.totalDays)}`),
+      h('p.hero__sub', `pro Tag — ${money(b.budgetBase, cur)} auf ${days(b.totalDays)}`),
+      b.planned ? h('p.hero__foot', `${money(b.planned, cur)} sind schon verplant und bleiben außen vor`) : null,
     );
   }
 
@@ -98,6 +114,9 @@ function hero(b, cur, actions) {
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),
     h('p.hero__sub', `von ${money(b.perDayToday, cur)} für heute`),
     bar(usedRatio, tone),
-    h('p.hero__foot', b.spentToday ? `${money(b.spentToday, cur)} heute schon ausgegeben` : 'heute noch nichts ausgegeben'),
+    h('p.hero__foot',
+      b.spentToday ? `${money(b.spentToday, cur)} heute schon ausgegeben` : 'heute noch nichts ausgegeben',
+      b.planned ? ` · ${money(b.planned, cur)} verplant` : '',
+    ),
   );
 }

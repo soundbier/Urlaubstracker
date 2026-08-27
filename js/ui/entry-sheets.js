@@ -83,26 +83,45 @@ function chipRow(options, selectedId, onSelect) {
   return row;
 }
 
-function dateRow(value, onChange) {
+/**
+ * Datumszeile mit Schnellwahl. `withTomorrow` blendet zusätzlich „Morgen“ ein —
+ * gebraucht wird das nur dort, wo auch in die Zukunft geplant werden kann.
+ * Gibt neben dem Element ein `set` zurück, damit die Maske das Datum auch von
+ * außen umstellen kann.
+ */
+function dateRow(value, onChange, { withTomorrow = false } = {}) {
   const today = todayISO();
   const input = h('input.field__input', { type: 'date', value, onchange: (e) => { value = e.target.value || today; sync(); onChange(value); } });
   const label = h('div.daterow__label');
 
   const quick = (iso, text) =>
-    h('button.chip', { type: 'button', dataset: { iso }, onclick: () => { value = iso; input.value = iso; sync(); onChange(iso); } }, text);
+    h('button.chip', { type: 'button', dataset: { iso }, onclick: () => { set(iso); onChange(iso); } }, text);
 
-  const chips = [quick(today, 'Heute'), quick(addDays(today, -1), 'Gestern'), quick(addDays(today, -2), dayLabel(addDays(today, -2), today, { compact: true }))];
+  const chips = [
+    quick(today, 'Heute'),
+    quick(addDays(today, -1), 'Gestern'),
+    withTomorrow ? quick(addDays(today, 1), 'Morgen') : quick(addDays(today, -2), dayLabel(addDays(today, -2), today, { compact: true })),
+  ];
 
   function sync() {
     label.textContent = fullDate(value);
     chips.forEach((c) => c.classList.toggle('is-active', c.dataset.iso === value));
   }
+
+  function set(iso) {
+    value = iso;
+    input.value = iso;
+    sync();
+  }
   sync();
 
-  return h('div.daterow',
-    h('div.chips', ...chips, h('label.chip.chip--date', icon('calendar', 17), 'Datum', input)),
-    label,
-  );
+  return {
+    el: h('div.daterow',
+      h('div.chips', ...chips, h('label.chip.chip--date', icon('calendar', 17), 'Datum', input)),
+      label,
+    ),
+    set,
+  };
 }
 
 function field(labelText, control) {
@@ -112,19 +131,29 @@ function field(labelText, control) {
 /**
  * Ausgabe anlegen oder bearbeiten.
  * Gibt `{ action: 'save', values }`, `{ action: 'delete' }` oder `undefined` zurück.
+ *
+ * Eine Ausgabe kann „schon bezahlt“ oder „verplant“ sein. Verplant heißt: das
+ * Geld ist fest eingeplant, aber noch nicht weg — es wird vom Tagesbudget
+ * abgezogen, taucht aber weder in der Tagesausgabe noch in der Abrechnung auf.
+ * Wer ein Datum in der Zukunft wählt, meint fast immer genau das; deshalb
+ * springt die Umschaltung von allein um, solange man sie nicht selbst angefasst
+ * hat.
  */
 export function expenseSheet({ trip, expense = null, defaults = {} }) {
   const editing = Boolean(expense);
+  const today = todayISO();
   let category = expense?.category || defaults.category || 'food';
   let date = expense?.date || defaults.date || todayISO();
   let payer = expense?.payer || defaults.payer || POT;
+  let planned = expense ? expense.planned === true : defaults.planned === true || date > today;
+  let plannedTouched = editing || defaults.planned !== undefined;
   const amount = amountField(expense?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: expense?.note || '', placeholder: 'z. B. Abendessen am Hafen', maxlength: 120, enterkeyhint: 'done' });
 
   const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' }))];
 
   return openSheet({
-    title: editing ? 'Ausgabe bearbeiten' : 'Was habt ihr ausgegeben?',
+    title: editing ? 'Eintrag bearbeiten' : 'Was kostet euch das?',
     fullHeight: true,
     build: (close) => {
       const save = () => {
@@ -134,18 +163,68 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
           amount.focusHint.classList.add('is-error');
           return;
         }
-        close({ action: 'save', values: { amount: cents, date, category, payer, note: note.value } });
+        close({
+          action: 'save',
+          values: {
+            amount: cents, date, category, payer, note: note.value, planned,
+            // Wer eine Vormerkung von Hand auf „bezahlt“ stellt, macht dasselbe
+            // wie der Haken in der Liste: reserviert bleibt reserviert.
+            fromPlan: planned ? false : expense?.planned === true || expense?.fromPlan === true,
+          },
+        });
       };
+
+      const submit = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 20));
+      const dateLabel = h('span.field__label');
+      const payerLabelEl = h('span.field__label');
+      const kindNote = h('p.field__note');
+      const when = dateRow(date, (iso) => {
+        date = iso;
+        // Ein künftiges Datum meint eine Vormerkung — außer man hat die
+        // Umschaltung schon selbst bedient.
+        if (!plannedTouched && iso > today !== planned) setPlanned(iso > today);
+        syncKind();
+      }, { withTomorrow: true });
+
+      const kindButtons = [
+        h('button.segmented__btn', { type: 'button', onclick: () => { plannedTouched = true; setPlanned(false); } }, 'Schon bezahlt'),
+        h('button.segmented__btn', { type: 'button', onclick: () => { plannedTouched = true; setPlanned(true); } }, 'Verplant'),
+      ];
+
+      function setPlanned(next) {
+        planned = next;
+        // „Schon bezahlt“ und ein Datum in der Zukunft passen nicht zusammen:
+        // dann ist heute gemeint.
+        if (!planned && date > today) { date = today; when.set(today); }
+        syncKind();
+      }
+
+      function syncKind() {
+        kindButtons[0].classList.toggle('is-active', !planned);
+        kindButtons[1].classList.toggle('is-active', planned);
+        dateLabel.textContent = planned ? 'Wann ist es fällig?' : 'Wann?';
+        payerLabelEl.textContent = planned ? 'Wer zahlt das?' : 'Bezahlt von';
+        kindNote.textContent = planned
+          ? 'Wird vom verfügbaren Geld abgezogen, zählt aber erst als Ausgabe, wenn ihr sie als bezahlt eintragt.'
+          : 'Ist bezahlt und zählt sofort zu den Ausgaben.';
+        submit.replaceChildren(icon('check', 20), editing ? 'Speichern' : planned ? 'Vormerken' : 'Eintragen');
+      }
+      syncKind();
 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
+        h('div.field',
+          h('span.field__label', 'Status'),
+          h('div.segmented', ...kindButtons),
+          kindNote,
+        ),
         field('Wofür?', chipRow(CATEGORIES.map((c) => ({ id: c.id, label: c.short, icon: c.icon })), category, (id) => { category = id; })),
-        field('Wann?', dateRow(date, (iso) => { date = iso; })),
-        field('Bezahlt von', chipRow(payers, payer, (id) => { payer = id; })),
+        h('label.field', dateLabel, when.el),
+        h('label.field', payerLabelEl, chipRow(payers, payer, (id) => { payer = id; })),
         field('Notiz', note),
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 20), editing ? 'Speichern' : 'Eintragen'),
+          submit,
         ),
       );
     },
@@ -178,7 +257,7 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
         field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' })), personId, (id) => { personId = id; })),
-        field('Wann?', dateRow(date, (iso) => { date = iso; })),
+        field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
         field('Notiz', note),
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,

@@ -328,6 +328,49 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .row__amount { font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .row__amount--in { color: var(--in); }
 
+/* Vorgemerkte Ausgaben: die Zeile trägt zwei Knöpfe — antippen zum Bearbeiten,
+   der Haken rechts trägt sie als bezahlt ein. */
+.list--planned { background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
+.prow {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--border);
+}
+.prow:first-child { border-top: 0; }
+.prow__open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 4px 12px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+.prow__open:active { background: var(--surface-2); }
+.prow__done {
+  flex: none;
+  width: 52px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: none;
+  color: var(--good);
+}
+.prow__done:active { background: var(--good-soft); }
+.row__icon--planned {
+  background: transparent;
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
+  color: var(--accent);
+}
+.row__amount--planned { color: var(--text-muted); }
+.prow.is-overdue .row__icon--planned { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); color: var(--warn); }
+.tag--due { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.tag--plan { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.section__note { font-size: 0.76rem; color: var(--text-faint); }
+
 .tag {
   font-size: 0.68rem;
   font-weight: 600;

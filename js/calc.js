@@ -122,25 +122,61 @@ export function allocateByShares(cents, shares) {
 
 const sum = (rows, pick) => rows.reduce((acc, r) => acc + (pick(r) || 0), 0);
 
+/**
+ * Verplante Ausgaben sind vorgemerkt, aber noch nicht bezahlt: das Geld liegt
+ * noch in der Kasse, ist aber schon vergeben. Sie zählen deshalb nirgends als
+ * Ausgabe mit — sie werden nur vom verteilbaren Geld abgezogen, bevor das
+ * Tagesbudget entsteht. Wird so ein Eintrag bezahlt, verliert er diese Marke
+ * und bekommt `fromPlan` (siehe unten).
+ */
+export const isPlanned = (e) => e?.planned === true;
+
+/**
+ * War es eine Vormerkung und ist inzwischen bezahlt? Diese Marke bleibt am
+ * Eintrag hängen, damit das reservierte Geld auch nach dem Bezahlen aus dem
+ * Tagesbudget herausgerechnet bleibt. Sonst spränge das Tagesbudget in dem
+ * Moment nach oben, in dem das Hotel bezahlt wird — obwohl gerade Geld weg ist.
+ */
+export const isFromPlan = (e) => e?.fromPlan === true && !isPlanned(e);
+
+/** Vorgemerktes oder daraus bezahltes Geld: läuft am Tagesbudget vorbei. */
+export const isReserved = (e) => isPlanned(e) || isFromPlan(e);
+
+/** Nur die tatsächlich bezahlten Ausgaben. */
+export const paidOnly = (expenses) => expenses.filter((e) => !isPlanned(e));
+
+/** Bezahlte Ausgaben ohne die aus einer Vormerkung — das tägliche Geld. */
+export const everydayOnly = (expenses) => expenses.filter((e) => !isReserved(e));
+
+/** Nur die vorgemerkten Ausgaben, nach Datum aufsteigend. */
+export const plannedOnly = (expenses) =>
+  expenses.filter(isPlanned).sort((a, b) => (a.date === b.date ? (a.createdAt || 0) - (b.createdAt || 0) : a.date < b.date ? -1 : 1));
+
 export function totalContributed(contributions) {
   return sum(contributions, (c) => c.amount);
 }
 
+/** Was wirklich weg ist. Vorgemerktes zählt hier bewusst nicht mit. */
 export function totalSpent(expenses) {
-  return sum(expenses, (e) => e.amount);
+  return sum(paidOnly(expenses), (e) => e.amount);
+}
+
+/** Was vorgemerkt, aber noch nicht bezahlt ist. */
+export function totalPlanned(expenses) {
+  return sum(expenses.filter(isPlanned), (e) => e.amount);
 }
 
 /** Summen je Kalendertag: `{ '2026-07-03': 4210, … }` */
 export function spentByDay(expenses) {
   const out = {};
-  for (const e of expenses) out[e.date] = (out[e.date] || 0) + e.amount;
+  for (const e of paidOnly(expenses)) out[e.date] = (out[e.date] || 0) + e.amount;
   return out;
 }
 
 /** Ausgaben je Kategorie, absteigend sortiert. */
 export function spentByCategory(expenses) {
   const acc = {};
-  for (const e of expenses) {
+  for (const e of paidOnly(expenses)) {
     const id = CATEGORY_BY_ID[e.category] ? e.category : 'other';
     acc[id] = (acc[id] || 0) + e.amount;
   }
@@ -152,7 +188,7 @@ export function spentByCategory(expenses) {
 /** Ausgaben nach Tag gruppiert, neueste zuerst; innerhalb eines Tages neueste Eingabe zuerst. */
 export function groupByDay(expenses) {
   const days = new Map();
-  for (const e of expenses) {
+  for (const e of paidOnly(expenses)) {
     if (!days.has(e.date)) days.set(e.date, []);
     days.get(e.date).push(e);
   }
@@ -188,11 +224,30 @@ export function tripPhase(trip, today) {
  *
  * Wichtig: das Tagesbudget wird aus dem Stand von *heute früh* gerechnet.
  * Sonst würde es beim Eintragen einer Ausgabe unter den Fingern schrumpfen.
+ *
+ * Verplantes Geld (`planned`) ist schon vergeben, aber noch nicht bezahlt. Es
+ * wird vom verteilbaren Geld abgezogen, bevor geteilt wird: bei 2000 € Kasse
+ * und 250 € Vorgemerktem rechnet das Tagesbudget mit 1750 €. Sonst würde die
+ * App jeden Tag Geld anbieten, das längst für das Hotel eingeplant ist. Nach
+ * dem Bezahlen bleibt der Betrag über `fromPlan` draußen — das Tagesbudget
+ * darf nicht in dem Moment nach oben springen, in dem Geld abfließt.
  */
 export function computeBudget({ trip, contributions = [], expenses = [], today = todayISO() }) {
+  const paid = paidOnly(expenses);
+  const everyday = everydayOnly(expenses);
   const total = totalContributed(contributions);
   const spent = totalSpent(expenses);
+  const planned = totalPlanned(expenses);
+  const paidFromPlan = sum(paid.filter(isFromPlan), (e) => e.amount);
+  // Alles, was einmal verplant war — offen oder inzwischen bezahlt. Genau
+  // dieser Betrag bleibt dauerhaft aus dem Tagesbudget heraus.
+  const reserved = planned + paidFromPlan;
+  const spentEveryday = sum(everyday, (e) => e.amount);
   const remaining = total - spent;
+  // Was nach Abzug des noch offenen Vorgemerkten wirklich frei verfügbar ist.
+  const free = remaining - planned;
+  // Die Grundlage aller Tagesbudgets: die Kasse ohne das Vergebene.
+  const budgetBase = total - reserved;
 
   const totalDays = daysInclusive(trip.startDate, trip.endDate);
   const phase = tripPhase(trip, today);
@@ -203,26 +258,35 @@ export function computeBudget({ trip, contributions = [], expenses = [], today =
   // Tage, auf die sich das Restgeld noch verteilt — heute zählt mit.
   const daysLeft = phase === 'before' ? totalDays : phase === 'after' ? 0 : totalDays - elapsedDays + 1;
 
-  const spentToday = sum(expenses.filter((e) => e.date === today), (e) => e.amount);
-  const spentBeforeToday = sum(expenses.filter((e) => e.date < today), (e) => e.amount);
-  const availableThisMorning = total - spentBeforeToday;
+  // Fürs Tagesbudget zählt nur das tägliche Geld: eine bezahlte Vormerkung war
+  // nie Teil davon und darf den Tag nicht auffressen.
+  const spentToday = sum(everyday.filter((e) => e.date === today), (e) => e.amount);
+  const spentBeforeToday = sum(everyday.filter((e) => e.date < today), (e) => e.amount);
+  const availableThisMorning = budgetBase - spentBeforeToday;
 
-  const planPerDay = totalDays > 0 ? Math.round(total / totalDays) : 0;
+  // Vorgemerktes, aufgeteilt danach, wann es dran ist — für die Anzeige.
+  const plannedRows = plannedOnly(expenses);
+  const plannedToday = sum(plannedRows.filter((e) => e.date === today), (e) => e.amount);
+  const plannedAhead = sum(plannedRows.filter((e) => e.date > today), (e) => e.amount);
+  const plannedOverdue = sum(plannedRows.filter((e) => e.date < today), (e) => e.amount);
+
+  const planPerDay = totalDays > 0 ? Math.round(budgetBase / totalDays) : 0;
   const dynamicPerDay = daysLeft > 0 ? Math.floor(availableThisMorning / daysLeft) : 0;
   const perDayToday = trip.budgetMode === 'fixed' ? planPerDay : dynamicPerDay;
   const leftToday = perDayToday - spentToday;
 
   // Polster: wie weit liegen wir gegenüber „gleichmäßig ausgeben“ vorn oder hinten.
-  const buffer = planPerDay * elapsedDays - spent;
+  const buffer = planPerDay * elapsedDays - spentEveryday;
 
-  // Hochrechnung: wenn es im Schnitt so weitergeht wie bisher.
-  const pace = elapsedDays > 0 ? Math.round(spent / elapsedDays) : 0;
-  const projectedTotal = elapsedDays > 0 ? pace * totalDays : 0;
-  const projectedLeftover = elapsedDays > 0 ? total - projectedTotal : remaining;
+  // Hochrechnung: wenn es im Schnitt so weitergeht wie bisher. Das Reservierte
+  // kommt obendrauf — es folgt keinem Schnitt, es steht ja schon fest.
+  const pace = elapsedDays > 0 ? Math.round(spentEveryday / elapsedDays) : 0;
+  const projectedTotal = elapsedDays > 0 ? pace * totalDays + reserved : 0;
+  const projectedLeftover = elapsedDays > 0 ? total - projectedTotal : free;
 
   let status;
   if (total === 0) status = 'empty';
-  else if (remaining < 0) status = 'over';
+  else if (remaining < 0 || free < 0) status = 'over';
   else if (leftToday < 0) status = 'over';
   else if (perDayToday > 0 && leftToday < perDayToday * 0.2) status = 'tight';
   else status = 'good';
@@ -230,7 +294,17 @@ export function computeBudget({ trip, contributions = [], expenses = [], today =
   return {
     total,
     spent,
+    spentEveryday,
+    planned,
+    reserved,
+    paidFromPlan,
+    plannedToday,
+    plannedAhead,
+    plannedOverdue,
+    plannedCount: plannedRows.length,
+    budgetBase,
     remaining,
+    free,
     totalDays,
     elapsedDays,
     daysLeft,
@@ -249,6 +323,7 @@ export function computeBudget({ trip, contributions = [], expenses = [], today =
     projectedLeftover,
     status,
     spentRatio: total > 0 ? Math.min(1, spent / total) : 0,
+    plannedRatio: total > 0 ? Math.min(1, Math.max(0, planned) / total) : 0,
   };
 }
 
@@ -260,10 +335,13 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
   const total = totalContributed(contributions);
   const days = dateRange(trip.startDate, trip.endDate);
   const perDay = spentByDay(expenses);
-  const planPerDay = total / days.length;
+  // Die Soll-Linie verteilt nur das freie Geld: sie endet nicht bei null,
+  // sondern beim vorgemerkten Betrag, der bis zuletzt reserviert bleibt.
+  const reserved = totalPlanned(expenses);
+  const planPerDay = (total - reserved) / days.length;
 
   // Ausgaben vor Reisebeginn zählen mit, sonst fehlt Geld ohne Erklärung.
-  let cum = sum(expenses.filter((e) => e.date < trip.startDate), (e) => e.amount);
+  let cum = sum(paidOnly(expenses).filter((e) => e.date < trip.startDate), (e) => e.amount);
 
   return days.map((date, i) => {
     const spentOnDay = perDay[date] || 0;
@@ -295,17 +373,20 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
  */
 export function settleUp({ trip, contributions = [], expenses = [] }) {
   const people = trip.people || [];
-  const spent = totalSpent(expenses);
+  // Vorgemerktes ist noch nicht geflossen und gehört deshalb nicht in die
+  // Abrechnung — sonst schuldete jemand Geld für ein Hotel, das keiner zahlte.
+  const paid = paidOnly(expenses);
+  const spent = totalSpent(paid);
 
   const shares = people.map((p) => (typeof p.share === 'number' && p.share > 0 ? p.share : 1));
   const fairShares = allocateByShares(spent, shares);
 
-  const paidIntoPot = sum(expenses.filter((e) => e.payer === POT), (e) => e.amount);
+  const paidIntoPot = sum(paid.filter((e) => e.payer === POT), (e) => e.amount);
   const potBalance = totalContributed(contributions) - paidIntoPot;
 
   const rows = people.map((p, i) => {
     const paidIn = sum(contributions.filter((c) => c.personId === p.id), (c) => c.amount);
-    const paidPrivate = sum(expenses.filter((e) => e.payer === p.id), (e) => e.amount);
+    const paidPrivate = sum(paid.filter((e) => e.payer === p.id), (e) => e.amount);
     return {
       personId: p.id,
       name: p.name,
