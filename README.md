@@ -198,7 +198,7 @@ um den Update-Ablauf auszuprobieren.
 
 ```
 index.html            App-Hülle
-styles.css            komplettes Stylesheet, hell und dunkel
+styles.css            komplettes Stylesheet, helles Design
 sw.js                 Service Worker: Offline-Betrieb und Update-Steuerung
 manifest.webmanifest  Installation als App
 

@@ -9,7 +9,7 @@
   "id": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0b1220",
+  "background_color": "#f4f6f8",
   "theme_color": "#0f766e",
   "categories": ["finance", "travel", "productivity"],
   "icons": [
