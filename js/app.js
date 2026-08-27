@@ -56,6 +56,16 @@ const actions = {
     }
   },
 
+  /** Aus einer Vormerkung wird eine bezahlte Ausgabe — ein Tipp auf den Haken. */
+  async markExpensePaid(expense) {
+    try {
+      await store.markExpensePaid(expense.id);
+      toast('Als bezahlt eingetragen.');
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
   async editExpense(expense) {
     const result = await expenseSheet({ trip: state.trip, expense });
     if (!result) return;

@@ -88,7 +88,11 @@ test('Import füllt fehlende Angaben mit etwas Brauchbarem', () => {
 
 test('Was exportiert wurde, lässt sich wieder einlesen', () => {
   const contributions = [{ id: 'c1', personId: 'p1', amount: 80000, date: '2026-06-20', note: '' }];
-  const expenses = [{ id: 'e1', date: '2026-07-01', amount: 20000, category: 'stay', payer: POT, note: '' }];
+  const expenses = [
+    { id: 'e1', date: '2026-07-01', amount: 20000, category: 'stay', payer: POT, note: '', planned: false, fromPlan: false },
+    { id: 'e2', date: '2026-07-08', amount: 12000, category: 'activity', payer: POT, note: 'Bootstour', planned: true, fromPlan: false },
+    { id: 'e3', date: '2026-07-02', amount: 30000, category: 'stay', payer: POT, note: 'Hotel', planned: false, fromPlan: true },
+  ];
   const back = parseImport(buildExport({ trip: TRIP, contributions, expenses }));
 
   assert.deepEqual(back.contributions, contributions);

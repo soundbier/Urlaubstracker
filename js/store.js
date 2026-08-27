@@ -214,7 +214,7 @@ export async function setMyPerson(personId) {
 
 // --------------------------------------------------------------- Ausgaben
 
-export async function addExpense({ amount, date, category, note, payer }) {
+export async function addExpense({ amount, date, category, note, payer, planned = false, fromPlan = false }) {
   const now = Date.now();
   const row = {
     id: newId(),
@@ -223,6 +223,9 @@ export async function addExpense({ amount, date, category, note, payer }) {
     category: category || 'other',
     note: (note || '').trim(),
     payer: payer || POT,
+    // Vorgemerkt: das Geld ist eingeplant, aber noch nicht ausgegeben.
+    planned: planned === true,
+    fromPlan: planned !== true && fromPlan === true,
     createdAt: now,
     updatedAt: now,
     createdBy: state.myPersonId || null,
@@ -235,6 +238,27 @@ export async function updateExpense(id, patch) {
   const row = state.expenses.find((e) => e.id === id);
   if (!row) return;
   await backend.putExpense({ ...row, ...patch, updatedAt: Date.now() });
+}
+
+/**
+ * Aus einer Vormerkung wird eine echte Ausgabe.
+ *
+ * Bezahlt wird jetzt — deshalb rückt ein in der Zukunft geplanter Eintrag auf
+ * den heutigen Tag. Ein überfälliger behält sein Datum: dann war das Geld an
+ * dem Tag weg, an dem es geplant war.
+ */
+export async function markExpensePaid(id, today = todayISO()) {
+  const row = state.expenses.find((e) => e.id === id);
+  if (!row || !row.planned) return;
+  await backend.putExpense({
+    ...row,
+    planned: false,
+    // Bleibt am Eintrag hängen: das Geld war reserviert und soll auch bezahlt
+    // nicht noch einmal vom Tagesbudget abgezogen werden.
+    fromPlan: true,
+    date: row.date > today ? today : row.date,
+    updatedAt: Date.now(),
+  });
 }
 
 export async function deleteExpense(id) {

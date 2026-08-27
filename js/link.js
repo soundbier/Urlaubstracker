@@ -103,6 +103,9 @@ export function parseImport(text) {
       ...e,
       category: CATEGORY_BY_ID[e.category] ? e.category : 'other',
       payer: e.payer === POT || knownPerson.has(e.payer) ? e.payer : POT,
+      // Nur eine echte Marke zählt; alles andere ist eine bezahlte Ausgabe.
+      planned: e.planned === true,
+      fromPlan: e.fromPlan === true && e.planned !== true,
     })),
   };
 }
@@ -122,7 +125,9 @@ export function buildCsv({ trip, expenses, contributions }) {
   }
   for (const e of [...expenses].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const payer = e.payer === POT ? 'Gemeinsame Kasse' : personName(e.payer);
-    lines.push(['Ausgabe', e.date, money(e.amount), categoryLabel(e.category), payer, e.note].map(esc).join(';'));
+    // Vorgemerktes steht mit eigener Art da — sonst zählte eine Tabelle Geld
+    // mit, das noch gar nicht ausgegeben ist.
+    lines.push([e.planned === true ? 'Verplant' : 'Ausgabe', e.date, money(e.amount), categoryLabel(e.category), payer, e.note].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';
