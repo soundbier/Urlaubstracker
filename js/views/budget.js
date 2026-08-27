@@ -1,7 +1,7 @@
 /** Die Kasse: was reinkam, wie es sich verteilt, und wer am Ende was bekommt. */
 import { h, s, icon } from '../dom.js';
 import { computeBudget, dailySeries, settleUp, spentByCategory, todayISO } from '../calc.js';
-import { money, moneySigned, days, dayMonthShort, number } from '../format.js';
+import { money, moneySigned, days, dayMonthShort } from '../format.js';
 import { tile, sectionTitle, contributionRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
 
 export function renderBudget(state, actions) {
@@ -12,14 +12,13 @@ export function renderBudget(state, actions) {
 
   return h('div.view',
     h('div.card',
-      h('div.card__head',
-        h('div', h('p.summary__label', 'In der Kasse'), h('p.summary__value', money(b.remaining, cur))),
-        potMeta(b, cur),
-      ),
+      potHead(b, cur),
       bar(b.spentRatio, b.remaining < 0 ? 'over' : b.spentRatio > 0.85 ? 'warn' : 'good'),
       h('div.tiles.tiles--flat',
         tile('Pro Tag', money(b.planPerDay, cur), `auf ${days(b.totalDays)}`),
-        tile('Heute', b.phase === 'after' ? '—' : money(b.perDayToday, cur), trip.budgetMode === 'fixed' ? 'fester Satz' : 'Rest ÷ Resttage'),
+        // Einzeilige Untertexte: „Rest ÷ Resttage“ brach um und schob die eine
+        // Kachel höher als ihre beiden Nachbarn.
+        tile('Heute', b.phase === 'after' ? '—' : money(b.perDayToday, cur), trip.budgetMode === 'fixed' ? 'fester Satz' : 'mitwachsend'),
         tile('Ø bisher', b.elapsedDays ? money(b.pace, cur) : '—', b.elapsedDays ? `über ${days(b.elapsedDays)}` : 'noch nichts'),
       ),
       b.elapsedDays && b.total
@@ -97,14 +96,21 @@ function projection(leftover, cur) {
 }
 
 /**
- * „In der Kasse“ zeigt Bargeld; verplant ist davon schon vergeben. Zwei Zeilen
- * statt einer umbrechenden: neben einer großen Zahl liest sich ein Satz, der
- * mitten im Betrag umbricht, wie ein dritter Wert.
+ * „In der Kasse“ zeigt Bargeld; verplant ist davon schon vergeben.
+ *
+ * Die Einordnung stand rechts neben der großen Zahl und rutschte auf schmalen
+ * Schirmen darunter — dann klebte sie rechtsbündig unter einer linksbündigen
+ * Zahl und sah aus wie ein zweiter, eigener Wert. Jetzt steht sie einfach
+ * darunter, an derselben Kante wie alles andere auf der Karte.
  */
-function potMeta(b, cur) {
-  return h('div.summary__meta',
-    h('span', `${money(b.spent, cur)} von ${money(b.total, cur)} ausgegeben`),
-    b.planned ? h('span', `davon ${money(b.planned, cur)} verplant`) : null,
+function potHead(b, cur) {
+  return h('div.pot',
+    h('p.summary__label', 'In der Kasse'),
+    h('p.summary__value', money(b.remaining, cur)),
+    h('p.pot__meta',
+      `${money(b.spent, cur)} von ${money(b.total, cur)} ausgegeben`,
+      b.planned ? ` · ${money(b.planned, cur)} verplant` : '',
+    ),
   );
 }
 
@@ -161,6 +167,11 @@ function trendChart(trip, contributions, expenses, today, budget) {
 
 // --------------------------------------------------------------- Kategorien
 
+/**
+ * Der Balken ist der Anteil — daneben stand er bis eben noch einmal als
+ * Prozentzahl. Die dritte Spalte hat außerdem die Beträge von der rechten
+ * Kante weggeschoben, an der sie sich sonst untereinander vergleichen lassen.
+ */
 function categoryList(expenses, total, cur) {
   const rows = spentByCategory(expenses);
   return h('div.catlist', ...rows.map((c) => {
@@ -171,7 +182,6 @@ function categoryList(expenses, total, cur) {
         h('div.cat__top', h('span.cat__label', c.label), h('span.cat__amount', money(c.amount, cur))),
         bar(share, 'neutral'),
       ),
-      h('span.cat__pct', `${number(share * 100)} %`),
     );
   }));
 }

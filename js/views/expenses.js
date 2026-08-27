@@ -2,7 +2,7 @@
 import { h, icon } from '../dom.js';
 import { computeBudget, groupByDay, paidOnly, plannedOnly, everydayOnly, todayISO, CATEGORY_BY_ID, CATEGORIES } from '../calc.js';
 import { money, dayLabel, plural } from '../format.js';
-import { expenseRow, plannedRow, sectionTitle, emptyState, bar } from '../ui/parts.js';
+import { expenseRow, plannedRow, sectionTitle, emptyState } from '../ui/parts.js';
 
 /** Über Neuaufbauten hinweg gemerkt, damit der Filter beim Eintragen stehen bleibt. */
 let filter = 'all';
@@ -73,6 +73,15 @@ function dayNote(everydayTotal, budget, date, today, cur) {
   return date === today ? `noch ${money(diff, cur)} bis zum Schnitt` : `${money(diff, cur)} unter dem Schnitt`;
 }
 
+/**
+ * Ein Tag mit seinen Einträgen.
+ *
+ * Über jeder Gruppe stand bis eben ein farbiger Balken und darunter derselbe
+ * Sachverhalt noch einmal als Satz. Auf einer Liste mit sieben Tagen macht das
+ * sieben Balken in Grün, Orange und Rot — die Seite sieht wichtig aus, ohne
+ * mehr zu sagen. Geblieben ist der Satz, direkt unter dem Tagesbetrag; über
+ * dem Schnitt färbt er sich, sonst bleibt er still.
+ */
 function dayGroup(group, trip, budget, today, rowOpts) {
   const cur = trip.currency;
   // Verglichen wird nur das tägliche Geld. Eine bezahlte Vormerkung war nie
@@ -84,20 +93,17 @@ function dayGroup(group, trip, budget, today, rowOpts) {
   // keinen Schnitt, gegen den sie liegen könnte.
   const inTrip = group.date >= trip.startDate && group.date <= trip.endDate;
   const compare = inTrip && budget.planPerDay > 0;
-  const ratio = compare ? everydayTotal / budget.planPerDay : 0;
-  const tone = ratio > 1 ? 'over' : ratio > 0.85 ? 'warn' : 'good';
 
   return h('section.daygroup',
     h('header.daygroup__head',
-      h('div',
-        h('h3.daygroup__title', dayLabel(group.date, today)),
+      h('h3.daygroup__title', dayLabel(group.date, today)),
+      h('div.daygroup__nums',
+        h('p.daygroup__total', money(group.total, cur)),
         compare
-          ? h('p.daygroup__sub', dayNote(everydayTotal, budget, group.date, today, cur))
+          ? h('p.daygroup__sub', { class: everydayTotal > budget.planPerDay ? 'is-over' : '' }, dayNote(everydayTotal, budget, group.date, today, cur))
           : inTrip ? null : h('p.daygroup__sub', 'außerhalb des Urlaubs'),
       ),
-      h('p.daygroup__total', money(group.total, cur)),
     ),
-    compare ? bar(ratio, tone) : null,
     h('div.list', ...group.items.map((e) => expenseRow(e, trip, rowOpts))),
   );
 }

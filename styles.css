@@ -303,6 +303,12 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .summary__value { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .summary__meta { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.8rem; color: var(--text-muted); text-align: right; }
 
+/* Kassenstand im Budget: Beschriftung, Zahl und Einordnung stehen unter-
+   einander an derselben linken Kante. Der Betrag darf umbrechen, ohne dass
+   die Einordnung daneben rutscht und wie ein zweiter Wert aussieht. */
+.pot { display: flex; flex-direction: column; gap: 1px; }
+.pot__meta { font-size: 0.8rem; color: var(--text-muted); }
+
 .callout {
   border-radius: var(--radius-sm);
   border: 1px dashed var(--border);
@@ -383,17 +389,19 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   border-top: 0;
   padding-right: 4px;
 }
+/* Ohne Trennlinie: über eine Liste von zwanzig Einträgen zog sie eine zweite
+   Spalte durch die Seite, als stünde dort etwas zum Ablesen. */
 .erow__again {
   flex: none;
-  width: 52px;
+  width: 48px;
   display: grid;
   place-items: center;
   border: 0;
-  border-left: 1px solid var(--border);
   background: none;
   color: var(--text-faint);
+  opacity: 0.75;
 }
-.erow__again:active { background: var(--surface-2); color: var(--accent); }
+.erow__again:active { background: var(--surface-2); color: var(--accent); opacity: 1; }
 
 /* Vorgemerkte Ausgaben: die Zeile trägt zwei Knöpfe — antippen zum Bearbeiten,
    der Haken rechts trägt sie als bezahlt ein. */
@@ -464,9 +472,13 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
 .daygroups { display: flex; flex-direction: column; gap: 18px; }
 .daygroup { display: flex; flex-direction: column; gap: 8px; }
-.daygroup__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.daygroup__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .daygroup__title { font-size: 0.95rem; font-weight: 640; }
+/* Betrag und Einordnung stehen als Block rechts: eine Kante, an der das Auge
+   die Tage untereinander vergleicht. */
+.daygroup__nums { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
 .daygroup__sub { font-size: 0.74rem; color: var(--text-faint); }
+.daygroup__sub.is-over { color: var(--over); }
 .daygroup__total { font-weight: 660; font-variant-numeric: tabular-nums; }
 
 /* --------------------------------------------------------------- Balken */
@@ -513,7 +525,6 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .cat__top { display: flex; justify-content: space-between; gap: 10px; font-size: 0.86rem; }
 .cat__label { color: var(--text-muted); }
 .cat__amount { font-weight: 620; font-variant-numeric: tabular-nums; }
-.cat__pct { font-size: 0.76rem; color: var(--text-faint); width: 42px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------ Abrechnung */
 
