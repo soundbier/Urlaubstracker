@@ -16,7 +16,7 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
 
 | Bereich | Was ihr dort tut |
 | --- | --- |
-| **Heute** | Eine große Zahl: was heute noch übrig ist. Darunter drei Kacheln — verfügbar, Resttage, Polster — und die Einträge des Tages. |
+| **Heute** | Eine große Zahl: was heute noch übrig ist. Darunter drei Kennzahlen — verfügbar, Resttage, Polster — und die Einträge des Tages. |
 | **Ausgaben** | Alles nach Tagen gruppiert, mit Filter nach Kategorie. Antippen zum Ändern. |
 | **Budget** | Einzahlungen, Verlauf über den Urlaub, Aufteilung nach Kategorie, Endabrechnung. |
 | **Mehr** | Zeitraum, Währung, Reisegruppe, Kostenaufteilung, Synchronisierung, Export. |
@@ -99,7 +99,7 @@ Tagesbudget = (Gesamtbudget − Verplantes) ÷ Urlaubstage
 ```
 
 Jeden Tag derselbe Betrag. Ob ihr insgesamt vor oder hinter dem Plan liegt,
-zeigt die Kachel **Polster**.
+zeigt die Kennzahl **Polster**.
 
 Wichtig: Das Tagesbudget wird immer aus dem Stand von *heute früh* gerechnet.
 Sonst würde die Zahl beim Eintragen einer Ausgabe unter den Fingern schrumpfen.

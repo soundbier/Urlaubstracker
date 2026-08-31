@@ -1,43 +1,68 @@
-/* Urlaubstracker — mobil zuerst, helles Design, große Tippflächen. */
+/*
+ * Urlaubstracker — mobil zuerst, große Tippflächen, wenig Dekor.
+ *
+ * Die Gestaltung trägt hier nichts bei, was die Zahlen nicht selbst sagen:
+ * Struktur entsteht über Abstand, Schriftgröße und Haarlinien, nicht über
+ * Kästen. Ein Rahmen steht nur dort, wo etwas wirklich zusammengehört; ein
+ * Schatten nur dort, wo etwas tatsächlich über dem Inhalt schwebt.
+ */
 
 /* ------------------------------------------------------------ Grundlagen */
 
 :root {
-  --bg: #f4f6f8;
+  /* Farben. Der Grund ist ein warmes Papierweiß statt des üblichen kühlen
+     Grau — dieselbe Helligkeit, aber die App sieht damit nach Reise aus und
+     nicht nach Verwaltungsoberfläche. */
+  --bg: #f8f7f4;
   --surface: #ffffff;
-  --surface-2: #eef1f5;
-  --border: #e2e6ec;
-  --text: #101828;
-  --text-muted: #64748b;
-  --text-faint: #94a3b8;
+  --surface-2: #efece6;
+  --border: #e3ded5;
+  --text: #1b1a17;
+  --text-muted: #6b655c;
+  --text-faint: #8f887d;
 
+  /* Eine Akzentfarbe und zwei semantische Töne — mehr nicht. „Gut“ hat keine
+     eigene Farbe mehr: dafür stand ein zweites Grün neben dem Akzent, das
+     nach einer zweiten Bedeutung aussah, wo dieselbe gemeint war. Gut heißt
+     jetzt schlicht „nicht rot“. */
   --accent: #0f766e;
-  --accent-soft: #d6f2ee;
-  --good: #0f766e;
-  --good-soft: #d6f2ee;
-  --warn: #b45309;
-  --warn-soft: #fdf0d9;
-  --over: #be123c;
-  --over-soft: #fde7ec;
-  --in: #15803d;
+  --accent-soft: #e2efec;
+  --warn: #a4600b;
+  --warn-soft: #f7edde;
+  --over: #b8123c;
 
-  --radius: 18px;
-  --radius-sm: 12px;
-  --shadow: 0 1px 2px rgb(16 24 40 / 6%), 0 8px 24px -16px rgb(16 24 40 / 24%);
-  --shadow-lift: 0 8px 30px -8px rgb(16 24 40 / 28%);
+  /* Wenige, bewusste Radien: 10 für Flächen und Knöpfe, 6 für Kleinteile,
+     rund nur dort, wo die Form etwas bedeutet (Punkt, Chip, Meldung). */
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-pill: 999px;
 
-  --nav-h: 62px;
+  /* Der einzige Schatten der App — für das, was wirklich über dem Inhalt
+     liegt: der schwebende Knopf, das Sheet, die Meldung. */
+  --shadow-float: 0 6px 22px -10px rgb(28 26 22 / 40%);
+
+  /* Schriftgrößen als Leiter, damit nicht jede Ansicht ihre eigene erfindet. */
+  --fs-display: clamp(2.5rem, 12.5vw, 3.2rem);
+  --fs-xl: 1.6rem;
+  --fs-lg: 1.05rem;
+  --fs-md: 0.95rem;
+  --fs-sm: 0.85rem;
+  --fs-xs: 0.78rem;
+  --fs-2xs: 0.72rem;
+
+  --gutter: 16px;
+  --tap: 44px;
+  --nav-h: 60px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --page: min(560px, 100%);
 
-  /* Schrift auf gefüllten Flächen (Accent, Warnung, Fehler). Ein Wert für
+  /* Schrift auf gefüllten Flächen (Akzent, Warnung, Fehler). Ein Wert für
      alle drei: hell sind sie dunkel genug für Weiß, dunkel hell genug für
      Tinte. */
   --on-accent: #ffffff;
-  --toast-bg: #101828;
-  --toast-text: #f8fafc;
-  --toast-border: transparent;
-  --scrim: rgb(2 6 23 / 45%);
+  --toast-bg: #26241f;
+  --toast-text: #f7f6f3;
+  --scrim: rgb(28 26 22 / 42%);
 
   color-scheme: light;
 }
@@ -51,35 +76,30 @@
  * `dark` auf — hier steht deshalb nur ein Block statt zweier gleicher.
  */
 :root[data-theme='dark'] {
-  --bg: #10151b;
-  --surface: #171e26;
-  --surface-2: #212a35;
-  --border: #2c3743;
-  --text: #e6ecf3;
-  --text-muted: #97a6b6;
-  --text-faint: #7d8ea0;
+  --bg: #14161a;
+  --surface: #1b1e23;
+  --surface-2: #24282f;
+  --border: #2f343c;
+  --text: #e9eaec;
+  --text-muted: #9aa0a8;
+  --text-faint: #7d838c;
 
-  --accent: #2dd4bf;
-  --accent-soft: #14312e;
-  --good: #34d399;
-  --good-soft: #14312a;
-  --warn: #fbbf24;
-  --warn-soft: #362a10;
-  --over: #fb7185;
-  --over-soft: #3a1a24;
-  --in: #4ade80;
+  /* Ein ruhigeres Türkis als der Neonton, den dunkle Oberflächen sonst gern
+     tragen: hell genug zum Lesen, leise genug für den Abend. */
+  --accent: #38bfae;
+  --accent-soft: #17322e;
+  --warn: #dda33f;
+  --warn-soft: #332810;
+  --over: #ef7489;
 
   /* Auf hellem Türkis, hellem Bernstein und hellem Rosé liest sich Weiß
      nicht mehr — dort steht jetzt Tinte. */
-  --on-accent: #06201d;
-  --toast-bg: #2b3644;
-  --toast-text: #f1f5f9;
-  --toast-border: #3d4a5a;
+  --on-accent: #06211e;
+  --toast-bg: #2b3038;
+  --toast-text: #f1f2f4;
   --scrim: rgb(0 0 0 / 62%);
 
-  /* Schatten tragen im Dunkeln nicht; die Kanten machen die Ränder. */
-  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 10px 26px -18px rgb(0 0 0 / 70%);
-  --shadow-lift: 0 10px 32px -10px rgb(0 0 0 / 75%);
+  --shadow-float: 0 8px 26px -12px rgb(0 0 0 / 75%);
 
   color-scheme: dark;
 }
@@ -106,7 +126,7 @@ ul, ol { padding: 0; list-style: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-strong { font-weight: 650; }
+strong { font-weight: 640; }
 
 .icon { flex: none; }
 /* Ohne diese Zeile bliebe ein `hidden` an einem Knopf wirkungslos: `.btn`
@@ -114,7 +134,14 @@ strong { font-weight: 650; }
    Browsers — auch bei gleicher Spezifität. */
 [hidden] { display: none !important; }
 .muted { color: var(--text-muted); }
-.small { font-size: 0.82rem; }
+.small { font-size: var(--fs-xs); }
+/* Ein Nachsatz unter einer Zahl oder einem Abschnitt. */
+.note { font-size: var(--fs-xs); color: var(--text-muted); }
+
+:where(button, a, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 
 /* --------------------------------------------------------------- Gerüst */
 
@@ -133,41 +160,44 @@ strong { font-weight: 650; }
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) 18px 12px;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--gutter) 10px;
   /* Deckend, damit beim Scrollen nichts durch die Kopfzeile schimmert. */
   background: var(--bg);
 }
 .topbar__main { min-width: 0; flex: 1; }
 .topbar__title {
-  font-size: 1.12rem;
-  font-weight: 650;
-  letter-spacing: -0.01em;
+  font-size: var(--fs-lg);
+  font-weight: 640;
+  letter-spacing: -0.012em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.topbar__sub { font-size: 0.8rem; color: var(--text-muted); }
+.topbar__sub { font-size: var(--fs-xs); color: var(--text-muted); }
 
+/* Der Zustand der Synchronisierung. Ohne Kreis und ohne Rahmen: solange
+   alles läuft, muss hier nichts leuchten. */
 .syncdot {
   display: grid;
   place-items: center;
-  width: 38px; height: 38px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
+  width: var(--tap); height: var(--tap);
+  margin-right: -10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--text-faint);
 }
-.syncdot--on { color: var(--good); border-color: color-mix(in srgb, var(--good) 40%, var(--border)); }
+.syncdot--on { color: var(--accent); }
 .syncdot--pending { color: var(--warn); }
-.syncdot--error { color: var(--over); border-color: color-mix(in srgb, var(--over) 45%, var(--border)); }
+.syncdot--error { color: var(--over); }
 
 .main { flex: 1; }
 
 .view {
-  padding: 4px 16px calc(var(--nav-h) + var(--safe-b) + 96px);
+  padding: 4px var(--gutter) calc(var(--nav-h) + var(--safe-b) + 96px);
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 28px;
 }
 .view--center {
   min-height: 70dvh;
@@ -177,9 +207,16 @@ strong { font-weight: 650; }
 body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
 .section { display: flex; flex-direction: column; gap: 10px; }
-.section__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.section__title { font-size: 0.82rem; font-weight: 620; text-transform: uppercase; letter-spacing: 0.07em; color: var(--text-muted); }
-.section__meta { font-size: 0.88rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+/* Abschnittsüberschriften in normaler Schreibweise: gesperrte Großbuchstaben
+   lassen jede Zwischenüberschrift wie eine Rubrik in einem Auswertungswerkzeug
+   aussehen. */
+.section__title { font-size: var(--fs-sm); font-weight: 640; color: var(--text); }
+.section__meta { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.section__note { font-size: var(--fs-2xs); color: var(--text-faint); }
+
+/* Eine Gruppe zusammengehöriger Felder — ohne Kasten darum. */
+.panel { display: flex; flex-direction: column; gap: 16px; }
 
 /* ----------------------------------------------------------- Navigation */
 
@@ -192,8 +229,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding-bottom: var(--safe-b);
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
-  backdrop-filter: blur(14px);
+  background: var(--surface);
   border-top: 1px solid var(--border);
 }
 .nav__item {
@@ -204,165 +240,144 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   padding: 9px 4px 8px;
   border: 0;
   background: none;
-  color: var(--text-faint);
+  color: var(--text-muted);
   height: var(--nav-h);
-  transition: color 0.15s;
 }
 .nav__item.is-active { color: var(--accent); }
-.nav__label { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.01em; }
+.nav__label { font-size: 0.69rem; font-weight: 600; }
 
 .fab {
   position: fixed;
-  right: max(16px, calc(50% - var(--page) / 2 + 16px));
+  right: max(var(--gutter), calc(50% - var(--page) / 2 + var(--gutter)));
   bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
   z-index: 31;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 14px 20px 14px 16px;
+  gap: 6px;
+  height: 52px;
+  padding: 0 20px 0 16px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
   font-weight: 620;
-  box-shadow: var(--shadow-lift);
+  box-shadow: var(--shadow-float);
 }
 .fab:active { transform: translateY(1px); }
 .fab__label { font-size: 0.92rem; }
 
-/* --------------------------------------------------------------- Hero */
+/* ----------------------------------------------------- Die große Zahl */
 
-.hero {
-  border-radius: var(--radius);
-  padding: 26px 22px 22px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  text-align: center;
-}
-/* Eine Tönung, kein Verlauf: die große Zahl soll auffallen, nicht der Karton. */
-.hero--good { background: var(--good-soft); border-color: color-mix(in srgb, var(--good) 22%, var(--border)); }
-.hero--warn { background: var(--warn-soft); border-color: color-mix(in srgb, var(--warn) 26%, var(--border)); }
-.hero--over { background: var(--over-soft); border-color: color-mix(in srgb, var(--over) 28%, var(--border)); }
-.hero--soon { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 22%, var(--border)); }
-
-.hero__label { font-size: 0.85rem; font-weight: 600; color: var(--text-muted); }
+/*
+ * Kein Kasten, keine Tönung, kein Schatten: die Zahl ist groß genug, um für
+ * sich zu stehen. Farbe bekommt sie nur, wenn sie etwas bedeutet — über dem
+ * Tagesbudget. Der Balken darunter trägt den Zustand.
+ */
+.hero { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 2px; }
+.hero__label { font-size: var(--fs-sm); color: var(--text-muted); }
 .hero__amount {
-  font-size: clamp(2.6rem, 13vw, 3.4rem);
-  font-weight: 700;
+  font-size: var(--fs-display);
+  font-weight: 660;
   letter-spacing: -0.035em;
-  line-height: 1.05;
+  line-height: 1.04;
   font-variant-numeric: tabular-nums;
 }
+.hero__sub { font-size: var(--fs-sm); color: var(--text-faint); margin-top: 2px; }
 .hero--over .hero__amount { color: var(--over); }
-.hero__sub { font-size: 0.88rem; color: var(--text-muted); }
-.hero .bar { margin-top: 12px; }
-.hero .btn { margin-top: 12px; align-self: center; }
+/* Ohne Zahl trägt die Zeile den Titel — dann ist sie die Überschrift der Seite. */
+.hero__title { font-size: 1.25rem; font-weight: 640; letter-spacing: -0.02em; }
+.hero__title + .hero__sub { margin-top: 4px; }
+.hero .bar { margin-top: 14px; }
+.hero .btn { margin-top: 14px; align-self: flex-start; }
 
-/* -------------------------------------------------------------- Kacheln */
+/* ------------------------------------------------------- Kennzahlreihe */
 
-.tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.tile {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 10px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.tiles--flat .tile { background: var(--surface-2); border-color: transparent; }
-.tile__label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); }
-/* Schrumpft mit, damit auch „− 1.100,00 €“ in einer Zeile in die Kachel passt.
+/*
+ * Drei Zahlen, die die große darüber einordnen. Getrennt durch einen Strich
+ * statt durch drei Rahmen — sie sind ein Satz, keine drei Meldungen.
+ */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); }
+.stat { padding-inline: 12px; border-left: 1px solid var(--border); min-width: 0; }
+.stat:first-child { padding-left: 0; border-left: 0; }
+.stat:last-child { padding-right: 0; }
+.stat__label { font-size: var(--fs-2xs); color: var(--text-faint); }
+/* Schrumpft mit, damit auch „− 1.100,00 €“ in einer Zeile in die Spalte passt.
    Umbrechen darf sie erst, wenn selbst das nicht mehr reicht — sonst steht das
    Eurozeichen allein auf der zweiten Zeile. */
-.tile__value { font-size: clamp(0.72rem, 3.3vw, 1.02rem); font-weight: 660; font-variant-numeric: tabular-nums; letter-spacing: -0.015em; overflow-wrap: anywhere; }
-.tile__sub { font-size: 0.7rem; color: var(--text-muted); line-height: 1.25; }
-.tile--over .tile__value { color: var(--over); }
-
-/* --------------------------------------------------------------- Karten */
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 18px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.stat__value {
+  font-size: clamp(0.78rem, 3.6vw, 1rem);
+  font-weight: 620;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
 }
-.card--plain { box-shadow: none; }
-.card__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.card__note { font-size: 0.83rem; color: var(--text-muted); display: flex; align-items: baseline; gap: 6px; }
-.card__note .icon { transform: translateY(2px); }
+.stat__sub { font-size: var(--fs-2xs); color: var(--text-faint); line-height: 1.3; }
+.stat--over .stat__value { color: var(--over); }
+
+/* --------------------------------------------------------- Kassenstand */
+
+.potblock { display: flex; flex-direction: column; gap: 14px; }
+.pot { display: flex; flex-direction: column; gap: 1px; }
+.pot__meta { font-size: var(--fs-xs); color: var(--text-faint); }
 
 .summary { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.summary__label { font-size: 0.8rem; color: var(--text-muted); font-weight: 600; }
-.summary__value { font-size: 1.7rem; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.summary__meta { display: flex; flex-direction: column; align-items: flex-end; font-size: 0.8rem; color: var(--text-muted); text-align: right; }
+.summary__label { font-size: var(--fs-sm); color: var(--text-muted); }
+.summary__value { font-size: var(--fs-xl); font-weight: 660; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.summary__meta { font-size: var(--fs-xs); color: var(--text-faint); text-align: right; }
 
-/* Kassenstand im Budget: Beschriftung, Zahl und Einordnung stehen unter-
-   einander an derselben linken Kante. Der Betrag darf umbrechen, ohne dass
-   die Einordnung daneben rutscht und wie ein zweiter Wert aussieht. */
-.pot { display: flex; flex-direction: column; gap: 1px; }
-.pot__meta { font-size: 0.8rem; color: var(--text-muted); }
-
+/* Ein Hinweis, der zum Umfeld gehört — kein Kasten mit gestrichelter Kante,
+   sondern eine ruhig abgesetzte Fläche. */
 .callout {
-  border-radius: var(--radius-sm);
-  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
   padding: 14px 16px;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   display: flex;
   flex-direction: column;
   gap: 10px;
   align-items: flex-start;
 }
-.callout--soft { border-style: solid; background: var(--surface-2); }
-.callout__title { font-size: 0.75rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-faint); }
+.callout__title { font-size: var(--fs-sm); font-weight: 620; color: var(--text); }
 
 /* --------------------------------------------------------------- Listen */
 
-.list {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
+/*
+ * Listen stehen direkt auf der Seite. Eine Haarlinie zwischen zwei Einträgen
+ * sagt dasselbe wie ein Rahmen um die ganze Liste — nur eben ohne den Rahmen,
+ * und über sieben Tagesgruppen sind das sieben Kästen weniger.
+ */
+.list { display: flex; flex-direction: column; }
+.list > * + * { border-top: 1px solid var(--border); }
+
 .row {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 14px;
+  min-height: 56px;
+  padding: 10px 0;
   border: 0;
-  border-top: 1px solid var(--border);
   background: none;
   text-align: left;
+  color: inherit;
 }
-.row:first-child { border-top: 0; }
 .row:active { background: var(--surface-2); }
+/* Nur das Symbol, kein gefülltes Kästchen darum: über zwanzig Zeilen war das
+   eine zweite Spalte aus grauen Quadraten. */
 .row__icon {
   flex: none;
-  width: 38px; height: 38px;
+  width: 22px; height: 22px;
   display: grid; place-items: center;
-  border-radius: 11px;
-  background: var(--surface-2);
-  color: var(--text-muted);
+  color: var(--text-faint);
 }
-.row__icon--person { color: #06202b; font-weight: 700; font-size: 0.95rem; }
+.row__icon--planned { color: var(--accent); }
 .row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 /* Zwei Zeilen statt einer Ellipse: „Ferienwohnung Anz…“ und „Mietwagen Rest…“
    waren auf einem 390-px-Schirm nicht mehr auseinanderzuhalten. */
 .row__title {
-  font-size: 0.95rem;
-  font-weight: 560;
+  font-size: var(--fs-md);
+  font-weight: 520;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -370,31 +385,19 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   line-clamp: 2;
   overflow-wrap: anywhere;
 }
-.row__sub { font-size: 0.76rem; color: var(--text-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.row__amount { font-weight: 640; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.row__amount--in { color: var(--in); }
+.row__sub { font-size: var(--fs-2xs); color: var(--text-faint); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.row__amount { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.row__amount--in { color: var(--accent); }
+.row__amount--planned { color: var(--text-muted); }
 /* Wer den Eintrag getippt hat — auf dem anderen Handy die Antwort auf „hat das
    schon jemand eingetragen?“. */
-.row__by { display: inline-flex; align-items: center; gap: 5px; color: var(--text-faint); }
+.row__by { display: inline-flex; align-items: center; gap: 5px; }
 
 /* Bezahlte Ausgaben: antippen bearbeitet, der Knopf rechts trägt dieselbe
    Ausgabe noch einmal ein. Bewusst blasser als der Haken bei den Vormerkungen —
    das hier ist eine Abkürzung, keine Aufgabe. */
-.erow {
-  display: flex;
-  align-items: stretch;
-  border-top: 1px solid var(--border);
-}
-.erow:first-child { border-top: 0; }
-.erow > .row {
-  flex: 1;
-  width: auto;
-  min-width: 0;
-  border-top: 0;
-  padding-right: 4px;
-}
-/* Ohne Trennlinie: über eine Liste von zwanzig Einträgen zog sie eine zweite
-   Spalte durch die Seite, als stünde dort etwas zum Ablesen. */
+.erow { display: flex; align-items: stretch; }
+.erow > .row { flex: 1; width: auto; min-width: 0; padding-right: 4px; }
 .erow__again {
   flex: none;
   width: 48px;
@@ -403,178 +406,151 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   border: 0;
   background: none;
   color: var(--text-faint);
-  opacity: 0.75;
 }
-.erow__again:active { background: var(--surface-2); color: var(--accent); opacity: 1; }
+.erow__again:active { color: var(--accent); }
 
 /* Vorgemerkte Ausgaben: die Zeile trägt zwei Knöpfe — antippen zum Bearbeiten,
-   der Haken rechts trägt sie als bezahlt ein. */
-.list--planned { background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface)); }
-.prow {
-  display: flex;
-  align-items: stretch;
-  border-top: 1px solid var(--border);
-}
-.prow:first-child { border-top: 0; }
+   der Haken rechts trägt sie als bezahlt ein. Die Tönung, die früher über der
+   ganzen Liste lag, ist weg: der Haken und das Symbol im Akzentton sagen schon,
+   dass hier noch etwas offen ist. */
+.prow { display: flex; align-items: stretch; }
 .prow__open {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 4px 12px 14px;
+  gap: 14px;
+  min-height: 56px;
+  padding: 10px 4px 10px 0;
   border: 0;
   background: none;
   text-align: left;
+  color: inherit;
 }
 .prow__open:active { background: var(--surface-2); }
 .prow__done {
   flex: none;
-  width: 52px;
+  width: 48px;
   display: grid;
   place-items: center;
   border: 0;
-  border-left: 1px solid var(--border);
   background: none;
-  color: var(--good);
-}
-.prow__done:active { background: var(--good-soft); }
-.row__icon--planned {
-  background: transparent;
-  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--border));
   color: var(--accent);
 }
-.row__amount--planned { color: var(--text-muted); }
-.prow.is-overdue .row__icon--planned { border-color: color-mix(in srgb, var(--warn) 55%, var(--border)); color: var(--warn); }
-.tag--due { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
-.tag--plan { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-.section__note { font-size: 0.76rem; color: var(--text-faint); }
+.prow__done:active { background: var(--accent-soft); border-radius: var(--radius-sm); }
+.prow.is-overdue .row__icon--planned { color: var(--warn); }
 
+/* Ein Beiwort an der Zeile — Zahler, Fälligkeit, Herkunft. Ohne Rahmen:
+   zwanzig umrandete Pillen in einer Liste sind zwanzig kleine Kästen. */
 .tag {
-  font-size: 0.68rem;
-  font-weight: 600;
+  font-size: var(--fs-2xs);
+  font-weight: 560;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--surface-2);
-  border: 1px solid var(--border);
   color: var(--text-muted);
 }
+.tag--due { background: var(--warn-soft); color: var(--warn); }
 
-.empty {
-  border: 1px dashed var(--border);
-  border-radius: var(--radius-sm);
-  padding: 22px 18px;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-.empty__text { font-size: 0.88rem; color: var(--text-muted); }
+.empty { padding: 18px 0 20px; }
+.empty__text { font-size: var(--fs-sm); color: var(--text-faint); }
+.empty .btn { margin-top: 14px; }
 
 /* ----------------------------------------------------------- Tagesgruppen */
 
-.daygroups { display: flex; flex-direction: column; gap: 18px; }
-.daygroup { display: flex; flex-direction: column; gap: 8px; }
-.daygroup__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.daygroup__title { font-size: 0.95rem; font-weight: 640; }
+.daygroups { display: flex; flex-direction: column; gap: 24px; }
+.daygroup { display: flex; flex-direction: column; gap: 2px; }
+.daygroup__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 6px; }
+.daygroup__title { font-size: var(--fs-md); font-weight: 620; }
 /* Betrag und Einordnung stehen als Block rechts: eine Kante, an der das Auge
    die Tage untereinander vergleicht. */
 .daygroup__nums { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
-.daygroup__sub { font-size: 0.74rem; color: var(--text-faint); }
+.daygroup__sub { font-size: var(--fs-2xs); color: var(--text-faint); }
 .daygroup__sub.is-over { color: var(--over); }
-.daygroup__total { font-weight: 660; font-variant-numeric: tabular-nums; }
+.daygroup__total { font-weight: 620; font-variant-numeric: tabular-nums; }
 
 /* --------------------------------------------------------------- Balken */
 
-.bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
-.bar__fill { height: 100%; border-radius: 999px; background: var(--accent); transition: width 0.3s ease; }
-.bar--good .bar__fill { background: var(--good); }
+.bar { height: 5px; border-radius: var(--radius-pill); background: var(--surface-2); overflow: hidden; }
+.bar__fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); transition: width 0.3s ease; }
 .bar--warn .bar__fill { background: var(--warn); }
 .bar--over .bar__fill { background: var(--over); }
-.bar--neutral .bar__fill { background: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.bar--neutral .bar__fill { background: color-mix(in srgb, var(--accent) 45%, var(--border)); }
 
 /* ---------------------------------------------------------------- Chart */
 
-.chart {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px 14px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
+.chart { display: flex; flex-direction: column; gap: 8px; }
 .chart__svg { width: 100%; height: 130px; display: block; }
 .chart__axis { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .chart__area { stroke: none; }
-.chart__stopTop { stop-color: var(--accent); stop-opacity: 0.3; }
+.chart__stopTop { stop-color: var(--accent); stop-opacity: 0.22; }
 .chart__stopBottom { stop-color: var(--accent); stop-opacity: 0.02; }
 .chart__plan { fill: none; stroke: var(--text-faint); stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .chart__actual { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.chart__dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
-.chart__legend { display: flex; gap: 16px; font-size: 0.74rem; color: var(--text-muted); }
+.chart__dot { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+.chart__legend { display: flex; gap: 16px; font-size: var(--fs-2xs); color: var(--text-muted); }
 .legend__item { display: inline-flex; align-items: center; gap: 6px; }
 .legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 .legend__swatch--actual { background: var(--accent); }
 .legend__swatch--plan { background: repeating-linear-gradient(90deg, var(--text-faint) 0 4px, transparent 4px 8px); }
-.chart__axisLabels { display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text-faint); }
+.chart__axisLabels { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--text-faint); }
 
 /* ------------------------------------------------------------ Kategorien */
 
-.catlist { display: flex; flex-direction: column; gap: 12px; }
+.catlist { display: flex; flex-direction: column; gap: 14px; }
 .cat { display: flex; align-items: center; gap: 12px; }
-.cat__icon { width: 26px; display: grid; place-items: center; color: var(--text-faint); }
+.cat__icon { width: 22px; display: grid; place-items: center; color: var(--text-faint); }
 .cat__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.cat__top { display: flex; justify-content: space-between; gap: 10px; font-size: 0.86rem; }
+.cat__top { display: flex; justify-content: space-between; gap: 10px; font-size: var(--fs-sm); }
 .cat__label { color: var(--text-muted); }
-.cat__amount { font-weight: 620; font-variant-numeric: tabular-nums; }
+.cat__amount { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------ Abrechnung */
 
-.split { display: flex; gap: 18px; padding: 12px 4px 0; flex-wrap: wrap; }
-.split__item { display: flex; align-items: center; gap: 7px; font-size: 0.84rem; }
+.split { display: flex; gap: 18px; padding-top: 12px; flex-wrap: wrap; }
+.split__item { display: flex; align-items: center; gap: 7px; font-size: var(--fs-sm); }
 .split__name { color: var(--text-muted); }
-.split__value { font-weight: 620; font-variant-numeric: tabular-nums; }
+.split__value { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
-.dot--lg { width: 14px; height: 14px; }
+.dot--lg { width: 13px; height: 13px; }
 
-.settle { display: flex; flex-direction: column; gap: 2px; }
+.settle { display: flex; flex-direction: column; }
 .settle__row {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 4px 12px;
   padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
-.settle__row:last-child { border-bottom: 0; }
+.settle__row:first-child { border-top: 0; }
 .settle__who { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.settle__nums { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 0.76rem; color: var(--text-muted); }
+.settle__nums { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-2xs); color: var(--text-muted); }
 .settle__share { color: var(--text-faint); }
-.settle__balance { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 680; font-variant-numeric: tabular-nums; color: var(--in); }
+.settle__balance { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 660; font-variant-numeric: tabular-nums; color: var(--accent); }
 .settle__balance.is-negative { color: var(--over); }
-.settle__todo { display: flex; flex-direction: column; gap: 8px; font-size: 0.88rem; color: var(--text); }
+.settle__todo { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text); }
 .settle__todo li { line-height: 1.4; }
 /* Mitten im Urlaub ist die Liste eine Momentaufnahme, keine Anweisung. */
-.settle__hint { font-size: 0.82rem; color: var(--text-muted); }
+.settle__hint { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* -------------------------------------------------------------- Formulare */
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field__label { font-size: 0.76rem; font-weight: 620; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-faint); }
+.field__label { font-size: var(--fs-xs); font-weight: 560; color: var(--text-muted); }
 .field__input {
   width: 100%;
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
+  min-height: var(--tap);
+  padding: 11px 13px;
+  border-radius: var(--radius);
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: var(--surface);
   color: var(--text);
   font-size: 1rem;
   appearance: none;
 }
 .field__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.field__input--code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82rem; line-height: 1.5; resize: vertical; }
+.field__input--code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-xs); line-height: 1.5; resize: vertical; }
 select.field__input { background-image: none; }
 /* `min-width: 0` ist Pflicht: Rasterzellen sind sonst mindestens so breit wie
    ihr Inhalt, und `input[type=date]` bringt eine feste Mindestbreite mit —
@@ -582,11 +558,11 @@ select.field__input { background-image: none; }
 .field__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .field__pair > * { min-width: 0; }
 .field__pair .field__input { min-width: 0; }
-.field__note { font-size: 0.76rem; color: var(--text-muted); }
-.field__error { font-size: 0.83rem; color: var(--over); min-height: 1.1em; }
+.field__note { font-size: var(--fs-xs); color: var(--text-muted); }
+.field__error { font-size: var(--fs-xs); color: var(--over); min-height: 1.1em; }
 
-.stack { display: flex; flex-direction: column; gap: 10px; }
-.steps { display: flex; flex-direction: column; gap: 8px; font-size: 0.86rem; color: var(--text-muted); counter-reset: step; }
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.steps { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-muted); counter-reset: step; }
 .steps li { display: flex; gap: 9px; line-height: 1.4; }
 .steps li::before {
   counter-increment: step;
@@ -596,11 +572,41 @@ select.field__input { background-image: none; }
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 0.72rem;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   display: grid; place-items: center;
   margin-top: 1px;
 }
+
+/* -------------------------------------------------------- Aktionszeilen */
+
+/*
+ * Sichern, Einspielen, Löschen: Handlungen, die man selten braucht und nie
+ * verwechseln darf. Als Zeilen untereinander statt als fünf gleich große
+ * Knöpfe — so bleibt die eine hervorgehobene Aktion darüber die einzige, die
+ * sich meldet.
+ */
+.arows { display: flex; flex-direction: column; }
+.arow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: var(--fs-md);
+}
+.arow:first-of-type { border-top: 0; }
+.arow .icon { color: var(--text-faint); }
+.arow:active { color: var(--accent); }
+.arow:active .icon { color: inherit; }
+.arow--danger { color: var(--over); }
+.arow--danger .icon { color: currentColor; }
 
 /* ---------------------------------------------------------- Reisegruppe */
 
@@ -616,19 +622,14 @@ select.field__input { background-image: none; }
 .people__name { min-width: 0; }
 .people__you {
   justify-self: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--accent);
-  background: var(--accent-soft);
-  padding: 6px 8px;
-  border-radius: 999px;
+  font-size: var(--fs-2xs);
+  font-weight: 620;
+  color: var(--text-faint);
 }
 /* Doppelt benannt: `.icon-btn` steht weiter unten und würde sonst Größe und
    Farbe zurücksetzen. */
-.icon-btn.people__remove { justify-self: center; width: 34px; height: 34px; }
-.people__add { align-self: flex-start; margin-top: 8px; }
+.icon-btn.people__remove { justify-self: center; width: 40px; height: 40px; }
+.people__add { align-self: flex-start; }
 
 /* In den Einstellungen steht unter jedem Namen noch, wem das Gerät gehört und
    ob die Person entfernt werden kann. Zwei Zeilen statt einer: nebeneinander
@@ -639,25 +640,25 @@ select.field__input { background-image: none; }
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: 8px 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
 }
-.person:last-of-type { border-bottom: 0; }
+.person:first-of-type { border-top: 0; padding-top: 0; }
 .person__name { min-width: 0; }
 .person__meta { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.icon-btn.person__remove { width: 34px; height: 34px; color: var(--over); background: transparent; }
+.icon-btn.person__remove { width: 40px; height: 40px; color: var(--over); }
 
 .slider { width: 100%; accent-color: var(--accent); }
 
 /* Kostenaufteilung ab drei Personen: Anteile statt Prozentfelder, die
    zusammen 100 ergeben müssen. Die Prozentzahl steht als Ergebnis daneben. */
 .shares { display: flex; flex-direction: column; gap: 4px; }
-.share { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 6px 0; }
-.share__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
-.share__pct { font-size: 0.82rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 999px; padding: 2px; }
+.share { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 4px 0; }
+.share__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
+.share__pct { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 2px; }
 .stepper__btn {
-  width: 32px; height: 32px;
+  width: 40px; height: 40px;
   border: 0; border-radius: 50%;
   background: none;
   color: var(--text);
@@ -667,19 +668,28 @@ select.field__input { background-image: none; }
 .stepper__btn:disabled { opacity: 0.35; }
 .stepper__value { min-width: 18px; text-align: center; font-weight: 620; font-variant-numeric: tabular-nums; }
 
-.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: var(--radius); }
 .segmented--3 { grid-template-columns: repeat(3, 1fr); }
-.segmented__btn { padding: 9px 8px; border: 0; border-radius: 9px; background: none; color: var(--text-muted); font-size: 0.88rem; font-weight: 600; }
-.segmented__btn.is-active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+.segmented__btn {
+  min-height: 42px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.segmented__btn.is-active { background: var(--surface); color: var(--text); }
 
 .status { display: flex; gap: 12px; align-items: flex-start; }
 .status .icon { margin-top: 2px; }
-.status--good { color: var(--good); }
+.status--good { color: var(--accent); }
 .status--warn { color: var(--warn); }
 .status--over { color: var(--over); }
 .status--muted { color: var(--text-faint); }
-.status__title { font-weight: 620; font-size: 0.92rem; color: var(--text); }
-.status__text { font-size: 0.82rem; color: var(--text-muted); }
+.status__title { font-weight: 620; font-size: var(--fs-md); color: var(--text); }
+.status__text { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* --------------------------------------------------------------- Knöpfe */
 
@@ -688,33 +698,67 @@ select.field__input { background-image: none; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 13px 18px;
-  border-radius: var(--radius-sm);
+  min-height: var(--tap);
+  padding: 12px 18px;
+  border-radius: var(--radius);
   border: 1px solid transparent;
   background: var(--surface-2);
   color: var(--text);
   font-weight: 620;
-  font-size: 0.95rem;
+  font-size: var(--fs-md);
 }
 .btn:active { transform: translateY(1px); }
 .btn:disabled { opacity: 0.55; }
 .btn--primary { background: var(--accent); color: var(--on-accent); }
-.btn--ghost { background: transparent; border-color: var(--border); color: var(--text-muted); }
-.btn--danger { color: var(--over); border-color: color-mix(in srgb, var(--over) 35%, var(--border)); }
+.btn--ghost { background: transparent; border-color: var(--border); color: var(--text); }
+.btn--danger { color: var(--over); border-color: color-mix(in srgb, var(--over) 30%, var(--border)); }
 .btn--primary.btn--danger { background: var(--over); color: var(--on-accent); border-color: transparent; }
 .btn--wide { width: 100%; }
-.btn--small { padding: 7px 12px; font-size: 0.82rem; border-radius: 9px; }
+.btn--small { min-height: 38px; padding: 6px 12px; font-size: var(--fs-xs); border-radius: var(--radius-sm); }
 
 .icon-btn {
   display: grid; place-items: center;
-  width: 36px; height: 36px;
-  border-radius: 50%;
+  width: var(--tap); height: var(--tap);
+  border-radius: var(--radius-pill);
   border: 0;
-  background: var(--surface-2);
+  background: none;
   color: var(--text-muted);
 }
+.icon-btn:active { background: var(--surface-2); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips--scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: calc(var(--gutter) * -1);
+  padding-inline: var(--gutter);
+}
+.chips--scroll::-webkit-scrollbar { display: none; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  font-weight: 540;
+  white-space: nowrap;
+}
+.chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.chip .icon { margin-left: -2px; }
+.chip--small { min-height: 36px; padding: 7px 11px; font-size: var(--fs-xs); }
+.chip--date { position: relative; overflow: hidden; }
+.chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 
 /* Kategorien im Eingabe-Sheet: gleich breite Felder, feste Plätze. */
 .catgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
@@ -722,49 +766,19 @@ select.field__input { background-image: none; }
    gewinnt sonst die spätere Regel und das Raster bekäme die Chip-Maße. */
 /* 44 px, nicht die 39, die aus der kleineren Schrift fielen: das hier wird
    im Gehen, einhändig und mit dem Daumen getroffen. */
-.chip.catgrid__item { justify-content: center; gap: 5px; min-width: 0; min-height: 44px; padding-inline: 5px; font-size: 0.82rem; }
+.chip.catgrid__item { justify-content: center; gap: 5px; min-width: 0; min-height: var(--tap); padding-inline: 5px; font-size: var(--fs-xs); border-radius: var(--radius); }
 .chip.catgrid__item .icon { margin-left: 0; }
 /* Auf sehr schmalen Geräten passt „Sonstiges“ mit Icon sonst nicht in die
    Zelle und wird abgeschnitten. */
 @media (max-width: 359px) {
-  .chip.catgrid__item { font-size: 0.75rem; gap: 4px; }
+  .chip.catgrid__item { font-size: var(--fs-2xs); gap: 4px; }
   .chip.catgrid__item .icon { width: 14px; height: 14px; }
 }
-.chips--scroll {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-  margin-inline: -16px;
-  padding-inline: 16px;
-}
-.chips--scroll::-webkit-scrollbar { display: none; }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 13px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text-muted);
-  font-size: 0.86rem;
-  font-weight: 560;
-  white-space: nowrap;
-}
-.chip.is-active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-}
-.chip .icon { margin-left: -2px; }
-.chip--small { padding: 7px 11px; font-size: 0.8rem; }
-.chip--date { position: relative; overflow: hidden; }
-.chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 
 .daterow { display: flex; flex-direction: column; gap: 6px; }
 .daterow__quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 48px; gap: 8px; }
-.daterow__quick > .chip { justify-content: center; min-width: 0; min-height: 44px; padding-inline: 6px; }
-.daterow__label { font-size: 0.76rem; color: var(--text-muted); }
+.daterow__quick > .chip { justify-content: center; min-width: 0; min-height: var(--tap); padding-inline: 6px; border-radius: var(--radius); }
+.daterow__label { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* ------------------------------------------------------------ Zahlenfeld */
 
@@ -772,20 +786,21 @@ select.field__input { background-image: none; }
 .amount__row { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
 .amount__value {
   font-size: clamp(2.4rem, 12vw, 3rem);
-  font-weight: 700;
+  font-weight: 660;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
 .amount__value.is-empty { color: var(--text-faint); }
 .amount__cur { font-size: 1.4rem; font-weight: 600; color: var(--text-muted); }
-.amount__hint { text-align: center; font-size: 0.8rem; color: var(--text-faint); min-height: 1.2em; }
+.amount__hint { text-align: center; font-size: var(--fs-xs); color: var(--text-faint); min-height: 1.2em; }
 .amount__hint.is-error { color: var(--over); }
 
 .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
 .key {
+  min-height: 52px;
   padding: 10px 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  border: 0;
   background: var(--surface-2);
   font-size: 1.3rem;
   font-weight: 600;
@@ -794,7 +809,7 @@ select.field__input { background-image: none; }
   font-variant-numeric: tabular-nums;
 }
 .key:active { background: var(--accent-soft); }
-.key--muted { color: var(--text-muted); background: transparent; }
+.key--muted { color: var(--text-muted); }
 
 /* ----------------------------------------------------------- Bottom-Sheet */
 
@@ -817,20 +832,19 @@ select.field__input { background-image: none; }
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border-radius: 22px 22px 0 0;
-  border: 1px solid var(--border);
-  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+  border-top: 1px solid var(--border);
+  box-shadow: var(--shadow-float);
   transform: translateY(14px);
   transition: transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
   padding-bottom: var(--safe-b);
 }
 .overlay.is-open .sheet { transform: translateY(0); }
 .sheet--tall { min-height: min(78dvh, 640px); }
-.sheet__grip { width: 38px; height: 4px; border-radius: 999px; background: var(--border); margin: 8px auto 0; }
-.sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 18px 6px; }
-.sheet__title { font-size: 1.08rem; font-weight: 650; letter-spacing: -0.01em; }
-.sheet__sub { font-size: 0.82rem; color: var(--text-muted); margin-top: 2px; }
-.sheet__body { overflow-y: auto; padding: 10px 18px 20px; -webkit-overflow-scrolling: touch; }
+.sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px var(--gutter) 6px; }
+.sheet__title { font-size: var(--fs-lg); font-weight: 640; letter-spacing: -0.012em; }
+.sheet__sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 2px; }
+.sheet__body { overflow-y: auto; padding: 10px var(--gutter) 20px; -webkit-overflow-scrolling: touch; }
 
 .entry { display: flex; flex-direction: column; gap: 18px; }
 
@@ -864,33 +878,27 @@ select.field__input { background-image: none; }
 
 /* --------------------------------------------------------- Detailzeile */
 
-.disclosure {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-/* In einer Karte steht sonst ein weißer Kasten auf weißem Grund. */
-.card > .disclosure { background: var(--surface-2); border-color: transparent; }
-.card > .disclosure .disclosure__body { border-top-color: var(--border); }
+/* Eine Zeile zwischen zwei Haarlinien statt eines weiteren Kastens: das
+   Aufklappbare ist Teil des Formulars, kein eigener Bereich. */
+.disclosure { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .disclosure__head {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 13px 14px;
+  min-height: 48px;
+  padding: 12px 0;
   cursor: pointer;
   list-style: none;
-  border-radius: var(--radius-sm);
 }
 .disclosure__head::-webkit-details-marker { display: none; }
-.disclosure__head:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.disclosure__title { font-size: 0.88rem; font-weight: 600; }
+.disclosure__title { font-size: var(--fs-sm); font-weight: 520; color: var(--text-muted); }
 /* Was zugeklappt drinsteht, muss man trotzdem sehen können — sonst trägt man
    still auf den falschen Namen ein. */
 .disclosure__summary {
   flex: 1;
   min-width: 0;
   text-align: right;
-  font-size: 0.82rem;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -902,40 +910,41 @@ select.field__input { background-image: none; }
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: 4px 14px 16px;
-  border-top: 1px solid var(--border);
-  margin-top: -1px;
+  padding: 2px 0 18px;
 }
 
 .confirm { display: flex; flex-direction: column; gap: 18px; }
-.confirm__text { font-size: 0.92rem; color: var(--text-muted); }
+.confirm__text { font-size: var(--fs-md); color: var(--text-muted); }
 .confirm__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 /* --------------------------------------------------------------- Willkommen */
 
-.welcome { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 24px 8px 8px; }
-.welcome--compact { padding-bottom: 4px; }
+.welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 28px 0 16px; }
+.view--center .welcome { align-items: center; text-align: center; }
+.welcome--compact { padding-bottom: 8px; }
+/* Das Zeichen aus dem App-Symbol, flach: ein schwebendes Logo mit Schlagschatten
+   ist ein Startbildschirm-Motiv, kein Formularkopf. */
 .welcome__mark {
-  width: 62px; height: 62px;
-  border-radius: 18px;
+  width: 44px; height: 44px;
+  border-radius: var(--radius);
   display: grid; place-items: center;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  box-shadow: var(--shadow-lift);
+  margin-bottom: 2px;
 }
-.welcome__title { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; }
-.welcome__text { font-size: 0.92rem; color: var(--text-muted); max-width: 34ch; }
+.welcome__title { font-size: 1.5rem; font-weight: 680; letter-spacing: -0.025em; }
+.welcome__text { font-size: var(--fs-md); color: var(--text-muted); max-width: 38ch; }
 .welcome .btn { width: 100%; }
 
 /* ------------------------------------------------------------- Kleinkram */
 
 .spinner {
-  width: 30px; height: 30px;
+  width: 28px; height: 28px;
   margin: 0 auto;
   border-radius: 50%;
-  border: 3px solid var(--border);
+  border: 2px solid var(--border);
   border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
@@ -953,13 +962,12 @@ select.field__input { background-image: none; }
   align-items: center;
   gap: 4px;
   padding: 12px 18px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: var(--toast-bg);
   color: var(--toast-text);
-  border: 1px solid var(--toast-border);
-  font-size: 0.88rem;
-  font-weight: 550;
-  box-shadow: var(--shadow-lift);
+  font-size: var(--fs-sm);
+  font-weight: 540;
+  box-shadow: var(--shadow-float);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s, transform 0.2s;
@@ -973,23 +981,24 @@ select.field__input { background-image: none; }
   margin: -6px -8px -6px 4px;
   padding: 6px 10px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: none;
   color: inherit;
-  font-size: 0.88rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .toast__action:active { opacity: 0.7; }
-.toast--error { background: var(--over); color: var(--on-accent); border-color: transparent; }
-.toast--success { background: var(--good); color: var(--on-accent); border-color: transparent; }
+.toast--error { background: var(--over); color: var(--on-accent); }
+.toast--success { background: var(--accent); color: var(--on-accent); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
 @media (min-width: 620px) {
-  .app { border-inline: 1px solid var(--border); background: var(--bg); min-height: 100dvh; }
-  .view { padding-inline: 22px; }
+  .app { border-inline: 1px solid var(--border); min-height: 100dvh; }
+  .view { padding-inline: 24px; }
+  .chips--scroll { margin-inline: -24px; padding-inline: 24px; }
 }

@@ -105,6 +105,12 @@ function categoryGrid(selectedId, onSelect) {
   return grid;
 }
 
+/**
+ * Eine Reihe zur Auswahl. Personen tragen ihren Farbpunkt statt eines
+ * Personen-Symbols: dieselbe Farbe steht in der Liste, in der Aufteilung und
+ * in der Abrechnung neben demselben Namen — fünfmal dasselbe graue Männchen
+ * sagt dagegen nur, dass hier Personen stehen, was ohnehin dransteht.
+ */
 function chipRow(options, selectedId, onSelect) {
   const row = h('div.chips');
   const buttons = options.map((o) => {
@@ -112,7 +118,9 @@ function chipRow(options, selectedId, onSelect) {
       selectedId = o.id;
       buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
       onSelect(o.id);
-    }, dataset: { id: o.id } }, o.icon ? icon(o.icon, 16) : null, o.label);
+    }, dataset: { id: o.id } },
+      o.icon ? icon(o.icon, 16) : o.dot ? h('span.dot', { style: { background: o.dot } }) : null,
+      o.label);
     b.classList.toggle('is-active', o.id === selectedId);
     return b;
   });
@@ -201,7 +209,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
   const amount = amountField(expense?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: expense?.note || '', placeholder: 'z. B. Abendessen am Hafen', maxlength: 120, enterkeyhint: 'done' });
 
-  const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' }))];
+  const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
   const payerName = (id) => payers.find((p) => p.id === id)?.label || 'Kasse';
 
   return openSheet({
@@ -277,7 +285,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
           : 'Ist bezahlt und zählt sofort zu den Ausgaben.';
         // Zugeklappt muss ablesbar bleiben, was drinsteht.
         detailSummary.textContent = planned ? `verplant · ${payerName(payer)}` : payerName(payer);
-        submit.replaceChildren(icon('check', 20), editing ? 'Speichern' : planned ? 'Vormerken' : 'Eintragen');
+        submit.replaceChildren(editing ? 'Speichern' : planned ? 'Vormerken' : 'Eintragen');
       }
       syncKind();
 
@@ -325,12 +333,12 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
-        field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, icon: 'person' })), personId, (id) => { personId = id; })),
+        field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
         field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
         field('Notiz', note),
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 20), editing ? 'Speichern' : 'Eintragen'),
+          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
         ),
       );
     },

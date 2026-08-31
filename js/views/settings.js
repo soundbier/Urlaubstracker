@@ -26,7 +26,7 @@ export function renderSettings(state, actions) {
     dataSection(state),
     h('section.section',
       sectionTitle('Über'),
-      h('div.card.card--plain',
+      h('div.panel',
         h('p.muted', 'Urlaubstracker — eine gemeinsame Urlaubskasse für alle, die zusammen unterwegs sind. Läuft auch ohne Netz; Eingaben werden nachgereicht, sobald wieder Empfang da ist.'),
         h('p.muted.small', `Version ${document.documentElement.dataset.version || '1.0.0'} · Modus: ${sync.mode === 'cloud' ? 'geteilt über Firestore' : 'nur auf diesem Gerät'}`),
       ),
@@ -54,7 +54,7 @@ function tripSection(state) {
 
   return h('section.section',
     sectionTitle('Der Urlaub'),
-    h('div.card.card--plain',
+    h('div.panel',
       h('label.field', h('span.field__label', 'Name'),
         h('input.field__input', { type: 'text', value: trip.name, maxlength: 60, onchange: (e) => save({ name: e.target.value.trim() || 'Unser Urlaub' }) })),
       h('div.field__pair',
@@ -76,6 +76,22 @@ function tripSection(state) {
           : 'Jeden Morgen neu gerechnet: Restgeld geteilt durch die verbleibenden Tage. Ein teurer Tag verteilt sich dann still auf den Rest.'),
       ),
     ),
+  );
+}
+
+/**
+ * Eine Aktion als Listenzeile.
+ *
+ * Untereinander standen hier fünf gleich aussehende, gleich breite Knöpfe —
+ * Sichern, Einspielen, Löschen, Verbinden — und keiner sagte, welcher der
+ * wichtige ist. Als Zeilen gelesen ordnen sie sich von selbst unter die eine
+ * hervorgehobene Aktion darüber. Das Symbol bleibt, weil es die Zeile beim
+ * Überfliegen unterscheidbar macht; `danger` färbt nur die Schrift.
+ */
+function actionRow(iconName, label, onClick, { danger = false } = {}) {
+  return h('button.arow', { type: 'button', class: danger ? 'arow--danger' : '', onclick: onClick },
+    icon(iconName, 18),
+    h('span.arow__label', label),
   );
 }
 
@@ -104,7 +120,7 @@ function appearanceSection(actions) {
 
   return h('section.section',
     sectionTitle('Aussehen'),
-    h('div.card.card--plain',
+    h('div.panel',
       h('div.field',
         h('span.field__label', 'Farben'),
         h('div.segmented.segmented--3',
@@ -160,7 +176,7 @@ function peopleSection(state, actions) {
 
   return h('section.section',
     sectionTitle('Reisegruppe', h('span.section__meta', plural(trip.people.length, 'Person', 'Personen'))),
-    h('div.card.card--plain',
+    h('div.panel',
       ...trip.people.map((p) => {
         const isMe = myPersonId === p.id;
         return h('div.person',
@@ -290,21 +306,23 @@ function syncSection(state) {
 
   return h('section.section',
     sectionTitle('Gemeinsam nutzen'),
-    h('div.card.card--plain',
+    h('div.panel',
       h('div.status', { class: `status--${status.tone}` },
         icon(status.icon, 22),
         h('div', h('p.status__title', status.title), h('p.status__text', status.text)),
       ),
       cloud
         ? h('div.stack',
-            invite ? h('button.btn.btn--primary', { type: 'button', onclick: () => shareInvite(invite) }, icon('share', 19), 'Einladung teilen') : null,
+            invite ? h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => shareInvite(invite) }, icon('share', 19), 'Einladung teilen') : null,
             invite ? h('p.field__note', 'Der Link ist der Schlüssel zur Kasse — er gehört in einen privaten Chat, nicht in eine offene Gruppe.') : null,
-            h('button.btn.btn--ghost', { type: 'button', onclick: () => rotateCode() }, 'Einladungscode erneuern'),
-            h('button.btn.btn--ghost', { type: 'button', onclick: () => disconnect() }, 'Synchronisierung beenden'),
+            h('div.arows',
+              actionRow('repeat', 'Einladungscode erneuern', () => rotateCode()),
+              actionRow('cloudOff', 'Synchronisierung beenden', () => disconnect()),
+            ),
           )
         : h('div.stack',
-            h('button.btn.btn--primary', { type: 'button', onclick: () => setupCloud() }, icon('cloud', 19), 'Mit Firebase verbinden'),
-            h('button.btn.btn--ghost', { type: 'button', onclick: () => enterInvite() }, 'Einladung eingeben'),
+            h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => setupCloud() }, icon('cloud', 19), 'Mit Firebase verbinden'),
+            h('div.arows', actionRow('share', 'Einladung eingeben', () => enterInvite())),
           ),
     ),
   );
@@ -482,16 +500,12 @@ function dataSection(state) {
 
   return h('section.section',
     sectionTitle('Daten'),
-    h('div.card.card--plain',
-      h('div.stack',
-        h('button.btn.btn--ghost', { type: 'button', onclick: () => download(buildCsv({ trip, expenses, contributions }), `${slug}.csv`, 'text/csv;charset=utf-8') },
-          icon('download', 18), 'Als CSV für Excel'),
-        h('button.btn.btn--ghost', { type: 'button', onclick: () => download(buildExport({ trip, contributions, expenses }), `${slug}-sicherung.json`, 'application/json') },
-          icon('download', 18), 'Sicherungskopie speichern'),
-        h('button.btn.btn--ghost', { type: 'button', onclick: () => importFile.click() }, icon('upload', 18), 'Sicherung einspielen'),
-        importFile,
-        h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => removeTrip(state) }, icon('trash', 18), 'Urlaubskasse löschen'),
-      ),
+    h('div.arows',
+      actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions }), `${slug}.csv`, 'text/csv;charset=utf-8')),
+      actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses }), `${slug}-sicherung.json`, 'application/json')),
+      actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
+      importFile,
+      actionRow('trash', 'Urlaubskasse löschen', () => removeTrip(state), { danger: true }),
     ),
   );
 }

@@ -12,7 +12,7 @@ export function renderOnboarding(state) {
 function inviteScreen(state) {
   const { invite, trip } = state;
   const error = h('p.field__error');
-  const button = h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: join }, icon('check', 20), 'Beitreten');
+  const button = h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: join }, 'Beitreten');
 
   async function join() {
     button.disabled = true;
@@ -131,7 +131,7 @@ function createScreen() {
 
   renderPeople();
 
-  const submit = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 20), 'Los geht’s');
+  const submit = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Los geht’s');
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -173,7 +173,7 @@ function createScreen() {
       h('h1.welcome__title', 'Urlaubskasse anlegen'),
       h('p.welcome__text', 'Tragt ein, was in die gemeinsame Kasse eingezahlt wurde. Die App rechnet daraus das Tagesbudget — und unterwegs hakt ihr kurz ab, was ausgegeben wurde.'),
     ),
-    h('form.card.card--plain', { onsubmit: onSubmit },
+    h('form.panel', { onsubmit: onSubmit },
       h('label.field', h('span.field__label', 'Wie heißt der Urlaub?'),
         h('input.field__input', { type: 'text', value: values.name, maxlength: 60, placeholder: 'Unser Urlaub', oninput: (e) => { values.name = e.target.value; } })),
       h('div.field__pair',

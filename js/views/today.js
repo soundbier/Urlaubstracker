@@ -5,7 +5,7 @@
 import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate } from '../format.js';
-import { tile, sectionTitle, expenseRow, plannedRow, emptyState, bar } from '../ui/parts.js';
+import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar } from '../ui/parts.js';
 
 const TONE = { good: 'good', tight: 'warn', over: 'over', empty: 'muted' };
 
@@ -25,25 +25,25 @@ export function renderToday(state, actions) {
   return h('div.view',
     hero(b, cur, actions),
     knowsMe ? null : whoAmI(trip, actions),
-    // Die drei Kacheln beantworten, was die große Zahl offenlässt: wie viel
+    // Die drei Kennzahlen beantworten, was die große Zahl offenlässt: wie viel
     // insgesamt noch da ist, wie lange es reichen muss, und ob ihr vor oder
     // hinter dem Plan liegt. Jede Zahl steht genau einmal auf dieser Seite.
-    h('div.tiles',
+    h('div.stats',
       // Nach dem Urlaub steht das übrige Geld schon groß oben — dann sagt die
-      // Kachel lieber, wofür es weg ist.
+      // Spalte lieber, wofür es weg ist.
       b.phase === 'after'
-        ? tile('Ausgegeben', money(b.spent, cur), `über ${days(b.totalDays)}`)
-        // Untertexte bleiben einzeilig, sonst stehen die drei Kacheln
+        ? stat('Ausgegeben', money(b.spent, cur), `über ${days(b.totalDays)}`)
+        // Untertexte bleiben einzeilig, sonst stehen die drei Spalten
         // unterschiedlich hoch nebeneinander. Ist etwas verplant, ist das die
         // Antwort auf „warum ist verfügbar weniger als die Kasse?“ — sonst
         // sagt der Kassenstand mehr.
-        : tile('Verfügbar', money(b.free, cur), b.planned ? `${money(b.planned, cur)} verplant` : `von ${money(b.total, cur)}`, { tone: b.free < 0 ? 'over' : '' }),
-      tile(
+        : stat('Verfügbar', money(b.free, cur), b.planned ? `${money(b.planned, cur)} verplant` : `von ${money(b.total, cur)}`, { tone: b.free < 0 ? 'over' : '' }),
+      stat(
         b.phase === 'after' ? 'Urlaub' : 'Noch',
         b.phase === 'after' ? 'vorbei' : b.phase === 'before' ? days(b.daysUntilStart) : days(b.daysLeft),
         b.phase === 'before' ? `ab ${compactDate(trip.startDate)}` : `bis ${compactDate(trip.endDate)}`,
       ),
-      tile(
+      stat(
         'Polster',
         b.elapsedDays ? moneySigned(b.buffer, cur) : '—',
         b.elapsedDays ? (b.buffer >= 0 ? 'unter dem Plan' : 'über dem Plan') : 'ab dem ersten Tag',
@@ -53,7 +53,7 @@ export function renderToday(state, actions) {
     due.length
       ? h('section.section',
           sectionTitle('Fällig', h('span.section__meta', money(due.reduce((a, e) => a + e.amount, 0), cur))),
-          h('div.list.list--planned', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
+          h('div.list', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
           h('p.section__note', 'Tippt den Haken, sobald bezahlt ist.'),
         )
       : null,
@@ -65,7 +65,10 @@ export function renderToday(state, actions) {
       ),
       todays.length
         ? h('div.list', ...todays.map((e) => expenseRow(e, trip, rowOpts)))
-        : emptyState('Heute noch nichts eingetragen.', 'Ausgabe eintragen', actions.addExpense),
+        // Ohne Knopf: der schwebende „Ausgabe“-Knopf steht keine 100 px
+        // darunter und macht dasselbe. Zwei Knöpfe für eine Handlung sagen
+        // nur, dass niemand entschieden hat, welcher der richtige ist.
+        : emptyState('Heute noch nichts eingetragen.'),
     ),
     b.phase === 'after' ? h('div.callout',
       h('p', 'Der Urlaub ist vorbei. Die Endabrechnung — wer wem noch was überweist — steht unter ', h('strong', 'Budget'), '.'),
@@ -104,14 +107,16 @@ function whoAmI(trip, actions) {
  * Hier standen einmal sechs Beträge übereinander: Tagesrest, Tagessatz, heute
  * ausgegeben, verplant, verfügbar, Kassenstand. Wer sechs Zahlen liest, liest
  * keine, und die halbe Reihe stand ohnehin gleich darunter noch einmal. Was
- * insgesamt verfügbar ist, steht jetzt in der Kachelreihe; was heute schon
+ * insgesamt verfügbar ist, steht jetzt in der Kennzahlreihe; was heute schon
  * ausgegeben und was verplant ist, steht in den beiden Abschnitten darunter.
  */
 function hero(b, cur, actions) {
   if (b.status === 'empty') {
+    // Ohne Kasse gibt es keine Zahl. Der Gedankenstrich, der hier stand, war
+    // in Zahlengröße gesetzt ein Strich quer über den halben Schirm — der Satz
+    // darunter sagt dasselbe, nur verständlich.
     return h('div.hero.hero--muted',
-      h('p.hero__label', 'Noch kein Geld in der Kasse'),
-      h('p.hero__amount', '—'),
+      h('p.hero__title', 'Noch kein Geld in der Kasse'),
       h('p.hero__sub', 'Tragt ein, was auf das gemeinsame Konto überwiesen wurde. Daraus rechnet die App das Tagesbudget.'),
       h('button.btn.btn--primary', { type: 'button', onclick: actions.addContribution }, icon('wallet', 19), 'Einzahlung eintragen'),
     );

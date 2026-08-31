@@ -2,7 +2,7 @@
 import { h, s, icon } from '../dom.js';
 import { computeBudget, dailySeries, settleUp, spentByCategory, todayISO } from '../calc.js';
 import { money, moneySigned, days, dayMonthShort } from '../format.js';
-import { tile, sectionTitle, contributionRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
+import { stat, sectionTitle, contributionRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
 
 export function renderBudget(state, actions) {
   const { trip, expenses, contributions } = state;
@@ -11,20 +11,21 @@ export function renderBudget(state, actions) {
   const b = computeBudget({ trip, contributions, expenses, today });
 
   return h('div.view',
-    h('div.card',
+    // Kein Karton um den Kassenstand: er ist das Erste auf der Seite und
+    // braucht keinen Rahmen, der ihm das sagt. Was danach kommt, ordnet sich
+    // über Abstand und Schriftgröße unter.
+    h('div.potblock',
       potHead(b, cur),
       bar(b.spentRatio, b.remaining < 0 ? 'over' : b.spentRatio > 0.85 ? 'warn' : 'good'),
-      h('div.tiles.tiles--flat',
-        tile('Pro Tag', money(b.planPerDay, cur), `auf ${days(b.totalDays)}`),
+      h('div.stats',
+        stat('Pro Tag', money(b.planPerDay, cur), `auf ${days(b.totalDays)}`),
         // Einzeilige Untertexte: „Rest ÷ Resttage“ brach um und schob die eine
-        // Kachel höher als ihre beiden Nachbarn.
-        tile('Heute', b.phase === 'after' ? '—' : money(b.perDayToday, cur), trip.budgetMode === 'fixed' ? 'fester Satz' : 'mitwachsend'),
-        tile('Ø bisher', b.elapsedDays ? money(b.pace, cur) : '—', b.elapsedDays ? `über ${days(b.elapsedDays)}` : 'noch nichts'),
+        // Spalte höher als ihre beiden Nachbarn.
+        stat('Heute', b.phase === 'after' ? '—' : money(b.perDayToday, cur), trip.budgetMode === 'fixed' ? 'fester Satz' : 'mitwachsend'),
+        stat('Ø bisher', b.elapsedDays ? money(b.pace, cur) : '—', b.elapsedDays ? `über ${days(b.elapsedDays)}` : 'noch nichts'),
       ),
       b.elapsedDays && b.total
-        ? h('p.card__note',
-            b.buffer >= 0 ? icon('check', 16) : icon('info', 16),
-            ` Die Kasse liegt ${bufferLabel(b.buffer, cur)}.`)
+        ? h('p.note', `Die Kasse liegt ${bufferLabel(b.buffer, cur)}.`)
         : null,
       howItWorks(b, trip, cur),
     ),
@@ -101,7 +102,7 @@ function projection(leftover, cur) {
  * Die Einordnung stand rechts neben der großen Zahl und rutschte auf schmalen
  * Schirmen darunter — dann klebte sie rechtsbündig unter einer linksbündigen
  * Zahl und sah aus wie ein zweiter, eigener Wert. Jetzt steht sie einfach
- * darunter, an derselben Kante wie alles andere auf der Karte.
+ * darunter, an derselben Kante wie alles andere auf der Seite.
  */
 function potHead(b, cur) {
   return h('div.pot',
@@ -234,7 +235,7 @@ function settlement(trip, contributions, expenses, cur, phase = 'after') {
 
   return h('div',
     table,
-    h('div.callout.callout--soft',
+    h('div.callout',
       h('p.callout__title', done ? 'Zum Ausgleich' : 'Stand jetzt'),
       done ? null : h('p.settle__hint', 'Würdet ihr heute abrechnen:'),
       h('ul.settle__todo', ...actions),
