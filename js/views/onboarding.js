@@ -1,8 +1,10 @@
 /** Erster Start: Urlaubskasse anlegen — oder einer Einladung folgen. */
 import { h, icon } from '../dom.js';
 import { toast } from '../ui/sheet.js';
+import { installInstructionsSheet } from '../ui/parts.js';
 import { todayISO, addDays, daysInclusive, isValidDate, MAX_PEOPLE, PERSON_COLORS } from '../calc.js';
 import { days, fullDate } from '../format.js';
+import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
 import * as store from '../store.js';
 
 export function renderOnboarding(state) {
@@ -37,6 +39,15 @@ function inviteScreen(state) {
       error,
       h('button.btn.btn--ghost', { type: 'button', onclick: () => store.dismissInvite() },
         trip ? `Zurück zu „${trip.name}“` : 'Stattdessen eigene Kasse anlegen'),
+      // Dieser Link ist gerade aus einem Chat im Browser gelandet — das
+      // Betriebssystem entscheidet, welche App einen Link bekommt, nicht
+      // diese Seite. Der einzige Hebel von hier aus: gleich zur Installation
+      // einladen, dann liegt beim nächsten Mal ein Symbol auf dem
+      // Startbildschirm statt eines Browser-Tabs.
+      isInstalled() ? null : h('button.btn.btn--ghost.btn--small', {
+        type: 'button',
+        onclick: async () => { if (canPromptInstall()) await promptInstall(); else installInstructionsSheet(); },
+      }, icon('download', 16), 'Als App installieren'),
     ),
   );
 }

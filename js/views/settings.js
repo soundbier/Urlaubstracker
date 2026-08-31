@@ -10,10 +10,12 @@
  */
 import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
+import { installInstructionsSheet } from '../ui/parts.js';
 import { getPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
 import { buildInviteLink, readInviteFromLocation, buildExport, buildCsv, parseImport } from '../link.js';
 import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
 import { days, fullDate, compactDate, plural } from '../format.js';
+import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
 import * as store from '../store.js';
 
 const CURRENCIES = [
@@ -416,6 +418,18 @@ function deviceGroup(actions) {
       onClick: async () => {
         const pick = await chooseSheet({ title: 'Aussehen', options: THEMES, current });
         if (pick && pick !== current) { setTheme(pick); actions.rerender(); }
+      },
+    }),
+    // Läuft die Seite schon im eigenständigen Fenster, ist installiert längst
+    // passiert — dann bräuchte die Zeile niemand mehr.
+    isInstalled() ? null : navRow('Als App installieren', {
+      sub: 'Eigenes Symbol, kein Adressfeld, läuft auch offline.',
+      onClick: async () => {
+        // Wo der Browser einen eigenen Dialog anbietet (Chrome/Edge auf
+        // Android und am Desktop), reicht ein Tipp. Sonst — allen voran
+        // Safari auf iOS — bleibt nur die Anleitung von Hand.
+        if (canPromptInstall()) await promptInstall();
+        else installInstructionsSheet();
       },
     }),
   );
