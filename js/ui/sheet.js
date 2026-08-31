@@ -67,7 +67,6 @@ export function openSheet({ title, subtitle, build, fullHeight = false, bodyClas
     const panel = h(
       'div.sheet',
       { role: 'dialog', 'aria-modal': 'true', 'aria-label': title || 'Dialog', class: fullHeight ? 'sheet--tall' : '' },
-      h('div.sheet__grip', { 'aria-hidden': 'true' }),
       h(
         'header.sheet__head',
         h('div', h('h2.sheet__title', title || ''), subtitle ? h('p.sheet__sub', subtitle) : null),
@@ -107,7 +106,10 @@ export function confirmSheet({ title, text, confirmLabel = 'Ja, machen', cancelL
         h(
           'div.confirm__actions',
           h('button.btn.btn--ghost', { type: 'button', onclick: () => close(false) }, cancelLabel),
-          h('button.btn', { type: 'button', class: danger ? 'btn--danger' : 'btn--primary', onclick: () => close(true) }, confirmLabel),
+          // Bei einer Rückfrage ist die Bestätigung die Handlung — auch die
+          // gefährliche. Ein Umriss neben einem Umriss lässt offen, welcher
+          // Knopf der Knopf ist.
+          h('button.btn.btn--primary', { type: 'button', class: danger ? 'btn--danger' : '', onclick: () => close(true) }, confirmLabel),
         ),
       ),
   }).then((v) => v === true);
@@ -149,7 +151,7 @@ export function promptSheet({
       return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
         h('label.field', h('span.field__label', label), input),
         error,
-        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 19), confirmLabel),
+        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, confirmLabel),
       );
     },
   }).then((v) => (typeof v === 'string' ? v : null));

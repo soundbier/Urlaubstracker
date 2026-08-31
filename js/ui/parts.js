@@ -3,11 +3,18 @@ import { h, icon } from '../dom.js';
 import { CATEGORY_BY_ID, POT, isFromPlan } from '../calc.js';
 import { money, dayLabel } from '../format.js';
 
-export function tile(label, value, sub, { tone = '' } = {}) {
-  return h('div.tile', { class: tone && `tile--${tone}` },
-    h('p.tile__label', label),
-    h('p.tile__value', value),
-    sub ? h('p.tile__sub', sub) : null,
+/**
+ * Eine Kennzahl in der Zeile unter der großen Zahl.
+ *
+ * Bewusst keine Kachel mehr: drei umrandete Kästen nebeneinander sahen aus wie
+ * drei gleich wichtige Meldungen, dabei ordnen sie nur die eine Zahl darüber
+ * ein. Getrennt wird jetzt durch einen Strich, nicht durch einen Rahmen.
+ */
+export function stat(label, value, sub, { tone = '' } = {}) {
+  return h('div.stat', { class: tone && `stat--${tone}` },
+    h('p.stat__label', label),
+    h('p.stat__value', value),
+    sub ? h('p.stat__sub', sub) : null,
   );
 }
 
@@ -128,7 +135,10 @@ export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null }) 
 export function contributionRow(contribution, trip, onClick) {
   const person = trip.people.find((p) => p.id === contribution.personId);
   return h('button.row', { type: 'button', onclick: () => onClick(contribution) },
-    h('span.row__icon.row__icon--person', { style: { background: person?.color || '#64748b' } }, (person?.name || '?').slice(0, 1).toUpperCase()),
+    // Ein Punkt statt eines farbigen Kastens mit Initiale: dieselbe Farbe
+    // erkennt man auch klein wieder, und in der Aufteilung darunter steht sie
+    // ohnehin schon als Punkt.
+    h('span.row__icon.row__icon--person', h('span.dot', { style: { background: person?.color || 'var(--text-faint)' } })),
     h('span.row__main',
       h('span.row__title', person?.name || 'Unbekannt'),
       h('span.row__sub', contribution.note || 'Einzahlung'),

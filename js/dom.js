@@ -1,7 +1,7 @@
 /** Winzige DOM-Hilfen. Kein Framework, kein innerHTML mit fremdem Text. */
 
 /**
- * `h('div.card', { onclick }, 'Text', kindElement)`
+ * `h('div.panel', { onclick }, 'Text', kindElement)`
  * Der Tag darf Klassen im CSS-Stil mitbringen: `button.chip.is-active`.
  */
 export function h(spec, props = null, ...children) {

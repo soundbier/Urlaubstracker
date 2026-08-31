@@ -45,16 +45,13 @@ export function renderExpenses(state, actions) {
     planned.length
       ? h('section.section',
           sectionTitle('Verplant', h('span.section__meta', money(planned.reduce((a, e) => a + e.amount, 0), cur))),
-          h('div.list.list--planned', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
+          h('div.list', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
         )
       : null,
     groups.length
       ? h('div.daygroups', ...groups.map((g) => dayGroup(g, trip, b, today, rowOpts)))
-      : emptyState(
-          filter === 'all' ? 'Noch keine Ausgaben eingetragen.' : 'In dieser Kategorie ist noch nichts eingetragen.',
-          'Ausgabe eintragen',
-          actions.addExpense,
-        ),
+      // Ohne Knopf: der schwebende „Ausgabe“-Knopf steht schon auf dieser Seite.
+      : emptyState(filter === 'all' ? 'Noch keine Ausgaben eingetragen.' : 'In dieser Kategorie ist noch nichts eingetragen.'),
   );
 }
 
