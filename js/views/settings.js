@@ -1,211 +1,336 @@
-/** Einstellungen: Urlaub, Personen, gemeinsame Nutzung, Daten. */
+/**
+ * Einstellungen.
+ *
+ * Gelesen wird hier öfter als geändert: „auf wen läuft das Konto?“, „wie ist
+ * geteilt?“, „welche Währung?“. Deshalb ist die Seite eine Liste von Zeilen,
+ * die den eingestellten Wert gleich mitzeigt — geöffnet wird nur, was man
+ * wirklich umstellen will. Vorher stand hier jedes Formularfeld dauerhaft
+ * offen: zwei Bildschirmlängen, durch die man scrollen musste, um zu sehen,
+ * was überhaupt eingestellt ist.
+ */
 import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
-import { sectionTitle } from '../ui/parts.js';
-import { getPrefs, setTheme, resolveTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
+import { getPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
 import { buildInviteLink, readInviteFromLocation, buildExport, buildCsv, parseImport } from '../link.js';
 import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
-import { days, fullDate, plural } from '../format.js';
+import { days, fullDate, compactDate, plural } from '../format.js';
 import * as store from '../store.js';
 
 const CURRENCIES = [
-  ['EUR', 'Euro (€)'], ['CHF', 'Schweizer Franken'], ['USD', 'US-Dollar ($)'],
-  ['GBP', 'Britisches Pfund (£)'], ['SEK', 'Schwedische Krone'], ['DKK', 'Dänische Krone'],
-  ['NOK', 'Norwegische Krone'], ['PLN', 'Złoty'], ['CZK', 'Tschechische Krone'],
-  ['HRK', 'Kuna'], ['TRY', 'Türkische Lira'], ['THB', 'Thai-Baht'],
+  ['EUR', 'Euro', '€'], ['CHF', 'Schweizer Franken', 'CHF'], ['USD', 'US-Dollar', '$'],
+  ['GBP', 'Britisches Pfund', '£'], ['SEK', 'Schwedische Krone', 'kr'], ['DKK', 'Dänische Krone', 'kr'],
+  ['NOK', 'Norwegische Krone', 'kr'], ['PLN', 'Złoty', 'zł'], ['CZK', 'Tschechische Krone', 'Kč'],
+  ['HRK', 'Kuna', 'kn'], ['TRY', 'Türkische Lira', '₺'], ['THB', 'Thai-Baht', '฿'],
 ];
 
-export function renderSettings(state, actions) {
-  const { sync } = state;
-
-  return h('div.view',
-    tripSection(state),
-    peopleSection(state, actions),
-    appearanceSection(actions),
-    syncSection(state),
-    dataSection(state),
-    h('section.section',
-      sectionTitle('Über'),
-      h('div.panel',
-        h('p.muted', 'Urlaubstracker — eine gemeinsame Urlaubskasse für alle, die zusammen unterwegs sind. Läuft auch ohne Netz; Eingaben werden nachgereicht, sobald wieder Empfang da ist.'),
-        h('p.muted.small', `Version ${document.documentElement.dataset.version || '1.0.0'} · Modus: ${sync.mode === 'cloud' ? 'geteilt über Firestore' : 'nur auf diesem Gerät'}`),
-      ),
-    ),
-  );
-}
-
-// ------------------------------------------------------------------- Urlaub
-
-function tripSection(state) {
-  const { trip } = state;
-  const save = (patch) => store.updateTrip(patch).catch((e) => toast(e.message, { type: 'error' }));
-
-  const start = h('input.field__input', { type: 'date', value: trip.startDate, onchange: (e) => {
-    const v = e.target.value;
-    if (!isValidDate(v)) return;
-    save({ startDate: v, endDate: v > trip.endDate ? v : trip.endDate });
-  } });
-  const end = h('input.field__input', { type: 'date', value: trip.endDate, min: trip.startDate, onchange: (e) => {
-    const v = e.target.value;
-    if (!isValidDate(v)) return;
-    if (v < trip.startDate) { toast('Das Ende liegt vor dem Anfang.', { type: 'error' }); e.target.value = trip.endDate; return; }
-    save({ endDate: v });
-  } });
-
-  return h('section.section',
-    sectionTitle('Der Urlaub'),
-    h('div.panel',
-      h('label.field', h('span.field__label', 'Name'),
-        h('input.field__input', { type: 'text', value: trip.name, maxlength: 60, onchange: (e) => save({ name: e.target.value.trim() || 'Unser Urlaub' }) })),
-      h('div.field__pair',
-        h('label.field', h('span.field__label', 'Von'), start),
-        h('label.field', h('span.field__label', 'Bis'), end),
-      ),
-      h('p.field__note', `${days(daysInclusive(trip.startDate, trip.endDate))} — ${fullDate(trip.startDate)} bis ${fullDate(trip.endDate)}`),
-      h('label.field', h('span.field__label', 'Währung'),
-        h('select.field__input', { onchange: (e) => save({ currency: e.target.value }) },
-          ...CURRENCIES.map(([code, label]) => h('option', { value: code, selected: trip.currency === code }, label)))),
-      h('div.field',
-        h('span.field__label', 'Tagesbudget'),
-        h('div.segmented',
-          modeButton('dynamic', 'Mitwachsend', trip.budgetMode, save),
-          modeButton('fixed', 'Fester Satz', trip.budgetMode, save),
-        ),
-        h('p.field__note', trip.budgetMode === 'fixed'
-          ? 'Jeden Tag derselbe Betrag: Gesamtbudget geteilt durch die Urlaubstage. Was ihr an einem Tag mehr ausgebt, seht ihr im Polster.'
-          : 'Jeden Morgen neu gerechnet: Restgeld geteilt durch die verbleibenden Tage. Ein teurer Tag verteilt sich dann still auf den Rest.'),
-      ),
-    ),
-  );
-}
-
-/**
- * Eine Aktion als Listenzeile.
- *
- * Untereinander standen hier fünf gleich aussehende, gleich breite Knöpfe —
- * Sichern, Einspielen, Löschen, Verbinden — und keiner sagte, welcher der
- * wichtige ist. Als Zeilen gelesen ordnen sie sich von selbst unter die eine
- * hervorgehobene Aktion darüber. Das Symbol bleibt, weil es die Zeile beim
- * Überfliegen unterscheidbar macht; `danger` färbt nur die Schrift.
- */
-function actionRow(iconName, label, onClick, { danger = false } = {}) {
-  return h('button.arow', { type: 'button', class: danger ? 'arow--danger' : '', onclick: onClick },
-    icon(iconName, 18),
-    h('span.arow__label', label),
-  );
-}
-
-function modeButton(mode, label, current, save) {
-  return h('button.segmented__btn', { type: 'button', class: current === mode ? 'is-active' : '', onclick: () => save({ budgetMode: mode }) }, label);
-}
-
-// ----------------------------------------------------------------- Aussehen
+const BUDGET_MODES = [
+  ['dynamic', 'Mitwachsend', 'Jeden Morgen neu: Restgeld geteilt durch die verbleibenden Tage. Ein teurer Tag verteilt sich still auf den Rest — ihr müsst nichts aufholen.'],
+  ['fixed', 'Fester Satz', 'Jeden Tag derselbe Betrag. Ob ihr vor oder hinter dem Plan liegt, zeigt die Kachel „Polster“.'],
+];
 
 const THEMES = [
-  ['auto', 'Automatisch'],
-  ['light', 'Hell'],
-  ['dark', 'Dunkel'],
+  ['auto', 'Automatisch', 'Folgt dem Handy.'],
+  ['light', 'Hell', null],
+  ['dark', 'Dunkel', 'Abends am Tisch leuchtet kein weißer Schirm in die Runde.'],
 ];
 
-/**
- * Hell oder dunkel. Die App wird abends am Tisch aufgemacht, wenn abgerechnet
- * wird, wer heute was bezahlt hat — und dann leuchtet ein weißer Schirm dem
- * ganzen Tisch ins Gesicht.
- *
- * Die Wahl gilt nur für dieses Gerät und wandert deshalb nicht in den Trip:
- * sonst würde das eine Handy dem anderen die Helligkeit umstellen.
- */
-function appearanceSection(actions) {
-  const current = getPrefs().theme || 'auto';
+// ------------------------------------------------------------- Bausteine
 
+/** Überschrift plus Karte. Die Karte gibt der Gruppe eine Kante, die Zeilen ihren Takt. */
+function group(title, { meta = null, note = null } = {}, ...rows) {
+  const body = rows.filter(Boolean);
+  if (!body.length) return null;
   return h('section.section',
-    sectionTitle('Aussehen'),
-    h('div.panel',
-      h('div.field',
-        h('span.field__label', 'Farben'),
-        h('div.segmented.segmented--3',
-          ...THEMES.map(([id, label]) =>
-            h('button.segmented__btn', {
-              type: 'button',
-              class: current === id ? 'is-active' : '',
-              onclick: () => { setTheme(id); actions.rerender(); },
-            }, label),
-          ),
-        ),
-        h('p.field__note', current === 'auto'
-          ? `Folgt dem Handy — gerade ${resolveTheme('auto') === 'dark' ? 'dunkel' : 'hell'}.`
-          : 'Bleibt so, egal was das Handy sonst macht.'),
-      ),
+    h('div.section__head',
+      h('h2.section__title', title),
+      meta ? h('span.section__meta', meta) : null,
+    ),
+    h('div.rows', ...body),
+    note ? h('p.section__note', note) : null,
+  );
+}
+
+/**
+ * Eine Zeile, die zu etwas führt: links wofür, rechts wie es steht.
+ *
+ * Der Wert gehört in die Zeile und nicht erst hinter den Tipp — sonst muss man
+ * jede Einstellung einzeln öffnen, um zu sehen, was drinsteht.
+ */
+function navRow(label, { value = '', sub = '', lead = null, onClick } = {}) {
+  return h('button.srow', { type: 'button', onclick: onClick },
+    lead,
+    h('span.srow__main',
+      h('span.srow__label', label),
+      sub ? h('span.srow__sub', sub) : null,
+    ),
+    value ? h('span.srow__value', value) : null,
+    h('span.srow__chevron', icon('chevron', 18)),
+  );
+}
+
+/** Eine Zeile, die etwas tut. Kein Pfeil — dahinter kommt keine weitere Seite. */
+function actionRow(iconName, label, onClick, { danger = false, sub = '' } = {}) {
+  return h('button.srow', { type: 'button', class: danger ? 'srow--danger' : '', onclick: onClick },
+    h('span.srow__lead', icon(iconName, 18)),
+    h('span.srow__main',
+      h('span.srow__label', label),
+      sub ? h('span.srow__sub', sub) : null,
     ),
   );
 }
 
-// ------------------------------------------------------------------ Personen
-
 /**
- * Wer gehört zur Kasse.
+ * Auswahl aus wenigen festen Möglichkeiten — Währung, Tagesbudget, Aussehen.
  *
- * Namen ändern geht immer, Personen kommen und gehen — nur nicht, solange Geld
- * an ihnen hängt (das prüft `store.removePerson`). „Das bin ich“ ist die
- * wichtigste Angabe auf dieser Seite: daran hängt, wem privat bezahlte
- * Ausgaben in der Endabrechnung gutgeschrieben werden.
+ * Als Liste statt als `<select>`: hier ist Platz für den Satz, der erklärt,
+ * was die Wahl bedeutet, und der Haken zeigt ohne Aufklappen, was gilt.
+ * Löst mit der gewählten Kennung auf, oder mit `undefined` beim Abbrechen.
  */
-function peopleSection(state, actions) {
-  const { trip, myPersonId, contributions, expenses } = state;
-  const save = (people) => store.updateTrip({ people }).catch((e) => toast(e.message, { type: 'error' }));
-
-  const rename = (id, name) => save(trip.people.map((p) => (p.id === id ? { ...p, name: name.trim() || p.name } : p)));
-
-  const remove = async (person) => {
-    const ok = await confirmSheet({
-      title: `„${person.name}“ entfernen?`,
-      text: person.id === myPersonId
-        ? 'Die Person verschwindet aus der Auswahl und aus der Abrechnung. Danach fragt die App wieder, wer an diesem Gerät sitzt.'
-        : 'Die Person verschwindet aus der Auswahl und aus der Abrechnung.',
-      confirmLabel: 'Entfernen',
-      danger: true,
-    });
-    if (!ok) return;
-    try {
-      await store.removePerson(person.id);
-      toast(`${person.name} ist raus.`);
-    } catch (err) {
-      toast(err?.message || 'Ging nicht.', { type: 'error' });
-    }
-  };
-
-  return h('section.section',
-    sectionTitle('Reisegruppe', h('span.section__meta', plural(trip.people.length, 'Person', 'Personen'))),
-    h('div.panel',
-      ...trip.people.map((p) => {
-        const isMe = myPersonId === p.id;
-        return h('div.person',
-          h('span.dot.dot--lg', { style: { background: p.color } }),
-          h('input.field__input.person__name', { type: 'text', value: p.name, maxlength: 30, onchange: (e) => rename(p.id, e.target.value) }),
-          h('div.person__meta',
-            h('button.chip.chip--small', { type: 'button', class: isMe ? 'is-active' : '', onclick: () => store.setMyPerson(p.id) },
-              isMe ? [icon('check', 15), 'das bin ich'] : 'das bin ich'),
-            // Entfernen steht nur da, wo es auch möglich ist: die letzte
-            // Person kann nicht weg, und an wem Geld hängt, bleibt drin.
-            trip.people.length > 1 && !personEntryCount(p.id, { contributions, expenses })
-              ? h('button.icon-btn.person__remove', { type: 'button', title: 'Entfernen', 'aria-label': `${p.name} entfernen`, onclick: () => remove(p) }, icon('trash', 17))
-              : null,
+function chooseSheet({ title, subtitle, options, current }) {
+  return openSheet({
+    title,
+    subtitle,
+    build: (close) =>
+      h('div.rows', ...options.map(([id, label, note]) =>
+        h('button.srow.srow--option', { type: 'button', class: id === current ? 'is-active' : '', onclick: () => close(id) },
+          h('span.srow__main',
+            h('span.srow__label', label),
+            note ? h('span.srow__sub', note) : null,
           ),
-        );
-      }),
-      trip.people.length < MAX_PEOPLE
-        ? h('button.btn.btn--ghost.btn--small.people__add', { type: 'button', onclick: () => actions.addPerson() }, icon('plus', 16), 'Person hinzufügen')
-        : h('p.field__note', `Mehr als ${MAX_PEOPLE} Personen kann eine Kasse nicht führen.`),
-      myPersonId ? null : h('p.field__note', 'Noch ist nicht gesagt, wer an diesem Gerät sitzt — ohne das landen privat bezahlte Ausgaben in der Abrechnung bei niemandem.'),
-      splitControl(trip, save),
+          id === current ? h('span.srow__check', icon('check', 19)) : null,
+        ),
+      )),
+  });
+}
+
+const saveTrip = (patch) => store.updateTrip(patch).catch((e) => toast(e.message, { type: 'error' }));
+
+// ------------------------------------------------------------------ Seite
+
+export function renderSettings(state, actions) {
+  return h('div.view',
+    tripGroup(state),
+    peopleGroup(state, actions),
+    deviceGroup(actions),
+    syncGroup(state),
+    dataGroup(state),
+    aboutGroup(state),
+    // Ganz unten und für sich: was hier steht, ist nicht zurückzuholen.
+    h('div.danger',
+      h('button.btn.btn--ghost.btn--danger.btn--wide', { type: 'button', onclick: () => removeTrip(state) },
+        icon('trash', 18), 'Urlaubskasse löschen'),
     ),
   );
+}
+
+// ------------------------------------------------------------------ Kasse
+
+function tripGroup(state) {
+  const { trip } = state;
+  const total = daysInclusive(trip.startDate, trip.endDate);
+  const currency = CURRENCIES.find(([code]) => code === trip.currency);
+  const mode = BUDGET_MODES.find(([id]) => id === trip.budgetMode) || BUDGET_MODES[0];
+
+  return group('Die Kasse', {},
+    navRow('Name', { value: trip.name, onClick: () => nameSheet(trip) }),
+    navRow('Zeitraum', {
+      value: `${compactDate(trip.startDate)} – ${compactDate(trip.endDate)}`,
+      sub: days(total),
+      onClick: () => rangeSheet(trip),
+    }),
+    navRow('Währung', {
+      value: currency ? `${currency[1]} (${currency[2]})` : trip.currency,
+      onClick: async () => {
+        const pick = await chooseSheet({ title: 'Währung', options: CURRENCIES.map(([c, n, s]) => [c, `${n} (${s})`, null]), current: trip.currency });
+        if (pick && pick !== trip.currency) saveTrip({ currency: pick });
+      },
+    }),
+    navRow('Tagesbudget', {
+      value: mode[1],
+      onClick: async () => {
+        const pick = await chooseSheet({
+          title: 'Tagesbudget',
+          subtitle: 'Wie aus dem Gesamtbudget die Zahl für heute wird.',
+          options: BUDGET_MODES,
+          current: trip.budgetMode,
+        });
+        if (pick && pick !== trip.budgetMode) saveTrip({ budgetMode: pick });
+      },
+    }),
+  );
+}
+
+function nameSheet(trip) {
+  return openSheet({
+    title: 'Name der Kasse',
+    build: (close) => {
+      const input = h('input.field__input', { type: 'text', value: trip.name, maxlength: 60, enterkeyhint: 'done' });
+      const save = () => { saveTrip({ name: input.value.trim() || 'Unser Urlaub' }); close(true); };
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        input,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Speichern'),
+      );
+    },
+  });
+}
+
+function rangeSheet(trip) {
+  return openSheet({
+    title: 'Zeitraum',
+    build: (close) => {
+      let start = trip.startDate;
+      let end = trip.endDate;
+      const note = h('p.field__note');
+      const error = h('p.field__error');
+
+      const sync = () => {
+        endInput.min = start;
+        note.textContent = end >= start
+          ? `${days(daysInclusive(start, end))} — ${fullDate(start)} bis ${fullDate(end)}`
+          : '';
+        error.textContent = end < start ? 'Das Ende liegt vor dem Anfang.' : '';
+      };
+
+      const startInput = h('input.field__input', { type: 'date', value: start, onchange: (e) => {
+        if (!isValidDate(e.target.value)) return;
+        start = e.target.value;
+        // Mitziehen statt meckern: wer den Anfang nach hinten schiebt, meint
+        // meistens die ganze Reise, nicht einen Zeitraum mit negativer Länge.
+        if (end < start) { end = start; endInput.value = end; }
+        sync();
+      } });
+      const endInput = h('input.field__input', { type: 'date', value: end, min: start, onchange: (e) => {
+        if (!isValidDate(e.target.value)) return;
+        end = e.target.value;
+        sync();
+      } });
+      sync();
+
+      const save = () => {
+        if (end < start) return;
+        saveTrip({ startDate: start, endDate: end });
+        close(true);
+      };
+
+      return h('div.stack',
+        h('div.field__pair',
+          h('label.field', h('span.field__label', 'Von'), startInput),
+          h('label.field', h('span.field__label', 'Bis'), endInput),
+        ),
+        note,
+        error,
+        h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: save }, 'Speichern'),
+      );
+    },
+  });
+}
+
+// ----------------------------------------------------------- Reisegruppe
+
+/**
+ * Wer mitfährt und wer an diesem Gerät sitzt.
+ *
+ * Letzteres ist die wichtigste Angabe der Seite: daran hängt, wem privat
+ * bezahlte Ausgaben in der Endabrechnung gutgeschrieben werden. Steht es noch
+ * nicht fest, sagt die Gruppe das unter der Liste.
+ */
+function peopleGroup(state, actions) {
+  const { trip, myPersonId } = state;
+
+  return group('Reisegruppe', {
+    meta: plural(trip.people.length, 'Person', 'Personen'),
+    note: myPersonId
+      ? null
+      : 'Noch ist nicht gesagt, wer an diesem Gerät sitzt — ohne das landen privat bezahlte Ausgaben in der Abrechnung bei niemandem.',
+  },
+    ...trip.people.map((p) =>
+      navRow(p.name, {
+        value: p.id === myPersonId ? 'du' : '',
+        lead: h('span.srow__dot', { style: { background: p.color } }),
+        onClick: () => personSheet(state, p),
+      }),
+    ),
+    trip.people.length < MAX_PEOPLE
+      ? actionRow('plus', 'Person hinzufügen', () => actions.addPerson())
+      : null,
+    trip.people.length > 1
+      ? navRow('Kosten aufteilen', { value: splitSummary(trip), onClick: () => splitSheet(trip) })
+      : null,
+  );
+}
+
+/** „50 / 50“ oder „gleichmäßig“ — was in der Zeile steht, ohne sie zu öffnen. */
+function splitSummary(trip) {
+  const shares = normalizeShares(trip.people.map((p) => p.share));
+  if (shares.every((v) => v === shares[0])) return 'gleichmäßig';
+  return allocateByShares(100, shares).map((p) => `${p}`).join(' / ');
+}
+
+function personSheet(state, person) {
+  const { trip, myPersonId, contributions, expenses } = state;
+  const isMe = myPersonId === person.id;
+  const entries = personEntryCount(person.id, { contributions, expenses });
+  const canRemove = trip.people.length > 1 && !entries;
+
+  return openSheet({
+    title: person.name,
+    build: (close) => {
+      const input = h('input.field__input', { type: 'text', value: person.name, maxlength: 30, enterkeyhint: 'done' });
+      const save = () => {
+        const name = input.value.trim();
+        if (name && name !== person.name) {
+          store.updateTrip({ people: trip.people.map((p) => (p.id === person.id ? { ...p, name } : p)) })
+            .catch((e) => toast(e.message, { type: 'error' }));
+        }
+        close(true);
+      };
+
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        h('label.field', h('span.field__label', 'Name'), input),
+        isMe
+          ? h('p.field__note', h('span.srow__check', icon('check', 17)), ' Dieses Gerät gehört zu dieser Person.')
+          : h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => { store.setMyPerson(person.id); close(true); } },
+              icon('person', 18), 'Das bin ich'),
+        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Speichern'),
+        canRemove
+          ? h('button.btn.btn--ghost.btn--danger.btn--wide', { type: 'button', onclick: async () => { close(false); await removePerson(state, person); } },
+              icon('trash', 18), 'Aus der Gruppe entfernen')
+          // Wer schon Geld in der Kasse hat, kann nicht verschwinden — sonst
+          // fehlten seine Einträge in der Abrechnung bei niemandem.
+          : entries
+            ? h('p.field__note', `${plural(entries, 'Eintrag hängt', 'Einträge hängen')} an dieser Person — sie kann deshalb nicht entfernt werden.`)
+            : null,
+      );
+    },
+  });
+}
+
+async function removePerson(state, person) {
+  const ok = await confirmSheet({
+    title: `„${person.name}“ entfernen?`,
+    text: person.id === state.myPersonId
+      ? 'Die Person verschwindet aus der Auswahl und aus der Abrechnung. Danach fragt die App wieder, wer an diesem Gerät sitzt.'
+      : 'Die Person verschwindet aus der Auswahl und aus der Abrechnung.',
+    confirmLabel: 'Entfernen',
+    danger: true,
+  });
+  if (!ok) return;
+  try {
+    await store.removePerson(person.id);
+    toast(`${person.name} ist raus.`);
+  } catch (err) {
+    toast(err?.message || 'Ging nicht.', { type: 'error' });
+  }
 }
 
 /** Wie die Gesamtkosten am Ende aufgeteilt werden. */
-function splitControl(trip, save) {
-  if (trip.people.length < 2) return null;
-  return trip.people.length === 2 ? twoWaySplit(trip, save) : shareSplit(trip, save);
+function splitSheet(trip) {
+  const save = (people) => store.updateTrip({ people }).catch((e) => toast(e.message, { type: 'error' }));
+  return openSheet({
+    title: 'Kosten aufteilen',
+    subtitle: 'Zählt nur für die Endabrechnung, nicht fürs Tagesbudget.',
+    build: () => (trip.people.length === 2 ? twoWaySplit(trip, save) : shareSplit(trip, save)),
+  });
 }
 
 /**
@@ -221,20 +346,16 @@ function twoWaySplit(trip, save) {
   const setLabel = (v) => { label.textContent = `${a.name} trägt ${v} %, ${b.name} ${100 - v} %.`; };
   setLabel(pctA);
 
-  const slider = h('input.slider', {
-    type: 'range', min: 5, max: 95, step: 5, value: pctA,
-    oninput: (e) => setLabel(Number(e.target.value)),
-    onchange: (e) => {
-      const v = Number(e.target.value);
-      save([{ ...a, share: v }, { ...b, share: 100 - v }]);
-    },
-  });
-
-  return h('div.field',
-    h('span.field__label', 'Kosten aufteilen'),
-    slider,
+  return h('div.stack',
+    h('input.slider', {
+      type: 'range', min: 5, max: 95, step: 5, value: pctA,
+      oninput: (e) => setLabel(Number(e.target.value)),
+      onchange: (e) => {
+        const v = Number(e.target.value);
+        save([{ ...a, share: v }, { ...b, share: 100 - v }]);
+      },
+    }),
     label,
-    pctA !== 50 ? null : h('p.field__note.muted', 'Standard ist halbe-halbe. Das zählt nur für die Endabrechnung.'),
   );
 }
 
@@ -260,8 +381,7 @@ function shareSplit(trip, save) {
     save(trip.people.map((p, k) => ({ ...p, share: k === i ? next : shares[k] })));
   };
 
-  return h('div.field',
-    h('span.field__label', 'Kosten aufteilen'),
+  return h('div.stack',
     h('div.shares', ...trip.people.map((p, i) =>
       h('div.share',
         h('span.dot', { style: { background: p.color } }),
@@ -275,14 +395,35 @@ function shareSplit(trip, save) {
       ),
     )),
     even
-      ? h('p.field__note', 'Alle tragen gleich viel. Das zählt nur für die Endabrechnung.')
-      : h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => save(trip.people.map((p) => ({ ...p, share: 1 }))) }, 'Wieder gleichmäßig aufteilen'),
+      ? h('p.field__note', 'Alle tragen gleich viel.')
+      : h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => save(trip.people.map((p) => ({ ...p, share: 1 }))) }, 'Wieder gleichmäßig aufteilen'),
+  );
+}
+
+// ----------------------------------------------------------- Dieses Gerät
+
+/**
+ * Was nur hier gilt und nicht in den Trip gehört: sonst würde das eine Handy
+ * dem anderen die Helligkeit umstellen.
+ */
+function deviceGroup(actions) {
+  const current = getPrefs().theme || 'auto';
+  const label = (THEMES.find(([id]) => id === current) || THEMES[0])[1];
+
+  return group('Dieses Gerät', {},
+    navRow('Aussehen', {
+      value: label,
+      onClick: async () => {
+        const pick = await chooseSheet({ title: 'Aussehen', options: THEMES, current });
+        if (pick && pick !== current) { setTheme(pick); actions.rerender(); }
+      },
+    }),
   );
 }
 
 // --------------------------------------------------------------------- Sync
 
-function syncSection(state) {
+function syncGroup(state) {
   const { sync } = state;
   const cloud = sync.mode === 'cloud';
   const invite = store.getInviteInfo();
@@ -305,26 +446,21 @@ function syncSection(state) {
       : { tone: 'muted', icon: 'cloudOff', title: 'Nur auf diesem Gerät', text: `${otherNames(state) || 'Die anderen'} sehen die Einträge noch nicht. Mit einem Firebase-Projekt teilt ihr euch denselben Stand.` };
 
   return h('section.section',
-    sectionTitle('Gemeinsam nutzen'),
-    h('div.panel',
-      h('div.status', { class: `status--${status.tone}` },
-        icon(status.icon, 22),
-        h('div', h('p.status__title', status.title), h('p.status__text', status.text)),
-      ),
-      cloud
-        ? h('div.stack',
-            invite ? h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => shareInvite(invite) }, icon('share', 19), 'Einladung teilen') : null,
-            invite ? h('p.field__note', 'Der Link ist der Schlüssel zur Kasse — er gehört in einen privaten Chat, nicht in eine offene Gruppe.') : null,
-            h('div.arows',
-              actionRow('repeat', 'Einladungscode erneuern', () => rotateCode()),
-              actionRow('cloudOff', 'Synchronisierung beenden', () => disconnect()),
-            ),
-          )
-        : h('div.stack',
-            h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => setupCloud() }, icon('cloud', 19), 'Mit Firebase verbinden'),
-            h('div.arows', actionRow('share', 'Einladung eingeben', () => enterInvite())),
-          ),
+    h('div.section__head', h('h2.section__title', 'Gemeinsam nutzen')),
+    h('div.status', { class: `status--${status.tone}` },
+      icon(status.icon, 22),
+      h('div', h('p.status__title', status.title), h('p.status__text', status.text)),
     ),
+    cloud
+      ? h('div.rows',
+          invite ? actionRow('share', 'Einladung teilen', () => shareInvite(invite), { sub: 'Der Link ist der Schlüssel zur Kasse — privater Chat, keine offene Gruppe.' }) : null,
+          actionRow('repeat', 'Einladungscode erneuern', () => rotateCode()),
+          actionRow('cloudOff', 'Synchronisierung beenden', () => disconnect()),
+        )
+      : h('div.rows',
+          actionRow('cloud', 'Mit Firebase verbinden', () => setupCloud()),
+          actionRow('share', 'Einladung eingeben', () => enterInvite()),
+        ),
   );
 }
 
@@ -343,7 +479,7 @@ function otherNames({ trip, myPersonId }) {
 
 async function shareInvite(invite) {
   const url = buildInviteLink(invite);
-  const text = `Urlaubskasse „${invite.tripName}“ — mit diesem Link kommst du rein:`;
+  const text = `Unsere Urlaubskasse „${invite.tripName}“ — mit diesem Link kommst du rein:`;
   try {
     if (navigator.share) {
       await navigator.share({ title: 'Urlaubstracker', text, url });
@@ -367,7 +503,7 @@ async function shareInvite(invite) {
 async function rotateCode() {
   const ok = await confirmSheet({
     title: 'Code erneuern?',
-    text: 'Alte Einladungslinks funktionieren danach nicht mehr. Wer schon beigetreten ist, bleibt dabei.',
+    text: 'Alte Einladungslinks funktionieren danach nicht mehr. Wer schon beigetreten ist, bleibt drin.',
     confirmLabel: 'Erneuern',
   });
   if (!ok) return;
@@ -387,11 +523,11 @@ async function disconnect() {
   toast('Läuft jetzt nur noch auf diesem Gerät.');
 }
 
-/** Firebase-Konfiguration einsammeln und den aktuellen Trip hochladen. */
+/** Firebase-Konfiguration einsammeln und die aktuelle Kasse hochladen. */
 function setupCloud() {
   return openSheet({
     title: 'Mit Firebase verbinden',
-    subtitle: 'Einmalig einrichten — danach sehen alle denselben Stand.',
+    subtitle: 'Einmalig einrichten — danach seht ihr alle denselben Stand.',
     fullHeight: true,
     build: (close) => {
       const input = h('textarea.field__input.field__input--code', {
@@ -406,7 +542,7 @@ function setupCloud() {
         if (problem) { error.textContent = problem; return; }
         error.textContent = '';
         try {
-          toast('Trip wird hochgeladen …');
+          toast('Kasse wird hochgeladen …');
           await store.connectCloud(cfg);
           close(true);
           toast('Verbunden. Jetzt die Einladung teilen.', { type: 'success' });
@@ -440,7 +576,8 @@ function enterInvite() {
       const input = h('textarea.field__input.field__input--code', { rows: 4, spellcheck: false, placeholder: 'https://…#einladung=…' });
       const error = h('p.field__error');
       const go = async () => {
-        const hash = String(input.value).includes('#') ? String(input.value).slice(String(input.value).indexOf('#')) : '';
+        const raw = String(input.value);
+        const hash = raw.includes('#') ? raw.slice(raw.indexOf('#')) : '';
         const invite = readInviteFromLocation(hash);
         if (!invite) { error.textContent = 'Dieser Link enthält keine Einladung.'; return; }
         try {
@@ -462,7 +599,7 @@ function enterInvite() {
 
 // -------------------------------------------------------------------- Daten
 
-function dataSection(state) {
+function dataGroup(state) {
   const { trip, contributions, expenses } = state;
 
   const download = (content, filename, type) => {
@@ -498,15 +635,11 @@ function dataSection(state) {
     }
   } });
 
-  return h('section.section',
-    sectionTitle('Daten'),
-    h('div.arows',
-      actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions }), `${slug}.csv`, 'text/csv;charset=utf-8')),
-      actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses }), `${slug}-sicherung.json`, 'application/json')),
-      actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
-      importFile,
-      actionRow('trash', 'Urlaubskasse löschen', () => removeTrip(state), { danger: true }),
-    ),
+  return group('Daten', {},
+    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions }), `${slug}.csv`, 'text/csv;charset=utf-8')),
+    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses }), `${slug}-sicherung.json`, 'application/json')),
+    actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
+    importFile,
   );
 }
 
@@ -523,4 +656,15 @@ async function removeTrip(state) {
   if (!ok) return;
   await store.deleteTrip();
   toast('Gelöscht.');
+}
+
+// --------------------------------------------------------------------- Über
+
+function aboutGroup(state) {
+  return h('section.section.about',
+    h('p.muted.small', `Urlaubstracker ${document.documentElement.dataset.version || ''} · ${
+      state.sync.mode === 'cloud' ? 'geteilt über Firestore' : 'nur auf diesem Gerät'
+    }`),
+    h('p.muted.small', 'Läuft auch ohne Netz; Eingaben werden nachgereicht, sobald wieder Empfang da ist.'),
+  );
 }

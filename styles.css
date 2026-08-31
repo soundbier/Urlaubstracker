@@ -586,27 +586,68 @@ select.field__input { background-image: none; }
  * Knöpfe — so bleibt die eine hervorgehobene Aktion darüber die einzige, die
  * sich meldet.
  */
-.arows { display: flex; flex-direction: column; }
-.arow {
+/* ------------------------------------------------- Einstellungs-Zeilen */
+
+/*
+ * Die Einstellungen sind eine Liste, keine Formularseite: jede Zeile nennt
+ * links, worum es geht, und rechts, wie es steht. Der Pfeil führt zum Sheet,
+ * in dem geändert wird.
+ */
+/* Wie die Ausgabenliste: Haarlinien statt Kasten. Fünf weiße Karten
+   untereinander wären auf dieser Seite die auffälligste Struktur — dabei ist
+   die Überschrift schon die Gruppe. */
+.rows { display: flex; flex-direction: column; }
+/* Die Zeile selbst setzt `border: 0` (Knopf-Reset). Bei gleicher Spezifität
+   gewinnt die spätere Regel — die Trennlinie braucht deshalb beide Klassen,
+   sonst laufen die Zeilen ohne Kante ineinander. */
+.rows > .srow + .srow { border-top: 1px solid var(--border); }
+
+.srow {
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 50px;
-  padding: 12px 0;
+  min-height: 52px;
+  padding: 10px 0;
   border: 0;
-  border-top: 1px solid var(--border);
   background: none;
   color: var(--text);
   text-align: left;
   font-size: var(--fs-md);
 }
-.arow:first-of-type { border-top: 0; }
-.arow .icon { color: var(--text-faint); }
-.arow:active { color: var(--accent); }
-.arow:active .icon { color: inherit; }
-.arow--danger { color: var(--over); }
-.arow--danger .icon { color: currentColor; }
+.srow:active { background: var(--surface-2); }
+
+.srow__lead { display: grid; place-items: center; color: var(--text-faint); }
+.srow__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.srow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.srow__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow__sub { font-size: var(--fs-2xs); color: var(--text-faint); line-height: 1.35; }
+.srow__value {
+  flex: none;
+  max-width: 48%;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Das Pfeil-Icon zeigt nach unten; hier soll es weiterführen, nicht aufklappen. */
+.srow__chevron { display: grid; place-items: center; color: var(--text-faint); transform: rotate(-90deg); }
+.srow__check { display: grid; place-items: center; color: var(--accent); }
+
+.srow--danger { color: var(--over); }
+.srow--danger .srow__lead { color: currentColor; }
+
+/* Auswahlzeile im Sheet: der Erklärsatz darf hier umbrechen. */
+.srow--option { align-items: flex-start; }
+.srow--option .srow__label { white-space: normal; font-weight: 560; }
+.srow--option.is-active .srow__label { color: var(--accent); }
+
+/* Löschen steht allein, mit Abstand nach oben — nichts daneben, was man
+   aus Versehen träfe. */
+.danger { margin-top: 10px; }
+.about { gap: 4px; text-align: center; }
 
 /* ---------------------------------------------------------- Reisegruppe */
 
@@ -630,23 +671,6 @@ select.field__input { background-image: none; }
    Farbe zurücksetzen. */
 .icon-btn.people__remove { justify-self: center; width: 40px; height: 40px; }
 .people__add { align-self: flex-start; }
-
-/* In den Einstellungen steht unter jedem Namen noch, wem das Gerät gehört und
-   ob die Person entfernt werden kann. Zwei Zeilen statt einer: nebeneinander
-   drängen sich Feld, Chip und Papierkorb auf schmalen Geräten so, dass der
-   Name auf drei Zeichen zusammenschrumpft. */
-.person {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 8px 10px;
-  padding: 12px 0;
-  border-top: 1px solid var(--border);
-}
-.person:first-of-type { border-top: 0; padding-top: 0; }
-.person__name { min-width: 0; }
-.person__meta { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.icon-btn.person__remove { width: 40px; height: 40px; color: var(--over); }
 
 .slider { width: 100%; accent-color: var(--accent); }
 
@@ -756,7 +780,6 @@ select.field__input { background-image: none; }
   font-weight: 600;
 }
 .chip .icon { margin-left: -2px; }
-.chip--small { min-height: 36px; padding: 7px 11px; font-size: var(--fs-xs); }
 .chip--date { position: relative; overflow: hidden; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 
