@@ -24,7 +24,7 @@ export function renderBudget(state, actions) {
       b.elapsedDays && b.total
         ? h('p.card__note',
             b.buffer >= 0 ? icon('check', 16) : icon('info', 16),
-            ` Ihr liegt ${bufferLabel(b.buffer, cur)}.`)
+            ` Die Kasse liegt ${bufferLabel(b.buffer, cur)}.`)
         : null,
       howItWorks(b, trip, cur),
     ),
@@ -41,7 +41,7 @@ export function renderBudget(state, actions) {
               return h('div.split__item', h('span.dot', { style: { background: p.color } }), h('span.split__name', p.name), h('span.split__value', money(sum, cur)));
             })),
           )
-        : emptyState('Tragt ein, was ihr beide überwiesen habt.', 'Einzahlung eintragen', actions.addContribution),
+        : emptyState('Tragt ein, wer wie viel auf das gemeinsame Konto überwiesen hat.', 'Einzahlung eintragen', actions.addContribution),
     ),
 
     expenses.length ? h('section.section', sectionTitle('Wofür ging das Geld?'), categoryList(expenses, b.spent, cur)) : null,
@@ -198,7 +198,7 @@ function settlement(trip, contributions, expenses, cur, phase = 'after') {
   const done = phase === 'after';
 
   if (!st.totalSpent && !st.potBalance) {
-    return emptyState('Sobald Geld eingezahlt oder ausgegeben ist, steht hier, wer wem was schuldet.');
+    return emptyState('Sobald Geld eingezahlt oder ausgegeben ist, steht hier, wer wem noch was schuldet.');
   }
 
   const table = h('div.settle',
@@ -230,7 +230,7 @@ function settlement(trip, contributions, expenses, cur, phase = 'after') {
   for (const t of st.transfers) {
     actions.push(h('li', h('strong', t.from), ' überweist ', h('strong', money(t.amount, cur)), ' an ', h('strong', t.to), '.'));
   }
-  if (!actions.length) actions.push(h('li', 'Ihr seid quitt — nichts mehr zu überweisen.'));
+  if (!actions.length) actions.push(h('li', 'Alles ausgeglichen — nichts mehr zu überweisen.'));
 
   return h('div',
     table,

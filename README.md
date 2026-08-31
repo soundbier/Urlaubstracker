@@ -1,13 +1,14 @@
 # Urlaubstracker
 
-Eine gemeinsame Urlaubskasse für zwei — als installierbare Web-App (PWA).
+Eine gemeinsame Urlaubskasse für alle, die zusammen unterwegs sind — als
+installierbare Web-App (PWA). Zu zweit, zu acht oder allein.
 
 Ihr tragt ein, was jede:r aufs gemeinsame Konto überwiesen hat. Daraus rechnet
 die App aus, wie viel pro Tag drin ist. Unterwegs hakt ihr in ein paar Sekunden
 ab, was ihr ausgegeben habt, und seht auf einen Blick, was heute noch übrig ist.
 Am Ende steht die Abrechnung: wer wem noch was überweist.
 
-Läuft offline, auf beiden Handys, ohne Abo.
+Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
 
 ---
 
@@ -18,7 +19,7 @@ Läuft offline, auf beiden Handys, ohne Abo.
 | **Heute** | Eine große Zahl: was heute noch übrig ist. Darunter drei Kacheln — verfügbar, Resttage, Polster — und die Einträge des Tages. |
 | **Ausgaben** | Alles nach Tagen gruppiert, mit Filter nach Kategorie. Antippen zum Ändern. |
 | **Budget** | Einzahlungen, Verlauf über den Urlaub, Aufteilung nach Kategorie, Endabrechnung. |
-| **Mehr** | Zeitraum, Währung, Namen, Kostenaufteilung, Synchronisierung, Export. |
+| **Mehr** | Zeitraum, Währung, Reisegruppe, Kostenaufteilung, Synchronisierung, Export. |
 
 Weitere Kleinigkeiten:
 
@@ -30,8 +31,9 @@ Weitere Kleinigkeiten:
 - **Nochmal** — neben jeder Ausgabe sitzt ein Knopf, der sie mit dem heutigen
   Datum noch einmal einträgt: gleicher Betrag, gleiche Kategorie. Kaffee,
   Parken und Maut sind Wiederholungstäter.
-- **Von wem** — zu zweit steht an jedem Eintrag, wer ihn getippt hat. Damit
-  landet die Runde nach dem Abendessen nicht zweimal in der Liste.
+- **Von wem** — sind mehrere Geräte verbunden, steht an jedem Eintrag, wer ihn
+  getippt hat. Damit landet die Runde nach dem Abendessen nicht zweimal in der
+  Liste.
 - **Hell oder dunkel** — unter *Mehr → Aussehen*. Standard ist „Automatisch“:
   die App folgt dem Handy.
 - **Bezahlt von** — aus der gemeinsamen Kasse oder aus eigener Tasche. Beides
@@ -43,6 +45,30 @@ Weitere Kleinigkeiten:
   wird. Ein Tipp auf den Haken macht daraus eine bezahlte Ausgabe.
 - **Offline** — die App startet ohne Netz, Eingaben werden nachgereicht.
 - **Export** — CSV für Excel, JSON als Sicherungskopie.
+
+---
+
+## Die Reisegruppe
+
+Beim Anlegen tragt ihr ein, wer mitfährt — **eine bis acht Personen**. Das erste
+Feld ist immer die Person am Gerät; daran erkennt die App später, wem privat
+bezahlte Ausgaben gehören. Wer allein reist, lässt die zweite Zeile einfach leer.
+
+Unter *Mehr → Reisegruppe* lässt sich das jederzeit ändern:
+
+- **Namen ändern** geht immer.
+- **Person hinzufügen**, wenn unterwegs jemand dazukommt.
+- **Person entfernen**, solange kein Geld an ihr hängt. Sobald sie eingezahlt
+  oder etwas privat bezahlt hat, bleibt sie drin — sonst stünde in der
+  Abrechnung eine Einzahlung ohne Einzahler.
+- **„Das bin ich“** sagt, wer an diesem Gerät sitzt. Fehlt die Angabe (etwa
+  direkt nach dem Beitritt über eine Einladung), fragt die App auf *Heute*
+  danach — und wer noch gar nicht in der Liste steht, trägt sich dort selbst ein.
+
+**Kosten aufteilen:** zu zweit ein Schieberegler (Standard halbe-halbe), ab drei
+Personen Anteile — ein Anteil je Person, zwei für wen doppelt so viel trägt. Die
+Prozentzahl steht daneben. Das zählt ausschließlich für die Endabrechnung, nie
+für das Tagesbudget.
 
 ---
 
@@ -81,9 +107,9 @@ Sonst würde die Zahl beim Eintragen einer Ausgabe unter den Fingern schrumpfen.
 ### Endabrechnung
 
 Getragen hat jede Person, was sie **eingezahlt** hat plus was sie **aus eigener
-Tasche** bezahlt hat. Fair wäre ihr Anteil an den Gesamtausgaben (Standard
-50/50, unter *Mehr → Kosten aufteilen* änderbar). Die Differenz ist ihr
-Guthaben — und die Summe aller Guthaben ist genau das, was noch auf dem
+Tasche** bezahlt hat. Fair wäre ihr Anteil an den Gesamtausgaben (standardmäßig
+gleichmäßig geteilt, unter *Mehr → Kosten aufteilen* änderbar). Die Differenz ist
+ihr Guthaben — und die Summe aller Guthaben ist genau das, was noch auf dem
 gemeinsamen Konto liegt.
 
 Daraus wird eine Liste von Überweisungen: erst geht das Restgeld vom Konto an
@@ -101,8 +127,8 @@ bis das Konto wieder auf null ist.
 
 ## Loslegen
 
-Die App öffnen — fertig. Beim ersten Start legt ihr den Urlaub an (Name,
-Zeitraum, eure Namen). Sie läuft dann erst mal nur auf diesem Gerät.
+Die App öffnen — fertig. Beim ersten Start legt ihr den Urlaub an: Name,
+Zeitraum und wer mitreist. Sie läuft dann erst mal nur auf diesem Gerät.
 
 ### Auf dem Handy installieren
 
@@ -116,9 +142,9 @@ die Zahlentastatur.
 
 ---
 
-## Zu zweit nutzen (Firebase Firestore)
+## Gemeinsam nutzen (Firebase Firestore)
 
-Damit beide Handys denselben Stand sehen, braucht es einmalig ein kostenloses
+Damit alle Geräte denselben Stand sehen, braucht es einmalig ein kostenloses
 Firebase-Projekt. Danach synchronisiert sich alles von selbst — auch mit
 schlechtem Empfang, weil Firestore Eingaben lokal zwischenspeichert und
 nachreicht.
@@ -163,10 +189,12 @@ Ohne diesen Schritt lehnt Firestore alle Zugriffe ab und die App meldet
    *Verbinden und hochladen*. Der bestehende Trip wandert mitsamt allen
    Einträgen in die Cloud.
 
-### 4. Das zweite Handy dazuholen
+### 4. Die anderen Geräte dazuholen
 
-**Mehr → Einladung teilen.** Der Link enthält alles, was das andere Gerät
+**Mehr → Einladung teilen.** Der Link enthält alles, was ein weiteres Gerät
 braucht — einfach per Nachricht schicken. Ein Tipp darauf, *Beitreten*, fertig.
+Danach fragt die App, wer an dem Gerät sitzt; wer noch nicht in der Liste steht,
+trägt sich dort selbst ein. Bis zu acht Geräte hängen an einer Kasse.
 
 > Der Link ist der Schlüssel zum Trip. Er gehört in einen privaten Chat, nicht
 > in eine öffentliche Gruppe. Falls er doch mal irgendwo landet:
@@ -261,7 +289,7 @@ js/
   calc.js             die gesamte Rechenlogik, ohne DOM — hier sitzt die Wahrheit
   store.js            Zustand und Schreibvorgänge
   backend-local.js    Speicherung im Gerät
-  backend-firestore.js  Synchronisierung zu zweit
+  backend-firestore.js  Synchronisierung über mehrere Geräte
   prefs.js            geräteeigene Einstellungen (auch hell/dunkel)
   link.js             Einladungslinks, CSV- und JSON-Export
   dom.js  format.js   kleine Helfer

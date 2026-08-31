@@ -1,5 +1,5 @@
 /**
- * Backend mit Firestore: beide Handys hängen am selben Trip.
+ * Backend mit Firestore: alle Geräte der Gruppe hängen am selben Trip.
  *
  * Firestore hält die Daten selbst offline vor und schiebt Änderungen nach,
  * sobald wieder Netz da ist. Für die App heißt das: schreiben geht immer,

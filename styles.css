@@ -109,6 +109,10 @@ code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0
 strong { font-weight: 650; }
 
 .icon { flex: none; }
+/* Ohne diese Zeile bliebe ein `hidden` an einem Knopf wirkungslos: `.btn`
+   setzt `display: inline-flex`, und eine Autorenregel schlägt die Vorgabe des
+   Browsers — auch bei gleicher Spezifität. */
+[hidden] { display: none !important; }
 .muted { color: var(--text-muted); }
 .small { font-size: 0.82rem; }
 
@@ -598,10 +602,70 @@ select.field__input { background-image: none; }
   margin-top: 1px;
 }
 
-.person { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
-.person__name { flex: 1; min-width: 0; }
+/* ---------------------------------------------------------- Reisegruppe */
+
+/* Namensfelder beim Anlegen: Farbpunkt, Feld, und rechts entweder das „Du“
+   oder der Knopf, mit dem die Zeile wieder verschwindet. Ein Raster statt
+   flex, damit alle Felder gleich breit bleiben — sonst wandert die rechte
+   Kante mit der Länge des Namens. */
+.people { display: flex; flex-direction: column; gap: 8px; }
+/* Die letzte Spalte hat eine feste Breite: „Du“ und der Entfernen-Knopf sind
+   unterschiedlich breit, und mit `auto` stünde jedes Namensfeld anders weit
+   nach rechts — bei drei Zeilen sieht das aus wie ein Fehler. */
+.people__row { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
+.people__name { min-width: 0; }
+.people__you {
+  justify-self: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  background: var(--accent-soft);
+  padding: 6px 8px;
+  border-radius: 999px;
+}
+/* Doppelt benannt: `.icon-btn` steht weiter unten und würde sonst Größe und
+   Farbe zurücksetzen. */
+.icon-btn.people__remove { justify-self: center; width: 34px; height: 34px; }
+.people__add { align-self: flex-start; margin-top: 8px; }
+
+/* In den Einstellungen steht unter jedem Namen noch, wem das Gerät gehört und
+   ob die Person entfernt werden kann. Zwei Zeilen statt einer: nebeneinander
+   drängen sich Feld, Chip und Papierkorb auf schmalen Geräten so, dass der
+   Name auf drei Zeichen zusammenschrumpft. */
+.person {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.person:last-of-type { border-bottom: 0; }
+.person__name { min-width: 0; }
+.person__meta { grid-column: 2; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.icon-btn.person__remove { width: 34px; height: 34px; color: var(--over); background: transparent; }
 
 .slider { width: 100%; accent-color: var(--accent); }
+
+/* Kostenaufteilung ab drei Personen: Anteile statt Prozentfelder, die
+   zusammen 100 ergeben müssen. Die Prozentzahl steht als Ergebnis daneben. */
+.shares { display: flex; flex-direction: column; gap: 4px; }
+.share { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 6px 0; }
+.share__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; }
+.share__pct { font-size: 0.82rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: 999px; padding: 2px; }
+.stepper__btn {
+  width: 32px; height: 32px;
+  border: 0; border-radius: 50%;
+  background: none;
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+.stepper__btn:disabled { opacity: 0.35; }
+.stepper__value { min-width: 18px; text-align: center; font-weight: 620; font-variant-numeric: tabular-nums; }
 
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: var(--radius-sm); }
 .segmented--3 { grid-template-columns: repeat(3, 1fr); }
@@ -693,6 +757,7 @@ select.field__input { background-image: none; }
   color: var(--on-accent);
 }
 .chip .icon { margin-left: -2px; }
+.chip--small { padding: 7px 11px; font-size: 0.8rem; }
 .chip--date { position: relative; overflow: hidden; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 

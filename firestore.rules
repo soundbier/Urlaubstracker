@@ -5,7 +5,8 @@ rules_version = '2';
 // Grundgedanke: ein Trip gehört den Geräten, die in `memberUids` stehen. Wer
 // den Einladungscode kennt, darf sich selbst dazu eintragen — den Code kann
 // ein fremdes Gerät nicht lesen, deshalb schickt es ihn beim Beitreten als
-// `joinProof` mit, und der Vergleich passiert hier auf dem Server.
+// `joinProof` mit, und der Vergleich passiert hier auf dem Server. Mehr als
+// acht Geräte kommen nicht an einen Trip; ebenso viele Personen führt die App.
 //
 // Veröffentlichen:  firebase deploy --only firestore:rules
 // (oder in der Firebase-Konsole unter Firestore Database → Regeln einfügen)
@@ -43,7 +44,7 @@ service cloud.firestore {
 
       allow update: if
         // Mitglieder pflegen den Trip. Sich selbst austragen ist erlaubt,
-        // die andere Person hinauswerfen nicht.
+        // andere hinauswerfen nicht.
         (isMember()
          && request.resource.data.memberUids.hasAll(members().removeAll([request.auth.uid])))
         ||

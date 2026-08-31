@@ -1,7 +1,7 @@
 {
   "name": "Urlaubstracker — gemeinsame Urlaubskasse",
   "short_name": "Urlaubskasse",
-  "description": "Einzahlungen eintragen, Tagesbudget sehen, Ausgaben abhaken — zu zweit auf beiden Handys.",
+  "description": "Einzahlungen eintragen, Tagesbudget sehen, Ausgaben abhaken — gemeinsam auf allen Geräten der Reisegruppe.",
   "lang": "de",
   "dir": "ltr",
   "start_url": "./",
