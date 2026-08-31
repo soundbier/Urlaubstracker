@@ -3,6 +3,7 @@ import { h, icon, replace, $ } from './dom.js';
 import * as store from './store.js';
 import { computeBudget, todayISO } from './calc.js';
 import { applyTheme } from './prefs.js';
+import { onInstallabilityChange } from './install.js';
 import { money, number, days } from './format.js';
 import { toast, confirmSheet, promptSheet } from './ui/sheet.js';
 import { expenseSheet, contributionSheet } from './ui/entry-sheets.js';
@@ -286,6 +287,11 @@ function nav(activeId) {
 // Die Farbwahl steht schon als `data-theme` am <html> (siehe index.html) —
 // hier zieht nur noch die Adressleiste nach.
 applyTheme();
+
+// `beforeinstallprompt` trifft oft erst nach dem ersten Aufbau ein — dann
+// muss die Installations-Zeile (Einstellungen, Einladungsbildschirm)
+// nachträglich auftauchen, ohne dass jemand die Ansicht wechseln muss.
+onInstallabilityChange(() => render());
 
 store.subscribe((next) => {
   // Nur nach dem Anlegen bzw. Beitreten auf „Heute“ springen. Beim Kaltstart

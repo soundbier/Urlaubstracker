@@ -2,6 +2,8 @@
 import { h, icon } from '../dom.js';
 import { CATEGORY_BY_ID, POT, isFromPlan } from '../calc.js';
 import { money, dayLabel } from '../format.js';
+import { openSheet } from './sheet.js';
+import { isIOS } from '../install.js';
 
 /**
  * Eine Kennzahl in der Zeile unter der großen Zahl.
@@ -145,6 +147,29 @@ export function contributionRow(contribution, trip, onClick) {
     ),
     h('span.row__amount.row__amount--in', `+ ${money(contribution.amount, trip.currency)}`),
   );
+}
+
+/**
+ * Anleitung fürs Installieren, wenn kein nativer Dialog zur Verfügung steht —
+ * vor allem für Safari auf iOS, das `beforeinstallprompt` nicht kennt.
+ */
+export function installInstructionsSheet() {
+  return openSheet({
+    title: 'Als App installieren',
+    subtitle: 'Einmal einrichten — danach startet die Kasse wie eine App, ohne Adresszeile.',
+    build: () =>
+      isIOS()
+        ? h('ol.steps',
+            h('li', 'Unten in Safari das ', h('strong', 'Teilen-Symbol'), ' antippen.'),
+            h('li', h('strong', 'Zum Home-Bildschirm'), ' auswählen.'),
+            h('li', 'Mit ', h('strong', 'Hinzufügen'), ' bestätigen.'),
+          )
+        : h('ol.steps',
+            h('li', 'Rechts oben im Browser das ', h('strong', 'Menü'), ' öffnen (drei Punkte).'),
+            h('li', h('strong', 'App installieren'), ' oder ', h('strong', 'Zum Startbildschirm hinzufügen'), ' antippen.'),
+            h('li', 'Bestätigen — das Symbol landet auf dem Startbildschirm.'),
+          ),
+  });
 }
 
 export function emptyState(text, actionLabel, onAction) {

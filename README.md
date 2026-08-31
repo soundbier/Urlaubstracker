@@ -140,6 +140,19 @@ Danach startet sie wie eine normale App, im Vollbild und ohne Adresszeile. Ein
 langer Druck auf das Symbol bietet *Ausgabe eintragen* an — das öffnet direkt
 die Zahlentastatur.
 
+Solange die Seite im Browser-Tab läuft (auch über den Einladungslink — dazu
+gleich mehr), zeigt sie unter *Mehr → Dieses Gerät* zusätzlich eine Zeile *Als
+App installieren*. Auf Chrome/Edge löst sie den eingebauten Dialog aus, sonst
+eine kurze Anleitung.
+
+> **Warum ein Einladungslink im Browser statt in der installierten App
+> öffnet:** Das entscheidet das Betriebssystem, nicht diese Seite — dagegen
+> hilft kein Trick im Code. Auf iOS/Safari geht es grundsätzlich nicht: Links
+> zu einer zum Home-Bildschirm hinzugefügten Web-App öffnen dort immer in
+> Safari. Auf Android/Chrome geht es, aber nur nach einem manuellen Schritt
+> pro Gerät: *Android-Einstellungen → Apps → Urlaubskasse → Geöffnet als
+> Standard → Unterstützte Links öffnen* aktivieren.
+
 ---
 
 ## Gemeinsam nutzen (Firebase Firestore)
