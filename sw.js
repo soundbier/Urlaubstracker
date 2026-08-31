@@ -14,12 +14,11 @@
  * Beim Veröffentlichen: APP_VERSION hochzählen (und `data-version` in
  * index.html mitziehen, `npm test` prüft das).
  */
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.7.0';
 const CACHE = `urlaubstracker-${APP_VERSION}`;
 
 const SHELL = [
   './',
-  './index.html',
   './styles.css',
   './manifest.webmanifest',
   './js/app.js',
@@ -54,9 +53,12 @@ const SHELL = [
  * Browser die Navigation ab: „Response served by service worker has
  * redirections“ — die App lässt sich dann überhaupt nicht mehr öffnen.
  *
- * Das passiert schneller als man denkt: Firebase Hosting normalisiert
- * `/index.html` auf `/` und schickt dafür eine 301. Beim Befüllen des Caches
- * folgt `fetch` ihr brav, und das Flag hängt fortan am Eintrag.
+ * Das passiert schneller als man denkt: Cloudflare Pages normalisiert
+ * `/index.html` auf `/` und schickt dafür eine 308 (Firebase Hosting tut
+ * dasselbe mit einer 301). Beim Befüllen des Caches folgt `fetch` ihr brav,
+ * und das Flag hängt fortan am Eintrag. Deshalb steht im Paket nur noch `./` —
+ * und diese Absicherung bleibt trotzdem, denn welcher Hoster wann umleitet,
+ * ist nichts, worauf sich die App verlassen sollte.
  *
  * Eine Kopie aus Rumpf, Status und Kopfzeilen trägt es nicht mehr.
  */
@@ -144,7 +146,7 @@ self.addEventListener('fetch', (event) => {
 
       // Seitenaufrufe landen immer auf der App-Hülle, damit auch #/budget geht.
       const navigating = request.mode === 'navigate';
-      const cached = await cache.match(navigating ? './index.html' : request);
+      const cached = await cache.match(navigating ? './' : request);
       // Beim Befüllen ist das Flag schon weg; hier steht die Garantie noch
       // einmal an der Stelle, an der sie zählt — auch für Caches, die eine
       // frühere Fassung angelegt hat.

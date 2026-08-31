@@ -9,9 +9,7 @@
 import { LocalBackend } from './backend-local.js';
 import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.js';
 import { newId, newInviteCode } from './ids.js';
-import { todayISO, POT } from './calc.js';
-
-const PERSON_COLORS = ['#f472b6', '#38bdf8', '#a3e635', '#fbbf24'];
+import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare } from './calc.js';
 
 let backend = null;
 const listeners = new Set();
@@ -58,8 +56,16 @@ addEventListener('offline', () => setSync({ online: false }));
 
 // ------------------------------------------------------------------- Anlegen
 
-function makePerson(name, i = 0) {
-  return { id: newId(8), name: String(name || '').trim() || `Person ${i + 1}`, share: 1, color: PERSON_COLORS[i % PERSON_COLORS.length] };
+function makePerson(name, i = 0, existing = []) {
+  return {
+    id: newId(8),
+    name: String(name || '').trim() || `Person ${i + 1}`,
+    // Wer dazukommt, trägt so viel wie die anderen im Schnitt. Fest 1 wäre
+    // falsch, sobald die Gruppe schon eine Aufteilung hat: neben 50/50 stünde
+    // die neue Person mit 1 % da, ohne dass das jemand so gemeint hätte.
+    share: averageShare(existing),
+    color: nextPersonColor(existing),
+  };
 }
 
 function makeTrip({ name, startDate, endDate, currency = 'EUR', budgetMode = 'dynamic', people }) {
@@ -81,8 +87,19 @@ function makeTrip({ name, startDate, endDate, currency = 'EUR', budgetMode = 'dy
 
 function handleChange(data) {
   const trip = data.trip;
+  // Wer an diesem Gerät sitzt, wird lokal gemerkt — die Person kann aber aus
+  // einem anderen Trip stammen (Einladung angenommen) oder inzwischen aus der
+  // Gruppe raus sein. Dann lieber gar niemand: die App fragt dann wieder nach,
+  // statt Ausgaben stillschweigend niemandem zuzuordnen.
+  const myPersonId =
+    trip && state.myPersonId && !(trip.people || []).some((p) => p.id === state.myPersonId)
+      ? null
+      : state.myPersonId;
+  if (myPersonId !== state.myPersonId) setPrefs({ myPersonId });
+
   set({
     trip,
+    myPersonId,
     contributions: sortByDate(data.contributions),
     expenses: sortByDate(data.expenses),
     // Eine offene Einladung hat Vorrang, sonst würde sie beim nächsten
@@ -158,8 +175,13 @@ export async function init() {
 
 // -------------------------------------------------------------------- Aktionen
 
+/**
+ * Neue Kasse anlegen. `peopleNames` steht in der Reihenfolge, in der die Namen
+ * eingetippt wurden; `myIndex` sagt, welcher davon an diesem Gerät sitzt.
+ */
 export async function createTrip({ name, startDate, endDate, currency, budgetMode, peopleNames, myIndex = 0, useCloud = false, firebaseConfig = null }) {
-  const people = peopleNames.map((n, i) => makePerson(n, i));
+  const people = [];
+  for (const [i, n] of peopleNames.slice(0, MAX_PEOPLE).entries()) people.push(makePerson(n, i, people));
   const trip = makeTrip({ name, startDate, endDate, currency, budgetMode, people });
   const me = people[myIndex] || people[0];
 
@@ -210,6 +232,46 @@ export async function setMyPerson(personId) {
   setPrefs({ myPersonId: personId });
   set({ myPersonId: personId });
   await backend.setMyPerson?.(personId);
+}
+
+/**
+ * Jemanden aufnehmen — unterwegs kommt wer dazu, oder es tritt jemand bei, der
+ * in der Liste noch gar nicht steht. `setAsMe` ist genau der zweite Fall: das
+ * Gerät trägt sich selbst ein.
+ */
+export async function addPerson(name, { setAsMe = false } = {}) {
+  if (!state.trip) throw new Error('Es gibt noch keine Urlaubskasse.');
+  const people = state.trip.people || [];
+  if (people.length >= MAX_PEOPLE) throw new Error(`Mehr als ${MAX_PEOPLE} Personen kann eine Kasse nicht führen.`);
+  const person = makePerson(name, people.length, people);
+  await updateTrip({ people: [...people, person] });
+  if (setAsMe) await setMyPerson(person.id);
+  return person;
+}
+
+/**
+ * Jemanden aus der Gruppe nehmen.
+ *
+ * Nur solange kein Geld an der Person hängt: eine Einzahlung ohne Einzahler
+ * oder eine privat bezahlte Ausgabe ohne Zahler würde die Abrechnung
+ * verfälschen, ohne dass es jemandem auffällt. Wer schon eingetragen ist,
+ * bleibt deshalb drin — Namen ändern geht weiterhin.
+ */
+export async function removePerson(personId) {
+  const people = state.trip?.people || [];
+  const person = people.find((p) => p.id === personId);
+  if (!person) return;
+  if (people.length <= 1) throw new Error('Eine Person muss bleiben.');
+  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses });
+  if (used) {
+    throw new Error(
+      used === 1
+        ? `An „${person.name}“ hängt noch ein Eintrag — den erst ändern, dann geht das Entfernen.`
+        : `An „${person.name}“ hängen noch ${used} Einträge — die erst ändern, dann geht das Entfernen.`,
+    );
+  }
+  await updateTrip({ people: people.filter((p) => p.id !== personId) });
+  if (state.myPersonId === personId) await setMyPerson(null);
 }
 
 // --------------------------------------------------------------- Ausgaben

@@ -113,6 +113,48 @@ export function confirmSheet({ title, text, confirmLabel = 'Ja, machen', cancelL
   }).then((v) => v === true);
 }
 
+/**
+ * Nach einem einzelnen Text fragen — ein Name, mehr nicht.
+ *
+ * Löst mit dem eingetippten Text auf, oder mit `null`, wenn abgebrochen wurde.
+ * `validate` bekommt den bereinigten Text und gibt eine Meldung zurück, wenn
+ * etwas dagegen spricht.
+ */
+export function promptSheet({
+  title,
+  subtitle = '',
+  label = 'Name',
+  placeholder = '',
+  value = '',
+  confirmLabel = 'Übernehmen',
+  maxlength = 30,
+  validate = null,
+}) {
+  return openSheet({
+    title,
+    subtitle,
+    build: (close) => {
+      const input = h('input.field__input', { type: 'text', value, placeholder, maxlength, enterkeyhint: 'done', autocomplete: 'off' });
+      const error = h('p.field__error');
+      const go = () => {
+        const text = input.value.trim();
+        const problem = text ? validate?.(text) : 'Bitte etwas eintragen.';
+        if (problem) {
+          error.textContent = problem;
+          input.focus();
+          return;
+        }
+        close(text);
+      };
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
+        h('label.field', h('span.field__label', label), input),
+        error,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 19), confirmLabel),
+      );
+    },
+  }).then((v) => (typeof v === 'string' ? v : null));
+}
+
 let toastTimer = null;
 
 /**

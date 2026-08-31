@@ -6,7 +6,8 @@ import {
   addDays, daysInclusive, dateRange, todayISO, isValidDate,
   computeBudget, dailySeries, settleUp, spentByCategory, groupByDay,
   totalSpent, totalPlanned, plannedOnly, paidOnly,
-  tripPhase, POT,
+  tripPhase, POT, MAX_PEOPLE, PERSON_COLORS, nextPersonColor, personEntryCount,
+  normalizeShares, averageShare,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -328,4 +329,118 @@ test('Gruppierungen für die Listen', () => {
   // Unbekannte Kategorien landen unter „Sonstiges“ statt zu verschwinden.
   const seltsam = spentByCategory([{ date: TODAY, amount: 100, category: 'quatsch' }]);
   assert.equal(seltsam[0].id, 'other');
+});
+
+// --------------------------------------------------------------- Reisegruppe
+
+test('Abrechnung: zu dritt geht die Rechnung genauso auf', () => {
+  const trip = {
+    ...TRIP,
+    people: [
+      { id: 'marie', name: 'Marie', share: 1 },
+      { id: 'lukas', name: 'Lukas', share: 1 },
+      { id: 'jo', name: 'Jo', share: 1 },
+    ],
+  };
+  const contributions = [
+    { id: 'c1', personId: 'marie', amount: 50000, date: '2026-06-20' },
+    { id: 'c2', personId: 'lukas', amount: 50000, date: '2026-06-20' },
+    // Jo hat nichts überwiesen, aber unterwegs privat bezahlt.
+  ];
+  const expenses = [
+    { id: 'e1', date: '2026-07-01', amount: 60000, category: 'stay', payer: POT },
+    { id: 'e2', date: '2026-07-02', amount: 30000, category: 'food', payer: 'jo' },
+  ];
+  const s = settleUp({ trip, contributions, expenses });
+
+  assert.equal(s.rows.length, 3);
+  assert.equal(s.totalSpent, 90000);
+  // 900 € durch drei — ohne Rundungsverlust.
+  assert.deepEqual(s.rows.map((r) => r.fairShare), [30000, 30000, 30000]);
+  assert.equal(s.rows.reduce((a, r) => a + r.fairShare, 0), s.totalSpent);
+  assert.equal(s.potBalance, 40000, '1000 € eingezahlt, 600 € vom Konto bezahlt');
+  assert.equal(s.rows.reduce((a, r) => a + r.balance, 0), s.potBalance, 'die Guthaben summieren sich auf den Kontostand');
+  // Jo hat genau seinen Anteil privat getragen und ist damit quitt.
+  assert.equal(s.rows[2].balance, 0);
+  assert.equal(s.leftInPot, 0);
+});
+
+test('Abrechnung: ungleiche Anteile in einer größeren Gruppe', () => {
+  // Zwei Erwachsene tragen je zwei Anteile, ein Kind einen.
+  const trip = {
+    ...TRIP,
+    people: [
+      { id: 'a', name: 'Anna', share: 2 },
+      { id: 'b', name: 'Ben', share: 2 },
+      { id: 'c', name: 'Cem', share: 1 },
+    ],
+  };
+  const contributions = [{ id: 'c1', personId: 'a', amount: 100000, date: '2026-06-20' }];
+  const expenses = [{ id: 'e1', date: '2026-07-01', amount: 10000, category: 'food', payer: POT }];
+  const s = settleUp({ trip, contributions, expenses });
+
+  assert.deepEqual(s.rows.map((r) => r.fairShare), [4000, 4000, 2000]);
+  assert.equal(s.rows.reduce((a, r) => a + r.fairShare, 0), 10000, 'kein Cent geht beim Teilen verloren');
+  assert.equal(s.rows.reduce((a, r) => a + r.balance, 0), s.potBalance);
+});
+
+test('Abrechnung: allein unterwegs ist niemandem etwas zu überweisen', () => {
+  const trip = { ...TRIP, people: [{ id: 'solo', name: 'Robin', share: 1 }] };
+  const s = settleUp({
+    trip,
+    contributions: [{ id: 'c1', personId: 'solo', amount: 50000, date: '2026-06-20' }],
+    expenses: [{ id: 'e1', date: '2026-07-01', amount: 20000, category: 'food', payer: POT }],
+  });
+  assert.equal(s.rows[0].fairShare, 20000);
+  assert.equal(s.rows[0].balance, 30000);
+  assert.equal(s.transfers.length, 0);
+  assert.deepEqual(s.payouts.map((p) => p.amount), [30000], 'das Restgeld geht zurück');
+});
+
+test('Aufteilen bleibt auch bei krummen Beträgen verlustfrei', () => {
+  // Drei Personen, ein Betrag, der sich nicht glatt teilen lässt.
+  for (const cents of [1, 100, 1001, 34567]) {
+    const parts = allocateByShares(cents, [1, 1, 1]);
+    assert.equal(parts.reduce((a, b) => a + b, 0), cents, `${cents} geht auf`);
+  }
+});
+
+test('Personenfarben reichen für die ganze Gruppe und wiederholen sich nicht', () => {
+  assert.ok(PERSON_COLORS.length >= MAX_PEOPLE, 'für jede Person eine eigene Farbe');
+  assert.equal(new Set(PERSON_COLORS).size, PERSON_COLORS.length);
+
+  const people = [{ color: PERSON_COLORS[0] }, { color: PERSON_COLORS[2] }];
+  assert.equal(nextPersonColor(people), PERSON_COLORS[1], 'eine mittendrin frei gewordene Farbe wird wiederverwendet');
+  assert.equal(nextPersonColor([]), PERSON_COLORS[0]);
+});
+
+test('An wem Geld hängt, lässt sich zählen', () => {
+  const daten = { contributions: CONTRIB, expenses: EXPENSES };
+  assert.equal(personEntryCount('lukas', daten), 2, 'eine Einzahlung und eine privat bezahlte Ausgabe');
+  assert.equal(personEntryCount('marie', daten), 1);
+  assert.equal(personEntryCount('niemand', daten), 0);
+});
+
+test('Anteile bleiben lesbar, wenn die Gruppe wächst', () => {
+  // Zu zweit speichert der Regler Prozente. Kommt eine dritte Person dazu,
+  // bekommt sie den Durchschnitt — und die Liste zeigt gekürzte Anteile.
+  const zuZweit = [{ share: 50 }, { share: 50 }];
+  assert.equal(averageShare(zuZweit), 50);
+  assert.deepEqual(normalizeShares([50, 50, averageShare(zuZweit)]), [1, 1, 1], 'gleichmäßig bleibt gleichmäßig');
+
+  const ungleich = [{ share: 75 }, { share: 25 }];
+  assert.deepEqual(normalizeShares([75, 25, averageShare(ungleich)]), [3, 1, 2]);
+
+  // Sehr schiefe Aufteilungen werden heruntergerechnet, ohne jemanden auf 0 zu setzen.
+  assert.deepEqual(normalizeShares([95, 5]), [9, 1]);
+  assert.ok(normalizeShares([100, 1]).every((v) => v >= 1));
+  // Unsinnige Werte fallen auf einen Anteil zurück, statt die Rechnung zu kippen.
+  assert.deepEqual(normalizeShares([0, -3, NaN]), [1, 1, 1]);
+  assert.equal(averageShare([]), 1);
+});
+
+test('Anteile in Prozent summieren sich auf 100', () => {
+  // Die Anzeige neben den Steppern nutzt dieselbe Verteilung wie das Geld.
+  assert.equal(allocateByShares(100, [1, 1, 1, 1, 1, 1, 1, 1]).reduce((a, b) => a + b, 0), 100);
+  assert.deepEqual(allocateByShares(100, [2, 1, 1]), [50, 25, 25]);
 });

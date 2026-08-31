@@ -4,7 +4,7 @@ import * as store from './store.js';
 import { computeBudget, todayISO } from './calc.js';
 import { applyTheme } from './prefs.js';
 import { money, number, days } from './format.js';
-import { toast, confirmSheet } from './ui/sheet.js';
+import { toast, confirmSheet, promptSheet } from './ui/sheet.js';
 import { expenseSheet, contributionSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
 import { renderExpenses } from './views/expenses.js';
@@ -60,8 +60,8 @@ addEventListener('hashchange', () => { render(); consumeQuickAdd(); });
  *
  * Ohne sie war ein Vertipper teuer: Zeile suchen, öffnen, löschen, bestätigen —
  * vier Schritte für etwas, das gerade eben passiert ist. Und ganz ohne
- * Rückmeldung bleibt offen, ob überhaupt etwas angekommen ist; zu zweit trägt
- * dann schnell jemand dieselbe Runde ein zweites Mal ein.
+ * Rückmeldung bleibt offen, ob überhaupt etwas angekommen ist; in der Gruppe
+ * trägt dann schnell jemand dieselbe Runde ein zweites Mal ein.
  */
 function undoable(message, undo) {
   toast(message, {
@@ -81,6 +81,31 @@ const actions = {
 
   setMyPerson(personId) {
     store.setMyPerson(personId).catch((err) => toast(err?.message || 'Ging nicht.', { type: 'error' }));
+  },
+
+  /**
+   * Jemanden aufnehmen — aus den Einstellungen heraus, oder von „Heute“, wenn
+   * das Gerät noch niemandem gehört (`setAsMe`). Beides fragt nur nach dem
+   * Namen: alles Weitere lässt sich danach in den Einstellungen ändern.
+   */
+  async addPerson({ setAsMe = false } = {}) {
+    if (!state.trip) return;
+    const taken = state.trip.people.map((p) => p.name.trim().toLowerCase());
+    const name = await promptSheet({
+      title: setAsMe ? 'Wer bist du?' : 'Person hinzufügen',
+      subtitle: setAsMe ? 'Der Name steht danach an deinen Einträgen und in der Abrechnung.' : 'Kommt jemand später dazu, zählt ab hier alles mit.',
+      label: 'Name',
+      placeholder: setAsMe ? 'Dein Name' : 'Name',
+      confirmLabel: 'Hinzufügen',
+      validate: (v) => (taken.includes(v.toLowerCase()) ? 'Diesen Namen gibt es in der Gruppe schon.' : null),
+    });
+    if (!name) return;
+    try {
+      const person = await store.addPerson(name, { setAsMe });
+      toast(setAsMe ? `Willkommen, ${person.name}.` : `${person.name} ist dabei.`, { type: 'success' });
+    } catch (err) {
+      toast(err?.message || 'Ging nicht.', { type: 'error' });
+    }
   },
 
   async addExpense(defaults = {}) {

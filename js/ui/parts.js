@@ -42,9 +42,9 @@ export function payerLabel(trip, payer) {
 /**
  * Wer hat das eingetippt?
  *
- * Auf zwei synchronisierten Handys ist das der Unterschied zwischen „das Essen
- * fehlt noch“ und „das hat Ben schon eingetragen“ — sonst steht die Runde
- * abends zweimal drin. Beim eigenen Eintrag bleibt es weg (das weiß man), und
+ * Auf mehreren synchronisierten Geräten ist das der Unterschied zwischen „das
+ * Essen fehlt noch“ und „das hat Ben schon eingetragen“ — sonst steht die
+ * Runde abends zweimal drin. Beim eigenen Eintrag bleibt es weg (das weiß man), und
  * beim privat bezahlten auch: dort steht der Name schon als Zahler daneben.
  */
 function byLabel(expense, trip, me) {

@@ -3,7 +3,7 @@
  * Sekunden erledigt hat und wieder Urlaub machen kann.
  */
 import { h, icon } from '../dom.js';
-import { computeBudget, plannedOnly, todayISO } from '../calc.js';
+import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate } from '../format.js';
 import { tile, sectionTitle, expenseRow, plannedRow, emptyState, bar } from '../ui/parts.js';
 
@@ -78,13 +78,23 @@ export function renderToday(state, actions) {
  * Nach dem Beitritt über eine Einladung weiß das Gerät noch nicht, wer daran
  * sitzt. Ohne diese Angabe landen privat bezahlte Ausgaben in der Abrechnung
  * bei niemandem.
+ *
+ * Wer über einen geteilten Link dazukommt, steht oft noch gar nicht in der
+ * Liste — deshalb der letzte Knopf: er trägt die Person selbst ein, statt sie
+ * darauf zu verweisen, dass jemand anderes das zuerst tun muss.
  */
 function whoAmI(trip, actions) {
   return h('div.callout',
-    h('p', 'Wer sitzt an diesem Handy? Das braucht die App für die Endabrechnung.'),
-    h('div.chips', ...trip.people.map((p) =>
-      h('button.chip', { type: 'button', onclick: () => actions.setMyPerson(p.id) },
-        h('span.dot', { style: { background: p.color } }), p.name))),
+    h('p.callout__title', 'Wer bist du?'),
+    h('p', 'Die App ordnet privat bezahlte Ausgaben deinem Namen zu — ohne die Angabe fehlen sie in der Endabrechnung.'),
+    h('div.chips',
+      ...trip.people.map((p) =>
+        h('button.chip', { type: 'button', onclick: () => actions.setMyPerson(p.id) },
+          h('span.dot', { style: { background: p.color } }), p.name)),
+      trip.people.length < MAX_PEOPLE
+        ? h('button.chip', { type: 'button', onclick: () => actions.addPerson({ setAsMe: true }) }, icon('plus', 15), 'Ich stehe noch nicht da')
+        : null,
+    ),
   );
 }
 
@@ -102,7 +112,7 @@ function hero(b, cur, actions) {
     return h('div.hero.hero--muted',
       h('p.hero__label', 'Noch kein Geld in der Kasse'),
       h('p.hero__amount', '—'),
-      h('p.hero__sub', 'Tragt ein, was ihr beide aufs gemeinsame Konto überwiesen habt. Daraus rechnet die App euer Tagesbudget.'),
+      h('p.hero__sub', 'Tragt ein, was auf das gemeinsame Konto überwiesen wurde. Daraus rechnet die App das Tagesbudget.'),
       h('button.btn.btn--primary', { type: 'button', onclick: actions.addContribution }, icon('wallet', 19), 'Einzahlung eintragen'),
     );
   }

@@ -23,6 +23,74 @@ export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]
 /** Zahler-Kennung für „aus der gemeinsamen Kasse bezahlt“. */
 export const POT = 'pot';
 
+/**
+ * Wie viele Personen eine Kasse haben kann.
+ *
+ * Die Zahl ist keine technische Grenze, sondern eine des Bildschirms: bei mehr
+ * als acht Namen wird aus der Zahler-Auswahl im Eingabe-Sheet eine Tapete. Sie
+ * passt außerdem zur Obergrenze der Geräte in `firestore.rules`.
+ */
+export const MAX_PEOPLE = 8;
+
+/**
+ * Die Farben, an denen man die Personen in Listen und Abrechnung auseinander
+ * hält. Acht Stück, deutlich verschiedene Farbtöne — auf hellem wie dunklem
+ * Grund lesbar.
+ */
+export const PERSON_COLORS = [
+  '#f472b6', '#38bdf8', '#a3e635', '#fbbf24',
+  '#c084fc', '#2dd4bf', '#fb7185', '#94a3b8',
+];
+
+/** Die nächste freie Farbe — nach einem Wechsel in der Gruppe kann eine mittendrin frei werden. */
+export function nextPersonColor(people = []) {
+  const used = new Set(people.map((p) => p.color));
+  return PERSON_COLORS.find((c) => !used.has(c)) || PERSON_COLORS[people.length % PERSON_COLORS.length];
+}
+
+function gcd(a, b) {
+  return b ? gcd(b, a % b) : a;
+}
+
+/**
+ * Anteile auf kleine, gut lesbare Zahlen bringen.
+ *
+ * Die Kostenaufteilung wird zu zweit in Prozent gespeichert (60/40), ab drei
+ * Personen als Anteile (3:2). Beides ist dieselbe Aussage — aber ein Regler,
+ * der „60“ hinterlässt, würde in der Anteilsliste als 60 dastehen und sich
+ * dort nicht mehr sinnvoll bedienen lassen. Gekürzt wird deshalb auf den
+ * größten gemeinsamen Teiler; was danach noch über `max` liegt, wird
+ * heruntergerechnet, ohne dass jemand auf null fällt.
+ */
+export function normalizeShares(shares, max = 9) {
+  const vals = shares.map((v) => (Number.isFinite(v) && v > 0 ? Math.round(v) : 1));
+  if (!vals.length) return [];
+  const teiler = vals.reduce((a, b) => gcd(a, b));
+  const out = vals.map((v) => v / teiler);
+  const biggest = Math.max(...out);
+  if (biggest <= max) return out;
+  return out.map((v) => Math.max(1, Math.round((v * max) / biggest)));
+}
+
+/** Der Anteil, mit dem jemand neu dazukommt: so viel wie die anderen im Schnitt. */
+export function averageShare(people = []) {
+  const vals = people.map((p) => (typeof p?.share === 'number' && p.share > 0 ? p.share : 1));
+  if (!vals.length) return 1;
+  return Math.max(1, Math.round(vals.reduce((a, b) => a + b, 0) / vals.length));
+}
+
+/**
+ * Woran hängt eine Person Geld? Genau das steht dem Entfernen im Weg: eine
+ * Einzahlung ohne Einzahler oder eine privat bezahlte Ausgabe ohne Zahler
+ * würde die Abrechnung still verfälschen.
+ */
+export function personEntryCount(personId, { contributions = [], expenses = [] } = {}) {
+  return (
+    contributions.filter((c) => c.personId === personId).length +
+    expenses.filter((e) => e.payer === personId).length
+  );
+}
+
 // ---------------------------------------------------------------- Datumshilfen
 
 /** Heutiger Kalendertag als ISO-String, in der Zeitzone des Geräts. */
@@ -366,7 +434,8 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
  *
  * Getragen hat jede Person, was sie eingezahlt und was sie zusätzlich aus
  * eigener Tasche bezahlt hat. Fair wäre ihr Anteil an den Gesamtausgaben
- * (Standard 50/50, über `person.share` änderbar). Die Differenz ist ihr
+ * (standardmäßig durch alle geteilt, über `person.share` änderbar — eine
+ * Person mit doppeltem Anteil trägt doppelt so viel). Die Differenz ist ihr
  * Guthaben — die Summe aller Guthaben ist genau das, was auf dem Konto liegt.
  * Das gilt in beide Richtungen: steht das Konto im Minus, sind auch die
  * Guthaben in der Summe negativ, und `topUps` sagt, wer wie viel nachlegt.

@@ -4,7 +4,7 @@ import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
 import { sectionTitle } from '../ui/parts.js';
 import { getPrefs, setTheme, resolveTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
 import { buildInviteLink, readInviteFromLocation, buildExport, buildCsv, parseImport } from '../link.js';
-import { daysInclusive, isValidDate } from '../calc.js';
+import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
 import { days, fullDate, plural } from '../format.js';
 import * as store from '../store.js';
 
@@ -20,14 +20,14 @@ export function renderSettings(state, actions) {
 
   return h('div.view',
     tripSection(state),
-    peopleSection(state),
+    peopleSection(state, actions),
     appearanceSection(actions),
     syncSection(state),
     dataSection(state),
     h('section.section',
       sectionTitle('Über'),
       h('div.card.card--plain',
-        h('p.muted', 'Urlaubstracker — eine gemeinsame Urlaubskasse für zwei. Läuft auch ohne Netz; Eingaben werden nachgereicht, sobald wieder Empfang da ist.'),
+        h('p.muted', 'Urlaubstracker — eine gemeinsame Urlaubskasse für alle, die zusammen unterwegs sind. Läuft auch ohne Netz; Eingaben werden nachgereicht, sobald wieder Empfang da ist.'),
         h('p.muted.small', `Version ${document.documentElement.dataset.version || '1.0.0'} · Modus: ${sync.mode === 'cloud' ? 'geteilt über Firestore' : 'nur auf diesem Gerät'}`),
       ),
     ),
@@ -126,31 +126,76 @@ function appearanceSection(actions) {
 
 // ------------------------------------------------------------------ Personen
 
-function peopleSection(state) {
-  const { trip, myPersonId } = state;
+/**
+ * Wer gehört zur Kasse.
+ *
+ * Namen ändern geht immer, Personen kommen und gehen — nur nicht, solange Geld
+ * an ihnen hängt (das prüft `store.removePerson`). „Das bin ich“ ist die
+ * wichtigste Angabe auf dieser Seite: daran hängt, wem privat bezahlte
+ * Ausgaben in der Endabrechnung gutgeschrieben werden.
+ */
+function peopleSection(state, actions) {
+  const { trip, myPersonId, contributions, expenses } = state;
   const save = (people) => store.updateTrip({ people }).catch((e) => toast(e.message, { type: 'error' }));
 
   const rename = (id, name) => save(trip.people.map((p) => (p.id === id ? { ...p, name: name.trim() || p.name } : p)));
 
-  const shareControl = trip.people.length === 2 ? twoWaySplit(trip, save) : null;
+  const remove = async (person) => {
+    const ok = await confirmSheet({
+      title: `„${person.name}“ entfernen?`,
+      text: person.id === myPersonId
+        ? 'Die Person verschwindet aus der Auswahl und aus der Abrechnung. Danach fragt die App wieder, wer an diesem Gerät sitzt.'
+        : 'Die Person verschwindet aus der Auswahl und aus der Abrechnung.',
+      confirmLabel: 'Entfernen',
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      await store.removePerson(person.id);
+      toast(`${person.name} ist raus.`);
+    } catch (err) {
+      toast(err?.message || 'Ging nicht.', { type: 'error' });
+    }
+  };
 
   return h('section.section',
-    sectionTitle('Wer seid ihr?'),
+    sectionTitle('Reisegruppe', h('span.section__meta', plural(trip.people.length, 'Person', 'Personen'))),
     h('div.card.card--plain',
-      ...trip.people.map((p) =>
-        h('div.person',
+      ...trip.people.map((p) => {
+        const isMe = myPersonId === p.id;
+        return h('div.person',
           h('span.dot.dot--lg', { style: { background: p.color } }),
           h('input.field__input.person__name', { type: 'text', value: p.name, maxlength: 30, onchange: (e) => rename(p.id, e.target.value) }),
-          h('button.chip', { type: 'button', class: myPersonId === p.id ? 'is-active' : '', onclick: () => store.setMyPerson(p.id) },
-            myPersonId === p.id ? [icon('check', 15), 'das bin ich'] : 'das bin ich'),
-        ),
-      ),
-      shareControl,
+          h('div.person__meta',
+            h('button.chip.chip--small', { type: 'button', class: isMe ? 'is-active' : '', onclick: () => store.setMyPerson(p.id) },
+              isMe ? [icon('check', 15), 'das bin ich'] : 'das bin ich'),
+            // Entfernen steht nur da, wo es auch möglich ist: die letzte
+            // Person kann nicht weg, und an wem Geld hängt, bleibt drin.
+            trip.people.length > 1 && !personEntryCount(p.id, { contributions, expenses })
+              ? h('button.icon-btn.person__remove', { type: 'button', title: 'Entfernen', 'aria-label': `${p.name} entfernen`, onclick: () => remove(p) }, icon('trash', 17))
+              : null,
+          ),
+        );
+      }),
+      trip.people.length < MAX_PEOPLE
+        ? h('button.btn.btn--ghost.btn--small.people__add', { type: 'button', onclick: () => actions.addPerson() }, icon('plus', 16), 'Person hinzufügen')
+        : h('p.field__note', `Mehr als ${MAX_PEOPLE} Personen kann eine Kasse nicht führen.`),
+      myPersonId ? null : h('p.field__note', 'Noch ist nicht gesagt, wer an diesem Gerät sitzt — ohne das landen privat bezahlte Ausgaben in der Abrechnung bei niemandem.'),
+      splitControl(trip, save),
     ),
   );
 }
 
 /** Wie die Gesamtkosten am Ende aufgeteilt werden. */
+function splitControl(trip, save) {
+  if (trip.people.length < 2) return null;
+  return trip.people.length === 2 ? twoWaySplit(trip, save) : shareSplit(trip, save);
+}
+
+/**
+ * Zu zweit ist die Aufteilung ein Schieberegler: eine Zahl, zwei Enden, und
+ * man sieht sofort, was die andere Seite bekommt.
+ */
 function twoWaySplit(trip, save) {
   const [a, b] = trip.people;
   const total = (a.share || 1) + (b.share || 1);
@@ -177,6 +222,48 @@ function twoWaySplit(trip, save) {
   );
 }
 
+/**
+ * Ab drei Personen sind es Anteile statt Prozent.
+ *
+ * Prozentfelder, die zusammen 100 ergeben müssen, sind zu dritt eine
+ * Rechenaufgabe: eine Zahl ändern heißt zwei nachziehen. Anteile addieren sich
+ * zu dem, was sie eben ergeben — „zwei Anteile“ heißt doppelt so viel wie
+ * einer, und die Prozentzahl steht zum Mitlesen daneben.
+ */
+function shareSplit(trip, save) {
+  // Gekürzt, damit hier nie 50 in einem Feld steht, das bis 9 geht: aus dem
+  // Regler von vorhin (50/50) können sonst krumme Anteile stehenbleiben.
+  const shares = normalizeShares(trip.people.map((p) => p.share));
+  // Dieselbe Verteilung wie beim Geld: einzeln gerundet ergäben acht gleiche
+  // Anteile achtmal 13 % und in der Summe 104 %.
+  const percent = allocateByShares(100, shares);
+  const even = shares.every((v) => v === shares[0]);
+
+  const setShare = (i, value) => {
+    const next = Math.max(1, Math.min(9, value));
+    save(trip.people.map((p, k) => ({ ...p, share: k === i ? next : shares[k] })));
+  };
+
+  return h('div.field',
+    h('span.field__label', 'Kosten aufteilen'),
+    h('div.shares', ...trip.people.map((p, i) =>
+      h('div.share',
+        h('span.dot', { style: { background: p.color } }),
+        h('span.share__name', p.name),
+        h('span.share__pct', `${percent[i]} %`),
+        h('div.stepper',
+          h('button.stepper__btn', { type: 'button', 'aria-label': `Anteil von ${p.name} verringern`, disabled: shares[i] <= 1, onclick: () => setShare(i, shares[i] - 1) }, '−'),
+          h('span.stepper__value', String(shares[i])),
+          h('button.stepper__btn', { type: 'button', 'aria-label': `Anteil von ${p.name} erhöhen`, disabled: shares[i] >= 9, onclick: () => setShare(i, shares[i] + 1) }, '+'),
+        ),
+      ),
+    )),
+    even
+      ? h('p.field__note', 'Alle tragen gleich viel. Das zählt nur für die Endabrechnung.')
+      : h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => save(trip.people.map((p) => ({ ...p, share: 1 }))) }, 'Wieder gleichmäßig aufteilen'),
+  );
+}
+
 // --------------------------------------------------------------------- Sync
 
 function syncSection(state) {
@@ -188,7 +275,7 @@ function syncSection(state) {
     ? sync.error
       ? { tone: 'over', icon: 'cloudOff', title: 'Synchronisierung stockt', text: sync.error }
       : sync.connected
-        ? { tone: 'good', icon: 'cloud', title: 'Verbunden', text: 'Beide Geräte sehen denselben Stand.' }
+        ? { tone: 'good', icon: 'cloud', title: 'Verbunden', text: 'Alle Geräte der Gruppe sehen denselben Stand.' }
         : {
             tone: 'warn',
             icon: 'cloudOff',
@@ -199,7 +286,7 @@ function syncSection(state) {
           }
     : sync.error
       ? { tone: 'over', icon: 'cloudOff', title: 'Nichts wird gespeichert', text: sync.error }
-      : { tone: 'muted', icon: 'cloudOff', title: 'Nur auf diesem Gerät', text: `${otherPersonName(state) || 'Das andere Handy'} sieht die Einträge noch nicht. Mit einem Firebase-Projekt teilt ihr euch denselben Trip.` };
+      : { tone: 'muted', icon: 'cloudOff', title: 'Nur auf diesem Gerät', text: `${otherNames(state) || 'Die anderen'} sehen die Einträge noch nicht. Mit einem Firebase-Projekt teilt ihr euch denselben Stand.` };
 
   return h('section.section',
     sectionTitle('Gemeinsam nutzen'),
@@ -211,6 +298,7 @@ function syncSection(state) {
       cloud
         ? h('div.stack',
             invite ? h('button.btn.btn--primary', { type: 'button', onclick: () => shareInvite(invite) }, icon('share', 19), 'Einladung teilen') : null,
+            invite ? h('p.field__note', 'Der Link ist der Schlüssel zur Kasse — er gehört in einen privaten Chat, nicht in eine offene Gruppe.') : null,
             h('button.btn.btn--ghost', { type: 'button', onclick: () => rotateCode() }, 'Einladungscode erneuern'),
             h('button.btn.btn--ghost', { type: 'button', onclick: () => disconnect() }, 'Synchronisierung beenden'),
           )
@@ -222,15 +310,22 @@ function syncSection(state) {
   );
 }
 
-/** Die andere Person im Trip — für Texte, die sonst raten müssten, wer das ist. */
-function otherPersonName({ trip, myPersonId }) {
-  const other = (trip.people || []).find((p) => p.id !== myPersonId);
-  return myPersonId && other ? other.name : '';
+/**
+ * Die anderen in der Gruppe, als lesbare Aufzählung — für Texte, die sonst
+ * raten müssten, wen sie meinen. Ohne eigene Person (noch nicht gesagt, wer
+ * hier sitzt) bleibt es leer, dann steht im Text die allgemeine Fassung.
+ */
+function otherNames({ trip, myPersonId }) {
+  const others = (trip.people || []).filter((p) => p.id !== myPersonId).map((p) => p.name);
+  if (!myPersonId || !others.length) return '';
+  if (others.length === 1) return others[0];
+  if (others.length > 3) return `${others.length} weitere Personen`;
+  return `${others.slice(0, -1).join(', ')} und ${others.at(-1)}`;
 }
 
 async function shareInvite(invite) {
   const url = buildInviteLink(invite);
-  const text = `Unsere Urlaubskasse „${invite.tripName}“ — mit diesem Link kommst du rein:`;
+  const text = `Urlaubskasse „${invite.tripName}“ — mit diesem Link kommst du rein:`;
   try {
     if (navigator.share) {
       await navigator.share({ title: 'Urlaubstracker', text, url });
@@ -245,7 +340,7 @@ async function shareInvite(invite) {
   } catch {
     openSheet({
       title: 'Einladungslink',
-      subtitle: 'Diesen Link an das andere Handy schicken.',
+      subtitle: 'Diesen Link an die anderen schicken.',
       build: () => h('div.stack', h('textarea.field__input.field__input--code', { readonly: true, rows: 5, value: url, onclick: (e) => e.target.select() })),
     });
   }
@@ -254,7 +349,7 @@ async function shareInvite(invite) {
 async function rotateCode() {
   const ok = await confirmSheet({
     title: 'Code erneuern?',
-    text: 'Alte Einladungslinks funktionieren danach nicht mehr. Wer schon beigetreten ist, bleibt drin.',
+    text: 'Alte Einladungslinks funktionieren danach nicht mehr. Wer schon beigetreten ist, bleibt dabei.',
     confirmLabel: 'Erneuern',
   });
   if (!ok) return;
@@ -265,7 +360,7 @@ async function rotateCode() {
 async function disconnect() {
   const ok = await confirmSheet({
     title: 'Synchronisierung beenden?',
-    text: 'Der Trip bleibt mit allen Einträgen auf diesem Gerät. Neue Einträge sieht das andere Gerät dann aber nicht mehr.',
+    text: 'Die Kasse bleibt mit allen Einträgen auf diesem Gerät. Neue Einträge sehen die anderen Geräte dann aber nicht mehr.',
     confirmLabel: 'Beenden',
     danger: true,
   });
@@ -278,7 +373,7 @@ async function disconnect() {
 function setupCloud() {
   return openSheet({
     title: 'Mit Firebase verbinden',
-    subtitle: 'Einmalig einrichten — danach seht ihr beide denselben Stand.',
+    subtitle: 'Einmalig einrichten — danach sehen alle denselben Stand.',
     fullHeight: true,
     build: (close) => {
       const input = h('textarea.field__input.field__input--code', {
@@ -312,7 +407,7 @@ function setupCloud() {
         h('label.field', h('span.field__label', 'Firebase-Konfiguration'), input),
         error,
         h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: go }, icon('cloud', 19), 'Verbinden und hochladen'),
-        h('p.muted.small', 'Diese Angaben sind nicht geheim — geschützt wird der Trip über die Sicherheitsregeln und den Einladungscode.'),
+        h('p.muted.small', 'Diese Angaben sind nicht geheim — geschützt wird die Kasse über die Sicherheitsregeln und den Einladungscode.'),
       );
     },
   });
@@ -372,7 +467,7 @@ function dataSection(state) {
       const ok = await confirmSheet({
         title: 'Sicherung einspielen?',
         text: `„${payload.trip.name}“ mit ${plural(payload.expenses.length, 'Ausgabe', 'Ausgaben')} ersetzt den aktuellen Stand${
-          state.sync.mode === 'cloud' ? ' — auf beiden Geräten.' : ' auf diesem Gerät.'
+          state.sync.mode === 'cloud' ? ' — auf allen verbundenen Geräten.' : ' auf diesem Gerät.'
         }`,
         confirmLabel: 'Einspielen',
         danger: true,
@@ -395,7 +490,7 @@ function dataSection(state) {
           icon('download', 18), 'Sicherungskopie speichern'),
         h('button.btn.btn--ghost', { type: 'button', onclick: () => importFile.click() }, icon('upload', 18), 'Sicherung einspielen'),
         importFile,
-        h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => removeTrip(state) }, icon('trash', 18), 'Urlaub löschen'),
+        h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => removeTrip(state) }, icon('trash', 18), 'Urlaubskasse löschen'),
       ),
     ),
   );
@@ -404,9 +499,9 @@ function dataSection(state) {
 async function removeTrip(state) {
   const cloud = state.sync.mode === 'cloud';
   const ok = await confirmSheet({
-    title: 'Urlaub löschen?',
+    title: 'Urlaubskasse löschen?',
     text: cloud
-      ? 'Der Trip wird für beide Geräte gelöscht — alle Einzahlungen und Ausgaben sind dann weg. Vorher am besten eine Sicherungskopie speichern.'
+      ? 'Die Kasse wird für alle Geräte gelöscht — alle Einzahlungen und Ausgaben sind dann weg. Vorher am besten eine Sicherungskopie speichern.'
       : 'Alle Einzahlungen und Ausgaben auf diesem Gerät werden gelöscht. Vorher am besten eine Sicherungskopie speichern.',
     confirmLabel: 'Endgültig löschen',
     danger: true,
