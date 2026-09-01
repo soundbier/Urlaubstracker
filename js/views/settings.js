@@ -249,7 +249,7 @@ function peopleGroup(state, actions) {
   },
     ...trip.people.map((p) =>
       navRow(p.name, {
-        value: p.id === myPersonId ? 'du' : '',
+        value: p.id === myPersonId ? 'Du' : '',
         lead: h('span.srow__dot', { style: { background: p.color } }),
         onClick: () => personSheet(state, p),
       }),
@@ -266,7 +266,7 @@ function peopleGroup(state, actions) {
 /** „50 / 50“ oder „gleichmäßig“ — was in der Zeile steht, ohne sie zu öffnen. */
 function splitSummary(trip) {
   const shares = normalizeShares(trip.people.map((p) => p.share));
-  if (shares.every((v) => v === shares[0])) return 'gleichmäßig';
+  if (shares.every((v) => v === shares[0])) return 'Gleichmäßig';
   return allocateByShares(100, shares).map((p) => `${p}`).join(' / ');
 }
 
@@ -553,7 +553,7 @@ async function shareJoinData(sharing) {
     `Unsere Urlaubskasse „${sharing.tripName || sharing.joinName}“ im Urlaubstracker.`,
     '',
     `Name der Kasse: ${sharing.joinName}`,
-    sharing.joinPassword ? `Passwort: ${sharing.joinPassword}` : 'Das Passwort bekommst du von mir.',
+    sharing.joinPassword ? `Passwort: ${sharing.joinPassword}` : 'Das Passwort bekommst du vom Admin.',
     '',
     'App öffnen, „Einer bestehenden Kasse beitreten“ antippen und beides eintragen:',
   ];
