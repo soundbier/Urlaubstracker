@@ -14,7 +14,7 @@ import * as fb from '../vendor/firebase.js';
 const APP_NAME = 'urlaubstracker';
 
 /** Felder des Trips, die der App gehören — Sync-Felder rühren wir nicht an. */
-const TRIP_FIELDS = ['name', 'startDate', 'endDate', 'currency', 'budgetMode', 'people', 'updatedAt'];
+const TRIP_FIELDS = ['name', 'joinName', 'startDate', 'endDate', 'currency', 'budgetMode', 'people', 'updatedAt'];
 
 function pickTripFields(trip) {
   const out = {};
@@ -22,11 +22,20 @@ function pickTripFields(trip) {
   return out;
 }
 
+/**
+ * Der Name bestimmt die Kennung des Dokuments (siehe `join.js`) — steht dort
+ * schon eine fremde Kasse, weist der Server das Anlegen ab. Dieselbe Antwort
+ * käme, wenn die Sicherheitsregeln nie veröffentlicht wurden; deshalb steht
+ * beides in der Meldung.
+ */
+export const NAME_TAKEN =
+  'Unter diesem Namen gibt es schon eine Kasse. Wähle einen anderen Namen — oder tritt der bestehenden mit ihrem Passwort bei. (Ist das Firebase-Projekt frisch: sind die Regeln aus firestore.rules veröffentlicht?)';
+
 /** Firestore-Fehler in etwas übersetzen, das man einer Person zeigen kann. */
 export function describeError(err) {
   const code = err?.code || '';
   if (code.includes('permission-denied')) {
-    return 'Kein Zugriff auf diesen Trip. Stimmt der Einladungscode? Und sind die Sicherheitsregeln aus firestore.rules veröffentlicht?';
+    return 'Kein Zugriff auf diese Kasse. Stimmen Name und Passwort? Und sind die Sicherheitsregeln aus firestore.rules veröffentlicht?';
   }
   if (code.includes('unavailable') || code.includes('network')) {
     return 'Keine Verbindung. Deine Eingaben werden gespeichert und später übertragen.';
@@ -200,15 +209,42 @@ export class FirestoreBackend {
     return fb.doc(this.db, 'trips', this.tripId, name, id);
   }
 
+  /**
+   * Liegt unter dieser Kennung schon eine Kasse, die diesem Gerät gehört?
+   *
+   * Lesen darf nur, wer Mitglied ist. Eine fremde Kasse und gar keine Kasse
+   * antworten deshalb gleich („kein Zugriff“) und sind hier beide `false` —
+   * die trennt erst der Schreibversuch. Was diese Prüfung verhindert, ist der
+   * eine Fall, den er nicht abfängt: die eigene Kasse desselben Namens, die
+   * ein zweites Anlegen kommentarlos überschreiben würde.
+   */
+  async isMine() {
+    if (!this.db) await this._connect();
+    try {
+      return (await fb.getDoc(fb.doc(this.db, 'trips', this.tripId))).exists();
+    } catch {
+      return false;
+    }
+  }
+
   async createTrip(trip, me) {
     if (!this.db) await this._connect();
-    await fb.setDoc(fb.doc(this.db, 'trips', this.tripId), {
-      ...pickTripFields(trip),
-      createdAt: trip.createdAt || Date.now(),
-      inviteCode: this.inviteCode,
-      memberUids: [this.uid],
-      members: { [this.uid]: { personId: me?.personId || null, joinedAt: Date.now() } },
-    });
+    try {
+      await fb.setDoc(fb.doc(this.db, 'trips', this.tripId), {
+        ...pickTripFields(trip),
+        createdAt: trip.createdAt || Date.now(),
+        inviteCode: this.inviteCode,
+        memberUids: [this.uid],
+        members: { [this.uid]: { personId: me?.personId || null, joinedAt: Date.now() } },
+      });
+    } catch (err) {
+      if (String(err?.code || '').includes('permission-denied')) {
+        // Auf der Kennung liegt schon ein Dokument, das uns nicht gehört: die
+        // Kennung kommt aus dem Namen, also ist der Name vergeben.
+        throw new Error(NAME_TAKEN);
+      }
+      throw err;
+    }
   }
 
   /**
@@ -216,13 +252,31 @@ export class FirestoreBackend {
    * Einladungscode im Dokument — den kann das Gerät vorher nicht lesen, deshalb
    * schicken wir ihn mit und lassen den Server vergleichen.
    */
-  async join(me) {
+  async join(me, { byName = false } = {}) {
     if (!this.db) await this._connect();
-    await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
-      memberUids: fb.arrayUnion(this.uid),
-      joinProof: this.inviteCode,
-      [`members.${this.uid}`]: { personId: me?.personId || null, joinedAt: Date.now() },
-    });
+    try {
+      await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
+        memberUids: fb.arrayUnion(this.uid),
+        joinProof: this.inviteCode,
+        [`members.${this.uid}`]: { personId: me?.personId || null, joinedAt: Date.now() },
+      });
+    } catch (err) {
+      const code = String(err?.code || '');
+      if (code.includes('not-found')) {
+        throw new Error(byName
+          ? 'Unter diesem Namen gibt es keine gemeinsame Kasse. Stimmt die Schreibweise?'
+          : 'Diese Kasse gibt es nicht mehr.');
+      }
+      if (code.includes('permission-denied')) {
+        // Ob der Name daneben liegt oder das Passwort, verrät der Server
+        // nicht — er lässt ein fremdes Gerät die Kasse ja gar nicht erst
+        // lesen. Also nennt die Meldung beides.
+        throw new Error(byName
+          ? 'Name oder Passwort stimmt nicht. Beim Passwort zählt auch Groß- und Kleinschreibung.'
+          : 'Diese Einladung gilt nicht mehr — bittet um eine neue.');
+      }
+      throw err;
+    }
   }
 
   async saveTrip(trip) {
@@ -236,7 +290,12 @@ export class FirestoreBackend {
     });
   }
 
-  async rotateInviteCode(code) {
+  /**
+   * Den hinterlegten Nachweis austauschen — das ist das Ändern des Passworts.
+   * Was hier ankommt, ist nie das Passwort selbst, sondern der daraus
+   * abgeleitete Wert aus `join.js`.
+   */
+  async setInviteCode(code) {
     await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), { inviteCode: code });
     this.inviteCode = code;
   }

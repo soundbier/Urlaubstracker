@@ -8,6 +8,10 @@
 #   /, index.html  Die App-Hülle, aus der die Versionsnummer stammt.
 #   manifest   Name, Symbole und Verknüpfungen der installierten App.
 #
+# Dazu die optionale firebase-config.json: sie sagt jedem Gerät, in welchem
+# Firebase-Projekt die Kassen liegen. Wird sie ausgetauscht, muss das ankommen —
+# sonst suchen neue Geräte im alten Projekt nach einer Kasse, die dort nicht ist.
+#
 # Alles andere (js/, styles.css, icons/, vendor/) darf Cloudflare ruhig lange
 # vorhalten: der Service Worker holt es beim Installieren einer neuen Fassung
 # mit `cache: 'reload'` und geht dabei an jedem HTTP-Cache vorbei.
@@ -22,4 +26,7 @@
   Cache-Control: no-cache, max-age=0
 
 /manifest.webmanifest
+  Cache-Control: no-cache, max-age=0
+
+/firebase-config.json
   Cache-Control: no-cache, max-age=0

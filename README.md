@@ -43,6 +43,9 @@ Weitere Kleinigkeiten:
 - **Verplant** — Ausgaben, die feststehen, aber noch nicht bezahlt sind (Hotel,
   Mietwagen, Bootstour). Sie werden vom Tagesbudget abgezogen, bevor geteilt
   wird. Ein Tipp auf den Haken macht daraus eine bezahlte Ausgabe.
+- **Beitreten mit Name und Passwort** — beim Anlegen bekommt die Kasse beides.
+  Wer die zwei Angaben hat, kommt herein; ein Link muss dafür nicht mehr durch
+  die Gegend geschickt werden.
 - **Offline** — die App startet ohne Netz, Eingaben werden nachgereicht.
 - **Export** — CSV für Excel, JSON als Sicherungskopie.
 
@@ -181,7 +184,7 @@ npx firebase-tools deploy --only firestore:rules
 ```
 
 Ohne diesen Schritt lehnt Firestore alle Zugriffe ab und die App meldet
-„Kein Zugriff auf diesen Trip“.
+„Kein Zugriff auf diese Kasse“.
 
 ### 3. Web-App anlegen und Konfiguration einfügen
 
@@ -199,23 +202,48 @@ Ohne diesen Schritt lehnt Firestore alle Zugriffe ab und die App meldet
    ```
 
 3. In der App: **Mehr → Mit Firebase verbinden**, den Block hineinkopieren,
-   *Verbinden und hochladen*. Der bestehende Trip wandert mitsamt allen
-   Einträgen in die Cloud.
+   Name und Passwort der Kasse bestätigen, *Verbinden und hochladen*. Der
+   bestehende Trip wandert mitsamt allen Einträgen in die Cloud.
+
+Wollt ihr, dass **alle** Geräte das Projekt von selbst kennen — dann reichen zum
+Beitreten wirklich nur Name und Passwort —, legt die Konfiguration einmal neben
+`index.html`:
+
+```sh
+cp firebase-config.example.json firebase-config.json   # Werte eintragen, committen
+```
+
+Die Datei ist optional und kein Geheimnis: dieselben Angaben stehen bei jeder
+Web-App im Quelltext. Geschützt wird die Kasse über die Sicherheitsregeln und
+das Passwort. Ohne die Datei geht alles wie bisher — dann bringt der
+Einladungslink die Konfiguration mit.
 
 ### 4. Die anderen Geräte dazuholen
 
-**Mehr → Einladung teilen.** Der Link enthält alles, was ein weiteres Gerät
-braucht — einfach per Nachricht schicken. Ein Tipp darauf, *Beitreten*, fertig.
-Danach fragt die App, wer an dem Gerät sitzt; wer noch nicht in der Liste steht,
-trägt sich dort selbst ein. Bis zu acht Geräte hängen an einer Kasse.
+Jede Kasse hat einen **Namen** und ein **Passwort**; beides legt ihr beim
+Anlegen fest und findet es unter *Mehr → Beitrittsdaten*. Damit kommen die
+anderen herein:
 
-> Der Link ist der Schlüssel zum Trip. Er gehört in einen privaten Chat, nicht
-> in eine öffentliche Gruppe. Falls er doch mal irgendwo landet:
-> **Mehr → Einladungscode erneuern** macht alte Links unbrauchbar.
->
-> Die Firebase-Konfiguration im Link ist übrigens kein Geheimnis — sie steht bei
-> jeder Web-App im Quelltext. Geschützt wird der Trip über die Sicherheitsregeln
-> und den Einladungscode.
+**App öffnen → „Einer bestehenden Kasse beitreten“ → Name und Passwort
+eintragen.** Danach fragt die App, wer an dem Gerät sitzt; wer noch nicht in der
+Liste steht, trägt sich dort selbst ein. Bis zu acht Geräte hängen an einer
+Kasse.
+
+- Beim **Namen** ist die Schreibweise egal: Groß- und Kleinschreibung,
+  Bindestriche und doppelte Leerzeichen macht die App gleich. Er muss im
+  Firebase-Projekt einmalig sein und lässt sich später nicht mehr ändern — die
+  Kasse umbenennen geht trotzdem, zum Beitreten zählt dann weiter der alte Name.
+- Beim **Passwort** zählt jedes Zeichen. Es steht nirgends in der Datenbank:
+  dorthin wandert nur ein daraus gerechneter Nachweis (PBKDF2), den die
+  Sicherheitsregeln vergleichen.
+- **Mehr → Beitrittsdaten → Passwort ändern** sperrt alle aus, die es noch nicht
+  benutzt haben. Wer schon dabei ist, bleibt dabei.
+- Der **Einladungslink** gibt es weiterhin (*Beitrittsdaten → Stattdessen
+  Einladungslink*). Er ist der bequemste Weg für Geräte, die das
+  Firebase-Projekt noch nicht kennen — er bringt die Konfiguration mit.
+
+> Name und Passwort sind zusammen der Schlüssel zur Kasse. Sie gehören in einen
+> privaten Chat oder ins Gespräch, nicht in eine öffentliche Gruppe.
 
 ---
 
@@ -296,6 +324,8 @@ sw.js                 Service Worker: Offline-Betrieb und Update-Steuerung
 manifest.webmanifest  Installation als App
 _headers              Kopfzeilen für Cloudflare Pages
 firestore.rules       Zugriffsregeln für Firestore
+firebase-config.example.json  Vorlage: als firebase-config.json ausliefern, dann
+                      kennt jedes Gerät das Firebase-Projekt der Gruppe
 
 js/
   app.js              Kopfzeile, Navigation, Schnelleingabe
@@ -304,6 +334,7 @@ js/
   backend-local.js    Speicherung im Gerät
   backend-firestore.js  Synchronisierung über mehrere Geräte
   prefs.js            geräteeigene Einstellungen (auch hell/dunkel)
+  join.js             Name + Passwort → Kennung und Nachweis der Kasse
   link.js             Einladungslinks, CSV- und JSON-Export
   dom.js  format.js   kleine Helfer
   ui/                 Sheets, Zahlentastatur, wiederkehrende Bausteine

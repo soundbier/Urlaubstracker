@@ -1,4 +1,9 @@
-/** Zufällige Kennungen — für Dokumente und für Einladungscodes. */
+/**
+ * Zufällige Kennungen für Dokumente.
+ *
+ * Die Kennung eines Trips steht hier nicht mehr drin: die rechnet `join.js` aus
+ * dem Namen der Kasse aus, damit ein fremdes Gerät sie überhaupt finden kann.
+ */
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // ohne I/O/0/1
 
@@ -14,10 +19,4 @@ function randomBytes(n) {
 /** Dokument-Kennung, lang genug um nicht erraten zu werden. */
 export function newId(len = 20) {
   return [...randomBytes(len)].map((b) => ALPHABET[b % ALPHABET.length]).join('');
-}
-
-/** Einladungscode in gut vorlesbaren Blöcken: `K7M4-QX2P`. */
-export function newInviteCode() {
-  const s = newId(8);
-  return `${s.slice(0, 4)}-${s.slice(4)}`;
 }

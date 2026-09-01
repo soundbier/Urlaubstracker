@@ -559,6 +559,9 @@ select.field__input { background-image: none; }
 .field__pair > * { min-width: 0; }
 .field__pair .field__input { min-width: 0; }
 .field__note { font-size: var(--fs-xs); color: var(--text-muted); }
+/* Ein kleiner Knopf, der zum Feld darüber gehört (etwa „Vorschlag“): er soll
+   so breit sein wie sein Text, nicht so breit wie das Eingabefeld. */
+.field__inline { align-self: flex-start; }
 .field__error { font-size: var(--fs-xs); color: var(--over); min-height: 1.1em; }
 
 .stack { display: flex; flex-direction: column; gap: 12px; }
@@ -960,6 +963,17 @@ select.field__input { background-image: none; }
 .welcome__title { font-size: 1.5rem; font-weight: 680; letter-spacing: -0.025em; }
 .welcome__text { font-size: var(--fs-md); color: var(--text-muted); max-width: 38ch; }
 .welcome .btn { width: 100%; }
+/* Der zweite Weg unter dem Formular: beitreten statt anlegen. Abgesetzt durch
+   einen Strich, damit er nicht wie der nächste Schritt des Formulars aussieht. */
+.welcome__foot {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 26px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
 
 /* ------------------------------------------------------------- Kleinkram */
 

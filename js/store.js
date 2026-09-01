@@ -8,7 +8,8 @@
  */
 import { LocalBackend } from './backend-local.js';
 import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.js';
-import { newId, newInviteCode } from './ids.js';
+import { newId } from './ids.js';
+import { joinKeysFor, joinProofFor, checkJoinName, checkPassword } from './join.js';
 import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare } from './calc.js';
 
 let backend = null;
@@ -68,11 +69,15 @@ function makePerson(name, i = 0, existing = []) {
   };
 }
 
-function makeTrip({ name, startDate, endDate, currency = 'EUR', budgetMode = 'dynamic', people }) {
+function makeTrip({ name, joinName, startDate, endDate, currency = 'EUR', budgetMode = 'dynamic', people }) {
   const now = Date.now();
   return {
     id: newId(),
     name: String(name || '').trim() || 'Unser Urlaub',
+    // Der Beitrittsname steht fest, sobald die Kasse angelegt ist: an ihm hängt
+    // die Kennung des Dokuments. Umbenennen ändert die Überschrift, nicht die
+    // Adresse — sonst käme nach jedem Umbenennen niemand mehr rein.
+    joinName: String(joinName || name || '').trim() || 'Unser Urlaub',
     startDate,
     endDate,
     currency,
@@ -127,6 +132,60 @@ async function makeCloudBackend({ config, tripId, inviteCode }) {
 }
 
 /**
+ * Auf etwas warten, das über das Netz geht — aber nicht endlos.
+ *
+ * Firestore löst einen Schreibvorgang erst auf, wenn der Server ihn bestätigt
+ * hat. Ohne Empfang bleibt das Versprechen offen, und die Oberfläche stünde mit
+ * gesperrtem Knopf da, ohne je eine Antwort zu bekommen.
+ */
+function withTimeout(promise, ms, message) {
+  let timer;
+  return Promise.race([
+    promise.finally(() => clearTimeout(timer)),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(message)), ms); }),
+  ]);
+}
+
+const NO_CONNECTION = 'Das dauert zu lange — dafür braucht es Empfang. Versuch es gleich noch einmal.';
+
+// -------------------------------------------------- Firebase-Konfiguration
+
+/**
+ * Die Konfiguration der Auslieferung.
+ *
+ * Liegt neben `index.html` eine `firebase-config.json`, gilt sie für alle, die
+ * diese Adresse öffnen — und dann reichen Name und Passwort wirklich aus, um
+ * beizutreten. Ohne die Datei bleibt es beim alten Weg: die Konfiguration
+ * kommt einmal von Hand ins Gerät oder über einen Einladungslink.
+ */
+let ambientConfig = null;
+let ambientLoaded = false;
+
+async function loadAmbientConfig() {
+  if (ambientLoaded) return ambientConfig;
+  ambientLoaded = true;
+  try {
+    const res = await withTimeout(fetch('./firebase-config.json'), 4000, 'zu langsam');
+    if (!res.ok) return null; // Die Datei ist optional — 404 ist der Normalfall.
+    const cfg = await res.json();
+    ambientConfig = validateFirebaseConfig(cfg) ? null : cfg;
+  } catch {
+    ambientConfig = null;
+  }
+  return ambientConfig;
+}
+
+/** Die Konfiguration, mit der dieses Gerät in die Cloud kommt — falls es eine gibt. */
+export function cloudConfig() {
+  return getPrefs().firebaseConfig || ambientConfig;
+}
+
+/** Kann dieses Gerät ohne weitere Einrichtung eine geteilte Kasse anlegen? */
+export function cloudReady() {
+  return !!cloudConfig();
+}
+
+/**
  * Nimmt eine Einladung aus der Adresszeile entgegen.
  *
  * Das passiert nicht nur beim Start: tippt jemand auf den Link, während die App
@@ -169,6 +228,10 @@ export async function init() {
     }
   }
 
+  // Vor dem ersten Bild: sonst baut sich der Anlege-Bildschirm neu auf, während
+  // schon jemand tippt — und das Getippte wäre weg.
+  if (!prefs.firebaseConfig) await loadAmbientConfig();
+
   await useBackend(new LocalBackend());
   if (cloudProblem) setSync({ error: cloudProblem });
 }
@@ -178,42 +241,139 @@ export async function init() {
 /**
  * Neue Kasse anlegen. `peopleNames` steht in der Reihenfolge, in der die Namen
  * eingetippt wurden; `myIndex` sagt, welcher davon an diesem Gerät sitzt.
+ *
+ * Name und Passwort sind zusammen der Schlüssel zur Kasse: aus ihnen rechnet
+ * `join.js` die Kennung des Dokuments und den Nachweis aus, mit dem die anderen
+ * später hereinkommen. Steht eine Firebase-Konfiguration bereit, landet die
+ * Kasse deshalb gleich in der Cloud — sonst bleibt sie auf diesem Gerät, und
+ * die beiden Angaben warten dort, bis jemand die Verbindung einrichtet.
  */
-export async function createTrip({ name, startDate, endDate, currency, budgetMode, peopleNames, myIndex = 0, useCloud = false, firebaseConfig = null }) {
+export async function createTrip({ name, startDate, endDate, currency, budgetMode, peopleNames, myIndex = 0, password = '', firebaseConfig = null }) {
   const people = [];
   for (const [i, n] of peopleNames.slice(0, MAX_PEOPLE).entries()) people.push(makePerson(n, i, people));
-  const trip = makeTrip({ name, startDate, endDate, currency, budgetMode, people });
+  const joinName = String(name || '').trim() || 'Unser Urlaub';
+  const trip = makeTrip({ name, joinName, startDate, endDate, currency, budgetMode, people });
   const me = people[myIndex] || people[0];
 
-  if (useCloud) {
-    const problem = validateFirebaseConfig(firebaseConfig);
+  const nameProblem = checkJoinName(joinName);
+  if (nameProblem) throw new Error(nameProblem);
+  const passwordProblem = checkPassword(password);
+  if (passwordProblem) throw new Error(passwordProblem);
+
+  const config = firebaseConfig || cloudConfig();
+  let warning = null;
+  if (config) {
+    const problem = validateFirebaseConfig(config);
     if (problem) throw new Error(problem);
-    const tripId = newId();
-    const inviteCode = newInviteCode();
-    const cloud = await makeCloudBackend({ config: firebaseConfig, tripId, inviteCode });
-    await cloud.createTrip(trip, { personId: me.id });
-    setPrefs({ firebaseConfig, tripRef: { mode: 'cloud', tripId, inviteCode }, myPersonId: me.id });
-    set({ myPersonId: me.id });
-    await useBackend(cloud);
-    return;
+    const cloud = await openCloudTrip(config, joinName, password);
+    try {
+      // Die eigene Kasse desselben Namens würde ein zweites Anlegen still
+      // überschreiben — der Server sieht darin ja eine erlaubte Änderung.
+      // Der erste Zugriff meldet auch gleich das Gerät an; ohne Empfang wartet
+      // er sonst ewig, und der Knopf bliebe für immer gesperrt.
+      if (await withTimeout(cloud.isMine(), 12000, NO_CONNECTION)) {
+        throw new Error('Unter diesem Namen führst du schon eine Kasse. Wähle einen anderen Namen.');
+      }
+      // Hier steht die Anmeldung schon: eine langsame Leitung heißt jetzt nur,
+      // dass der Schreibvorgang in der Warteschlange liegt und später rausgeht.
+      await withTimeout(cloud.createTrip(trip, { personId: me.id }), 15000, NO_CONNECTION).catch((err) => {
+        if (err?.message !== NO_CONNECTION) throw err;
+      });
+      setPrefs({
+        firebaseConfig: config,
+        tripRef: { mode: 'cloud', tripId: cloud.tripId, inviteCode: cloud.inviteCode, joinName, joinPassword: password },
+        myPersonId: me.id,
+      });
+      set({ myPersonId: me.id });
+      await useBackend(cloud);
+      return { mode: 'cloud', warning: null };
+    } catch (err) {
+      await afterFailedAttempt(cloud);
+      // Am Firebase-Projekt darf der erste Start nicht scheitern: wer gerade
+      // keinen Empfang hat, bekommt die Kasse auf diesem Gerät und teilt sie
+      // später. Ein vergebener Name ist etwas anderes — den muss man ändern,
+      // also kommt der Fehler durch.
+      if (err?.message !== NO_CONNECTION) throw err;
+      warning = 'Ohne Verbindung angelegt: die Kasse läuft vorerst nur auf diesem Gerät. Teilen geht später unter „Mehr“.';
+    }
   }
 
-  setPrefs({ tripRef: { mode: 'local' }, myPersonId: me.id });
+  // Ohne Cloud bleiben Name und Passwort trotzdem stehen: wer später verbindet,
+  // muss sich nichts neu ausdenken.
+  setPrefs({ tripRef: { mode: 'local', joinName, joinPassword: password }, myPersonId: me.id });
   set({ myPersonId: me.id });
   const local = new LocalBackend();
   await local.createTrip(trip);
   await useBackend(local);
+  return { mode: 'local', warning };
 }
 
-/** Einer Einladung folgen — aus dem Link oder mit von Hand eingetippten Daten. */
-export async function joinTrip({ tripId, inviteCode, config }) {
-  const cfg = config || getPrefs().firebaseConfig;
+/** Ein Cloud-Backend für die Kasse mit diesem Namen und Passwort. */
+async function openCloudTrip(config, joinName, password) {
+  const { tripId, proof } = await joinKeysFor(joinName, password);
+  return makeCloudBackend({ config, tripId, inviteCode: proof });
+}
+
+/**
+ * Aufräumen, wenn ein Verbindungsversuch schiefgegangen ist.
+ *
+ * Alle Cloud-Backends teilen sich dieselbe Firebase-App; der Versuch hat die
+ * bestehende beim Verbinden abgeräumt. Läuft gerade eine geteilte Kasse, wäre
+ * sie danach stumm — sie zeigte weiter den letzten Stand, ohne noch etwas zu
+ * hören. Deshalb fährt sie hier wieder hoch.
+ */
+async function afterFailedAttempt(attempt) {
+  await attempt.stop().catch(() => {});
+  if (backend?.mode === 'cloud') await useBackend(backend).catch(() => {});
+}
+
+/**
+ * Einer bestehenden Kasse beitreten — mit Name und Passwort.
+ *
+ * Das ist der Weg für alle, die keinen Einladungslink bekommen haben: die
+ * beiden Angaben sagt man sich am Tisch, in einer Sprachnachricht oder am
+ * Telefon. Die Kennung der Kasse rechnet das Gerät selbst aus.
+ */
+export async function joinTripByName({ name, password, config = null }) {
+  const cfg = config || cloudConfig();
+  const problem = validateFirebaseConfig(cfg);
+  if (problem) {
+    throw new Error(
+      'Diesem Gerät fehlt noch die Firebase-Konfiguration der Gruppe. Öffne einen Einladungslink oder füge sie unten ein.',
+    );
+  }
+
+  const cloud = await openCloudTrip(cfg, name, password);
+  try {
+    await withTimeout(cloud.join({ personId: getPrefs().myPersonId }, { byName: true }), 20000, NO_CONNECTION);
+  } catch (err) {
+    await afterFailedAttempt(cloud);
+    throw err;
+  }
+  setPrefs({
+    firebaseConfig: cfg,
+    tripRef: { mode: 'cloud', tripId: cloud.tripId, inviteCode: cloud.inviteCode, joinName: String(name).trim(), joinPassword: password },
+  });
+  set({ invite: null, phase: 'loading' });
+  await useBackend(cloud);
+}
+
+/** Einer Einladung folgen — aus einem Link mit fertiger Kennung und Nachweis. */
+export async function joinTrip({ tripId, inviteCode, config, tripName = '' }) {
+  const cfg = config || cloudConfig();
   const problem = validateFirebaseConfig(cfg);
   if (problem) throw new Error(problem);
 
   const cloud = await makeCloudBackend({ config: cfg, tripId, inviteCode });
-  await cloud.join({ personId: getPrefs().myPersonId });
-  setPrefs({ firebaseConfig: cfg, tripRef: { mode: 'cloud', tripId, inviteCode } });
+  try {
+    await withTimeout(cloud.join({ personId: getPrefs().myPersonId }), 20000, NO_CONNECTION);
+  } catch (err) {
+    await afterFailedAttempt(cloud);
+    throw err;
+  }
+  // Das Passwort steht nicht im Link — den Namen kennt das Gerät danach aus dem
+  // Dokument selbst.
+  setPrefs({ firebaseConfig: cfg, tripRef: { mode: 'cloud', tripId, inviteCode, joinName: tripName, joinPassword: '' } });
   set({ invite: null, phase: 'loading' });
   await useBackend(cloud);
 }
@@ -356,40 +516,90 @@ export async function deleteContribution(id) {
 
 // ------------------------------------------------------------------- Sync
 
-/** Den aktuellen lokalen Trip in ein Firebase-Projekt hochladen. */
-export async function connectCloud(firebaseConfig) {
+/**
+ * Den aktuellen lokalen Trip in ein Firebase-Projekt hochladen.
+ *
+ * Name und Passwort entscheiden hier über die Kennung — ab jetzt kommen die
+ * anderen mit genau diesen beiden Angaben herein.
+ */
+export async function connectCloud(firebaseConfig, { joinName, password } = {}) {
   const problem = validateFirebaseConfig(firebaseConfig);
   if (problem) throw new Error(problem);
   if (!state.trip) throw new Error('Es gibt noch keinen Trip zum Hochladen.');
 
-  const tripId = newId();
-  const inviteCode = newInviteCode();
-  const cloud = await makeCloudBackend({ config: firebaseConfig, tripId, inviteCode });
-  await cloud.createTrip(state.trip, { personId: state.myPersonId });
-  await cloud.importAll({ contributions: state.contributions, expenses: state.expenses });
+  const prefs = getPrefs();
+  const name = String(joinName || prefs.tripRef?.joinName || state.trip.joinName || state.trip.name || '').trim();
+  const secret = String(password || prefs.tripRef?.joinPassword || '');
+  const nameProblem = checkJoinName(name);
+  if (nameProblem) throw new Error(nameProblem);
+  const passwordProblem = checkPassword(secret);
+  if (passwordProblem) throw new Error(passwordProblem);
 
-  setPrefs({ firebaseConfig, tripRef: { mode: 'cloud', tripId, inviteCode } });
+  const cloud = await openCloudTrip(firebaseConfig, name, secret);
+  try {
+    if (await withTimeout(cloud.isMine(), 12000, NO_CONNECTION)) {
+      throw new Error('Unter diesem Namen liegt in diesem Projekt schon eine Kasse. Wähle einen anderen Namen.');
+    }
+    await cloud.createTrip({ ...state.trip, joinName: name }, { personId: state.myPersonId });
+    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses });
+  } catch (err) {
+    await afterFailedAttempt(cloud);
+    throw err;
+  }
+
+  setPrefs({
+    firebaseConfig,
+    tripRef: { mode: 'cloud', tripId: cloud.tripId, inviteCode: cloud.inviteCode, joinName: name, joinPassword: secret },
+  });
   await useBackend(cloud);
 }
 
 /** Zurück in den lokalen Modus — mit einer Kopie des aktuellen Standes. */
 export async function disconnectCloud() {
   const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses };
-  setPrefs({ tripRef: { mode: 'local' } });
+  const prefs = getPrefs();
+  // Name und Passwort bleiben stehen: wer die Kasse später wieder teilt, soll
+  // sich nichts Neues ausdenken müssen.
+  setPrefs({ tripRef: { mode: 'local', joinName: joinName(), joinPassword: prefs.tripRef?.joinPassword || '' } });
   const local = new LocalBackend();
   await local.replaceAll(copy);
   await useBackend(local);
 }
 
-export async function rotateInviteCode() {
-  const code = newInviteCode();
-  await backend.rotateInviteCode?.(code);
+/**
+ * Neues Passwort für die Kasse.
+ *
+ * Der Beitrittsname bleibt, wie er ist — an ihm hängt die Kennung des
+ * Dokuments. Wer schon drin ist, bleibt drin; alte Einladungslinks und das alte
+ * Passwort führen danach ins Leere.
+ */
+export async function changeJoinPassword(password) {
   const prefs = getPrefs();
-  setPrefs({ tripRef: { ...prefs.tripRef, inviteCode: code } });
-  return code;
+  if (prefs.tripRef?.mode !== 'cloud') throw new Error('Die Kasse liegt gar nicht in der Cloud.');
+  const problem = checkPassword(password);
+  if (problem) throw new Error(problem);
+
+  const name = joinName();
+  const proof = await joinProofFor(name, password);
+  await withTimeout(Promise.resolve(backend.setInviteCode?.(proof)), 20000, NO_CONNECTION);
+  setPrefs({ tripRef: { ...prefs.tripRef, inviteCode: proof, joinName: name, joinPassword: password } });
+  return password;
 }
 
-export function getInviteInfo() {
+/** Der Name, mit dem man dieser Kasse beitritt — nicht zwingend die Überschrift. */
+function joinName() {
+  const prefs = getPrefs();
+  return String(state.trip?.joinName || prefs.tripRef?.joinName || state.trip?.name || '').trim();
+}
+
+/**
+ * Was man weitersagen muss, damit jemand dazukommt.
+ *
+ * Das Passwort steht nur auf den Geräten, die es gesetzt oder eingetippt
+ * haben — wer über einen Link beigetreten ist, hat es nie gesehen. Dann bleibt
+ * das Feld leer, und die Oberfläche sagt das auch.
+ */
+export function getSharingInfo() {
   const prefs = getPrefs();
   if (prefs.tripRef?.mode !== 'cloud') return null;
   return {
@@ -397,6 +607,12 @@ export function getInviteInfo() {
     inviteCode: state.trip?.inviteCode || prefs.tripRef.inviteCode,
     config: prefs.firebaseConfig,
     tripName: state.trip?.name || '',
+    joinName: joinName(),
+    joinPassword: prefs.tripRef.joinPassword || '',
+    // Kassen aus früheren Fassungen liegen unter einer zufälligen Kennung: zu
+    // ihnen führt kein Name, nur der Einladungslink. Woran man sie erkennt: im
+    // Dokument steht kein Beitrittsname.
+    byName: !!state.trip?.joinName,
   };
 }
 

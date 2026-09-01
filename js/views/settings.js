@@ -11,8 +11,10 @@
 import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
 import { installInstructionsSheet } from '../ui/parts.js';
+import { joinSheet, plainInput } from '../ui/join-sheet.js';
 import { getPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
-import { buildInviteLink, readInviteFromLocation, buildExport, buildCsv, parseImport } from '../link.js';
+import { checkJoinName, checkPassword, suggestPassword } from '../join.js';
+import { buildInviteLink, buildExport, buildCsv, parseImport } from '../link.js';
 import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
 import { days, fullDate, compactDate, plural } from '../format.js';
 import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
@@ -440,7 +442,7 @@ function deviceGroup(actions) {
 function syncGroup(state) {
   const { sync } = state;
   const cloud = sync.mode === 'cloud';
-  const invite = store.getInviteInfo();
+  const sharing = store.getSharingInfo();
 
   const status = cloud
     ? sync.error
@@ -457,7 +459,16 @@ function syncGroup(state) {
           }
     : sync.error
       ? { tone: 'over', icon: 'cloudOff', title: 'Nichts wird gespeichert', text: sync.error }
-      : { tone: 'muted', icon: 'cloudOff', title: 'Nur auf diesem Gerät', text: `${otherNames(state) || 'Die anderen'} sehen die Einträge noch nicht. Mit einem Firebase-Projekt teilt ihr euch denselben Stand.` };
+      : {
+          tone: 'muted',
+          icon: 'cloudOff',
+          title: 'Nur auf diesem Gerät',
+          text: `${otherNames(state) || 'Die anderen'} sehen die Einträge noch nicht. ${
+            store.cloudReady()
+              ? 'Einmal teilen — danach kommen sie mit Name und Passwort in dieselbe Kasse.'
+              : 'Mit einem Firebase-Projekt teilt ihr euch denselben Stand.'
+          }`,
+        };
 
   return h('section.section',
     h('div.section__head', h('h2.section__title', 'Gemeinsam nutzen')),
@@ -467,15 +478,141 @@ function syncGroup(state) {
     ),
     cloud
       ? h('div.rows',
-          invite ? actionRow('share', 'Einladung teilen', () => shareInvite(invite), { sub: 'Der Link ist der Schlüssel zur Kasse — privater Chat, keine offene Gruppe.' }) : null,
-          actionRow('repeat', 'Einladungscode erneuern', () => rotateCode()),
+          sharing?.byName
+            ? navRow('Beitrittsdaten', {
+                value: sharing.joinName,
+                sub: sharing.joinPassword ? 'Name und Passwort zum Weitersagen' : 'Passwort ist auf diesem Gerät nicht bekannt',
+                onClick: () => joinDataSheet(state, sharing),
+              })
+            : null,
+          sharing?.byName
+            ? actionRow('share', 'Beitrittsdaten teilen', () => shareJoinData(sharing))
+            // Kassen aus früheren Fassungen haben keinen Beitrittsnamen — für
+            // sie bleibt der Link der einzige Weg hinein.
+            : sharing
+              ? actionRow('share', 'Einladung teilen', () => shareInvite(sharing), { sub: 'Diese Kasse stammt aus einer älteren Fassung: hier führt nur der Link hinein.' })
+              : null,
           actionRow('cloudOff', 'Synchronisierung beenden', () => disconnect()),
         )
       : h('div.rows',
-          actionRow('cloud', 'Mit Firebase verbinden', () => setupCloud()),
-          actionRow('share', 'Einladung eingeben', () => enterInvite()),
+          // Kennt das Gerät schon ein Firebase-Projekt (eigene Einrichtung oder
+          // eine mitgelieferte Konfiguration), ist Teilen ein Knopfdruck.
+          store.cloudReady()
+            ? actionRow('cloud', 'Kasse gemeinsam nutzen', () => shareTrip(state), { sub: 'Danach kommen die anderen mit Name und Passwort dazu.' })
+            : actionRow('cloud', 'Mit Firebase verbinden', () => setupCloud(state)),
+          actionRow('people', 'Einer anderen Kasse beitreten', () => joinSheet()),
         ),
   );
+}
+
+/**
+ * Was man weitersagt, damit jemand dazukommt.
+ *
+ * Beides steht hier zum Ablesen: der Name ist ohnehin sichtbar, das Passwort
+ * kennt das Gerät nur, wenn es hier gesetzt oder eingetippt wurde. Wer über
+ * einen Link beigetreten ist, hat es nie gesehen — dann steht hier, wie man
+ * trotzdem weiterkommt.
+ */
+function joinDataSheet(state, sharing) {
+  return openSheet({
+    title: 'So kommen andere rein',
+    subtitle: 'Name und Passwort — mehr braucht niemand.',
+    build: (close) =>
+      h('div.stack',
+        readonlyField('Name der Kasse', sharing.joinName),
+        sharing.joinPassword
+          ? readonlyField('Passwort', sharing.joinPassword)
+          : h('p.field__note', 'Das Passwort steht nur auf den Geräten, die es gesetzt oder eingetippt haben — dieses hier gehört nicht dazu. Wer es kennt, findet es in seinen Einstellungen; sonst setzt ihr unten ein neues.'),
+        h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => { close(true); shareJoinData(sharing); } },
+          icon('share', 19), 'Beitrittsdaten teilen'),
+        h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => { close(true); shareInvite(sharing); } },
+          icon('copy', 18), 'Stattdessen Einladungslink'),
+        h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => { close(true); changePasswordSheet(sharing); } },
+          icon('repeat', 18), 'Passwort ändern'),
+        state.trip?.name && state.trip.name !== sharing.joinName
+          ? h('p.field__note', `Die Kasse heißt inzwischen „${state.trip.name}“ — zum Beitreten zählt aber der Name von oben.`)
+          : h('p.field__note', 'Der Beitrittsname bleibt, auch wenn ihr die Kasse später umbenennt.'),
+      ),
+  });
+}
+
+/** Ein Wert zum Abschreiben: nicht änderbar, aber mit einem Tipp ausgewählt. */
+function readonlyField(label, value) {
+  return h('label.field',
+    h('span.field__label', label),
+    h('input.field__input.field__input--code', {
+      type: 'text', value, readonly: true,
+      onclick: (e) => e.target.select(),
+    }),
+  );
+}
+
+async function shareJoinData(sharing) {
+  const url = `${location.origin}${location.pathname}`;
+  const lines = [
+    `Unsere Urlaubskasse „${sharing.tripName || sharing.joinName}“ im Urlaubstracker.`,
+    '',
+    `Name der Kasse: ${sharing.joinName}`,
+    sharing.joinPassword ? `Passwort: ${sharing.joinPassword}` : 'Das Passwort bekommst du von mir.',
+    '',
+    'App öffnen, „Einer bestehenden Kasse beitreten“ antippen und beides eintragen:',
+  ];
+  const text = lines.join('\n');
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: 'Urlaubstracker', text, url });
+      return;
+    }
+  } catch (err) {
+    if (err?.name === 'AbortError') return;
+  }
+  try {
+    await navigator.clipboard.writeText(`${text}\n${url}`);
+    toast('Beitrittsdaten kopiert.', { type: 'success' });
+  } catch {
+    openSheet({
+      title: 'Beitrittsdaten',
+      subtitle: 'Das hier an die anderen schicken.',
+      build: () => h('div.stack', h('textarea.field__input.field__input--code', { readonly: true, rows: 7, value: `${text}\n${url}`, onclick: (e) => e.target.select() })),
+    });
+  }
+}
+
+/** Neues Passwort setzen — der Beitrittsname bleibt, wie er ist. */
+function changePasswordSheet(sharing) {
+  return openSheet({
+    title: 'Passwort ändern',
+    subtitle: `Für die Kasse „${sharing.joinName}“.`,
+    build: (close) => {
+      const input = plainInput({ maxlength: 60, placeholder: 'Neues Passwort', enterkeyhint: 'go' });
+      const error = h('p.field__error');
+      const save = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Passwort ändern');
+
+      const go = async () => {
+        const problem = checkPassword(input.value);
+        if (problem) { error.textContent = problem; return; }
+        error.textContent = '';
+        save.disabled = true;
+        try {
+          await store.changeJoinPassword(input.value);
+          close(true);
+          toast('Neues Passwort gesetzt.', { type: 'success' });
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+          save.disabled = false;
+        }
+      };
+
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
+        h('label.field', h('span.field__label', 'Neues Passwort'), input),
+        h('button.btn.btn--ghost.btn--small.field__inline', { type: 'button', onclick: () => { input.value = suggestPassword(); input.focus(); } },
+          icon('repeat', 16), 'Vorschlag'),
+        h('p.field__note', 'Wer schon dabei ist, bleibt dabei. Mit dem alten Passwort und alten Einladungslinks kommt danach niemand mehr herein.'),
+        error,
+        save,
+      );
+    },
+  });
 }
 
 /**
@@ -514,17 +651,6 @@ async function shareInvite(invite) {
   }
 }
 
-async function rotateCode() {
-  const ok = await confirmSheet({
-    title: 'Code erneuern?',
-    text: 'Alte Einladungslinks funktionieren danach nicht mehr. Wer schon beigetreten ist, bleibt drin.',
-    confirmLabel: 'Erneuern',
-  });
-  if (!ok) return;
-  await store.rotateInviteCode();
-  toast('Neuer Einladungscode erstellt.', { type: 'success' });
-}
-
 async function disconnect() {
   const ok = await confirmSheet({
     title: 'Synchronisierung beenden?',
@@ -537,8 +663,28 @@ async function disconnect() {
   toast('Läuft jetzt nur noch auf diesem Gerät.');
 }
 
+/**
+ * Die Kasse hochladen, wenn das Gerät schon ein Firebase-Projekt kennt.
+ *
+ * Gefragt wird nur noch nach dem, was danach weitergesagt wird: Name und
+ * Passwort. Beides steht meistens schon vom Anlegen her fest — dann sind die
+ * Felder vorausgefüllt und es bleibt bei einem Tipp auf „Teilen“.
+ */
+function shareTrip(state) {
+  return openSheet({
+    title: 'Kasse gemeinsam nutzen',
+    subtitle: 'Mit diesen zwei Angaben kommen die anderen herein.',
+    build: (close) => sharingForm({
+      state,
+      confirmLabel: 'Teilen und hochladen',
+      onSubmit: (joinName, password) => store.connectCloud(store.cloudConfig(), { joinName, password }),
+      close,
+    }),
+  });
+}
+
 /** Firebase-Konfiguration einsammeln und die aktuelle Kasse hochladen. */
-function setupCloud() {
+function setupCloud(state) {
   return openSheet({
     title: 'Mit Firebase verbinden',
     subtitle: 'Einmalig einrichten — danach seht ihr alle denselben Stand.',
@@ -548,22 +694,20 @@ function setupCloud() {
         rows: 8, spellcheck: false, autocapitalize: 'off',
         placeholder: 'const firebaseConfig = {\n  apiKey: "…",\n  authDomain: "…",\n  projectId: "…",\n  appId: "…"\n};',
       });
-      const error = h('p.field__error');
 
-      const go = async () => {
-        const cfg = parseFirebaseConfig(input.value);
-        const problem = validateFirebaseConfig(cfg);
-        if (problem) { error.textContent = problem; return; }
-        error.textContent = '';
-        try {
+      const form = sharingForm({
+        state,
+        confirmLabel: 'Verbinden und hochladen',
+        confirmIcon: 'cloud',
+        onSubmit: (joinName, password) => {
+          const cfg = parseFirebaseConfig(input.value);
+          const problem = validateFirebaseConfig(cfg);
+          if (problem) throw new Error(problem);
           toast('Kasse wird hochgeladen …');
-          await store.connectCloud(cfg);
-          close(true);
-          toast('Verbunden. Jetzt die Einladung teilen.', { type: 'success' });
-        } catch (err) {
-          error.textContent = err?.message || String(err);
-        }
-      };
+          return store.connectCloud(cfg, { joinName, password });
+        },
+        close,
+      });
 
       return h('div.stack',
         h('ol.steps',
@@ -573,42 +717,51 @@ function setupCloud() {
           h('li', 'Unter Projekteinstellungen eine ', h('strong', 'Web-App'), ' hinzufügen und den Konfigurationsblock hier einfügen.'),
         ),
         h('label.field', h('span.field__label', 'Firebase-Konfiguration'), input),
-        error,
-        h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: go }, icon('cloud', 19), 'Verbinden und hochladen'),
-        h('p.muted.small', 'Diese Angaben sind nicht geheim — geschützt wird die Kasse über die Sicherheitsregeln und den Einladungscode.'),
+        form,
+        h('p.muted.small', 'Diese Angaben sind nicht geheim — geschützt wird die Kasse über die Sicherheitsregeln und das Passwort.'),
       );
     },
   });
 }
 
-/** Einer Einladung folgen, wenn der Link nicht direkt geöffnet werden konnte. */
-function enterInvite() {
-  return openSheet({
-    title: 'Einladung eingeben',
-    subtitle: 'Den Link einfügen, den du bekommen hast.',
-    build: (close) => {
-      const input = h('textarea.field__input.field__input--code', { rows: 4, spellcheck: false, placeholder: 'https://…#einladung=…' });
-      const error = h('p.field__error');
-      const go = async () => {
-        const raw = String(input.value);
-        const hash = raw.includes('#') ? raw.slice(raw.indexOf('#')) : '';
-        const invite = readInviteFromLocation(hash);
-        if (!invite) { error.textContent = 'Dieser Link enthält keine Einladung.'; return; }
-        try {
-          await store.joinTrip(invite);
-          close(true);
-          toast('Du bist dabei.', { type: 'success' });
-        } catch (err) {
-          error.textContent = err?.message || String(err);
-        }
-      };
-      return h('div.stack',
-        h('label.field', h('span.field__label', 'Einladungslink'), input),
-        error,
-        h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: go }, 'Beitreten'),
-      );
-    },
+/** Name und Passwort abfragen und damit hochladen — für beide Wege oben. */
+function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, close }) {
+  const prefs = getPrefs();
+  const nameInput = plainInput({
+    value: state.trip?.joinName || prefs.tripRef?.joinName || state.trip?.name || '',
+    maxlength: 60, enterkeyhint: 'next',
   });
+  const passwordInput = plainInput({
+    value: prefs.tripRef?.joinPassword || '',
+    maxlength: 60, placeholder: 'Passwort ausdenken', enterkeyhint: 'go',
+  });
+  const error = h('p.field__error');
+  const button = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon(confirmIcon, 19), confirmLabel);
+
+  const go = async () => {
+    const problem = checkJoinName(nameInput.value) || checkPassword(passwordInput.value);
+    if (problem) { error.textContent = problem; return; }
+    error.textContent = '';
+    button.disabled = true;
+    try {
+      await onSubmit(nameInput.value.trim(), passwordInput.value);
+      close(true);
+      toast('Geteilt. Jetzt die Beitrittsdaten weitersagen.', { type: 'success' });
+    } catch (err) {
+      error.textContent = err?.message || String(err);
+      button.disabled = false;
+    }
+  };
+
+  return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
+    h('label.field', h('span.field__label', 'Name der Kasse'), nameInput),
+    h('label.field', h('span.field__label', 'Passwort'), passwordInput),
+    h('button.btn.btn--ghost.btn--small.field__inline', { type: 'button', onclick: () => { passwordInput.value = suggestPassword(); passwordInput.focus(); } },
+      icon('repeat', 16), 'Vorschlag'),
+    h('p.field__note', 'Der Name muss im Firebase-Projekt einmalig sein — an ihm findet die App die Kasse wieder. Ändern lässt er sich danach nicht mehr.'),
+    error,
+    button,
+  );
 }
 
 // -------------------------------------------------------------------- Daten
