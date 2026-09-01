@@ -1,0 +1,17 @@
+{
+  "_hinweis": [
+    "Diese Datei als firebase-config.json neben index.html legen (Kopie mit richtigen Werten),",
+    "dann kennt jedes Gerät, das die Adresse öffnet, euer Firebase-Projekt.",
+    "Beitreten braucht danach nur noch Name und Passwort der Kasse — keinen Link.",
+    "Ohne die Datei läuft alles wie bisher: die Konfiguration kommt von Hand hinein",
+    "oder über einen Einladungslink. Geheim ist sie nicht; geschützt wird die Kasse",
+    "über firestore.rules und das Passwort.",
+    "Unterstriche-Felder wie dieses werden ignoriert."
+  ],
+  "apiKey": "AIza…",
+  "authDomain": "euer-projekt.firebaseapp.com",
+  "projectId": "euer-projekt",
+  "storageBucket": "euer-projekt.appspot.com",
+  "messagingSenderId": "000000000000",
+  "appId": "1:000000000000:web:0000000000000000000000"
+}

@@ -14,7 +14,7 @@
  * Beim Veröffentlichen: APP_VERSION hochzählen (und `data-version` in
  * index.html mitziehen, `npm test` prüft das).
  */
-const APP_VERSION = '1.10.0';
+const APP_VERSION = '1.11.0';
 const CACHE = `urlaubstracker-${APP_VERSION}`;
 
 const SHELL = [
@@ -27,6 +27,7 @@ const SHELL = [
   './js/dom.js',
   './js/format.js',
   './js/ids.js',
+  './js/join.js',
   './js/install.js',
   './js/link.js',
   './js/prefs.js',
@@ -34,6 +35,7 @@ const SHELL = [
   './js/backend-firestore.js',
   './js/ui/sheet.js',
   './js/ui/parts.js',
+  './js/ui/join-sheet.js',
   './js/ui/entry-sheets.js',
   './js/views/today.js',
   './js/views/expenses.js',
@@ -140,6 +142,12 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return; // Firestore & Co. selbst regeln lassen
+
+  // Die Konfiguration der Auslieferung gehört nicht ins Paket: sie sagt, in
+  // welchem Firebase-Projekt die Kassen liegen, und darf sich ändern, ohne dass
+  // dafür eine neue Fassung nötig wäre. Ohne Netz gibt es sie eben nicht — dann
+  // steht die App auf dem, was das Gerät schon gespeichert hat.
+  if (url.pathname.endsWith('/firebase-config.json')) return;
 
   event.respondWith(
     (async () => {

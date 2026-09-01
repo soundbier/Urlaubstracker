@@ -2,6 +2,8 @@
 import { h, icon } from '../dom.js';
 import { toast } from '../ui/sheet.js';
 import { installInstructionsSheet } from '../ui/parts.js';
+import { joinSheet, plainInput } from '../ui/join-sheet.js';
+import { checkJoinName, checkPassword, suggestPassword } from '../join.js';
 import { todayISO, addDays, daysInclusive, isValidDate, MAX_PEOPLE, PERSON_COLORS } from '../calc.js';
 import { days, fullDate } from '../format.js';
 import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
@@ -55,7 +57,11 @@ function inviteScreen(state) {
 /**
  * Der erste Bildschirm überhaupt — und der einzige, an dem noch nichts erklärt
  * ist. Deshalb steht hier nur, was die App wirklich braucht: wie der Urlaub
- * heißt, wie lange er dauert, und wer mitfährt.
+ * heißt, wie man hereinkommt, wie lange er dauert, und wer mitfährt.
+ *
+ * Name und Passwort stehen ganz oben zusammen, weil sie zusammengehören: sie
+ * sind der Schlüssel zur Kasse. Wer die beiden kennt, ist dabei — mehr braucht
+ * niemand weiterzugeben, keinen Link, keine Kennung.
  *
  * Der erste Name ist immer die Person am Gerät. Vorher stand darunter noch die
  * Frage „Wer sitzt an diesem Handy?“ mit den Antworten „Die erste Person“ und
@@ -67,6 +73,7 @@ function createScreen() {
   const today = todayISO();
   const values = {
     name: '',
+    password: '',
     startDate: today,
     endDate: addDays(today, 13),
     currency: 'EUR',
@@ -144,8 +151,29 @@ function createScreen() {
 
   const submit = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Los geht’s');
 
+  const nameInput = plainInput({
+    value: values.name, maxlength: 60, placeholder: 'z. B. Roadtrip Süd 2026', enterkeyhint: 'next',
+    oninput: (e) => { values.name = e.target.value; },
+  });
+  const passwordInput = plainInput({
+    value: values.password, maxlength: 60, placeholder: 'Passwort ausdenken', enterkeyhint: 'next',
+    oninput: (e) => { values.password = e.target.value; },
+  });
+  // Ein Vorschlag statt eines leeren Felds: zwei Wörter und eine Zahl lassen
+  // sich vorlesen, „Sommer1“ nicht weitergeben, ohne rot zu werden.
+  const suggest = h('button.btn.btn--ghost.btn--small.field__inline', {
+    type: 'button',
+    onclick: () => { values.password = suggestPassword(); passwordInput.value = values.password; passwordInput.focus(); },
+  }, icon('repeat', 16), 'Vorschlag');
+
   const onSubmit = async (e) => {
     e.preventDefault();
+    const keyProblem = checkJoinName(values.name) || checkPassword(values.password);
+    if (keyProblem) {
+      error.textContent = keyProblem;
+      (checkJoinName(values.name) ? nameInput : passwordInput).focus();
+      return;
+    }
     if (!isValidDate(values.startDate) || !isValidDate(values.endDate) || values.endDate < values.startDate) {
       error.textContent = 'Bitte einen gültigen Zeitraum wählen.';
       return;
@@ -169,14 +197,24 @@ function createScreen() {
 
     error.textContent = '';
     submit.disabled = true;
+    submit.textContent = shared ? 'Lege an …' : 'Los geht’s';
     try {
       // Der erste Name ist die Person an diesem Gerät.
-      await store.createTrip({ ...values, peopleNames: people, myIndex: 0 });
+      const result = await store.createTrip({ ...values, peopleNames: people, myIndex: 0 });
+      // Die Kasse steht — nur eben nicht dort, wo sie stehen sollte. Das gehört
+      // gesagt, sonst wundert sich später jemand, warum niemand etwas sieht.
+      if (result?.warning) toast(result.warning, { type: 'error', duration: 7000 });
     } catch (err) {
       error.textContent = err?.message || String(err);
       submit.disabled = false;
+      submit.textContent = 'Los geht’s';
     }
   };
+
+  // Ob die Kasse gleich geteilt wird, hängt daran, ob dieses Gerät ein
+  // Firebase-Projekt kennt. Das entscheidet sich vor dem ersten Aufbau (siehe
+  // `store.init`), steht hier also fest.
+  const shared = store.cloudReady();
 
   return h('div.view',
     h('div.welcome.welcome--compact',
@@ -185,8 +223,15 @@ function createScreen() {
       h('p.welcome__text', 'Tragt ein, was in die gemeinsame Kasse eingezahlt wurde. Die App rechnet daraus das Tagesbudget — und unterwegs hakt ihr kurz ab, was ausgegeben wurde.'),
     ),
     h('form.panel', { onsubmit: onSubmit },
-      h('label.field', h('span.field__label', 'Wie heißt der Urlaub?'),
-        h('input.field__input', { type: 'text', value: values.name, maxlength: 60, placeholder: 'Unser Urlaub', oninput: (e) => { values.name = e.target.value; } })),
+      h('label.field', h('span.field__label', 'Wie heißt der Urlaub?'), nameInput),
+      h('div.field',
+        h('span.field__label', 'Passwort für die Kasse'),
+        passwordInput,
+        suggest,
+        h('p.field__note', shared
+          ? 'Mit diesem Namen und diesem Passwort kommen die anderen in dieselbe Kasse — mehr müsst ihr euch nicht schicken. Beides steht später in den Einstellungen.'
+          : 'Merkt euch beides: sobald die Kasse geteilt wird, kommen die anderen genau damit herein.'),
+      ),
       h('div.field__pair',
         h('label.field', h('span.field__label', 'Von'), startInput),
         h('label.field', h('span.field__label', 'Bis'), endInput),
@@ -200,7 +245,16 @@ function createScreen() {
       ),
       error,
       submit,
-      h('p.muted.small', 'Läuft erst mal nur auf diesem Gerät. In den Einstellungen könnt ihr die Kasse später mit weiteren Geräten teilen.'),
+      h('p.muted.small', shared
+        ? 'Die Kasse wird geteilt: Wer den Namen und das Passwort kennt, sieht denselben Stand — auf jedem Gerät, ohne Konto.'
+        : 'Läuft erst mal nur auf diesem Gerät. In den Einstellungen könnt ihr die Kasse später mit weiteren Geräten teilen.'),
+    ),
+    // Wer eingeladen wurde, aber keinen Link hat, sucht genau hier: unter dem
+    // Formular, das er nicht ausfüllen will.
+    h('div.welcome__foot',
+      h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => joinSheet({ name: values.name }) },
+        icon('people', 18), 'Einer Kasse beitreten'),
+      h('p.muted.small', 'Es gibt die Kasse schon? Dann brauchst du nur ihren Namen und ihr Passwort.'),
     ),
   );
 }

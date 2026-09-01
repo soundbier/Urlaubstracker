@@ -11,7 +11,11 @@ const KEY = 'urlaubstracker.prefs.v1';
 
 const DEFAULTS = {
   firebaseConfig: null, // { apiKey, authDomain, projectId, appId, … }
-  tripRef: null,        // { mode: 'local' } | { mode: 'cloud', tripId, inviteCode }
+  // { mode: 'local' } | { mode: 'cloud', tripId, inviteCode }
+  // Dazu, wenn bekannt: joinName und joinPassword — die zwei Angaben, mit denen
+  // andere beitreten. Sie stehen hier und nicht im Trip: das Passwort gehört
+  // nicht in die Datenbank, in der es geprüft wird.
+  tripRef: null,
   myPersonId: null,     // wer sitzt an diesem Gerät
   theme: 'auto',        // auto | light | dark
 };
