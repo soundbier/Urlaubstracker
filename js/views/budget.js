@@ -1,11 +1,11 @@
 /** Die Kasse: was reinkam, wie es sich verteilt, und wer am Ende was bekommt. */
 import { h, s, icon } from '../dom.js';
-import { computeBudget, dailySeries, settleUp, spentByCategory, todayISO } from '../calc.js';
+import { computeBudget, dailySeries, settleUp, spentByCategory, cashBalances, todayISO } from '../calc.js';
 import { money, moneySigned, days, dayMonthShort } from '../format.js';
-import { stat, sectionTitle, contributionRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
+import { stat, sectionTitle, contributionRow, cashOutRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
 
 export function renderBudget(state, actions) {
-  const { trip, expenses, contributions } = state;
+  const { trip, expenses, contributions, cashOuts } = state;
   const today = todayISO();
   const cur = trip.currency;
   const b = computeBudget({ trip, contributions, expenses, today });
@@ -45,6 +45,8 @@ export function renderBudget(state, actions) {
         : emptyState('Tragt ein, wer wie viel auf das gemeinsame Konto überwiesen hat.', 'Einzahlung eintragen', actions.addContribution),
     ),
 
+    trip.people.length > 1 ? cashSection(trip, cashOuts, expenses, cur, actions) : null,
+
     expenses.length ? h('section.section', sectionTitle('Wofür ging das Geld?'), categoryList(expenses, b.spent, cur)) : null,
 
     h('section.section',
@@ -53,10 +55,37 @@ export function renderBudget(state, actions) {
       // und der ändert sich mit jeder Ausgabe wieder. Aufgeklappt steht er
       // erst da, wenn er auch gilt.
       b.phase === 'after'
-        ? settlement(trip, contributions, expenses, cur, b.phase)
+        ? settlement(trip, contributions, expenses, cashOuts, cur, b.phase)
         : disclosure('Zwischenstand ansehen', h('span.disclosure__summary', 'Stand jetzt'),
-            settlement(trip, contributions, expenses, cur, b.phase)),
+            settlement(trip, contributions, expenses, cashOuts, cur, b.phase)),
     ),
+  );
+}
+
+// -------------------------------------------------------------------- Bargeld
+
+/**
+ * Wer noch wie viel Bargeld in der Tasche hat.
+ *
+ * Steht extra neben den Einzahlungen: eine Auszahlung ist keine Ausgabe (das
+ * Geld ist ja noch da, nur eben in bar statt auf dem Konto) und würde deshalb
+ * in keiner anderen Liste auftauchen. Ohne diese Übersicht wüsste am Ende
+ * niemand mehr, wer noch Bargeld übrig hat und in die Kasse zurücklegen muss.
+ */
+function cashSection(trip, cashOuts, expenses, cur, actions) {
+  const balances = cashBalances({ people: trip.people, cashOuts, expenses });
+  const relevant = balances.some((r) => r.paidOut || r.spent);
+
+  return h('section.section',
+    sectionTitle('Bargeld', h('button.btn.btn--small', { type: 'button', onclick: actions.addCashOut }, icon('plus', 16), 'Eintragen')),
+    relevant
+      ? h('div',
+          h('div.list', ...cashOuts.map((c) => cashOutRow(c, trip, actions.editCashOut))),
+          h('div.split', ...balances.map((r) =>
+            h('div.split__item', h('span.dot', { style: { background: trip.people.find((p) => p.id === r.personId)?.color } }), h('span.split__name', r.name), h('span.split__value', money(r.balance, cur))),
+          )),
+        )
+      : emptyState('Nehmt ihr Bargeld aus der Kasse für unterwegs mit, steht hier, wer davon noch wie viel hat.', 'Bargeld ausgezahlt', actions.addCashOut),
   );
 }
 
@@ -202,14 +231,20 @@ function categoryList(expenses, total, cur) {
  * Wer hat wie viel getragen und wer bekommt am Ende was. Eingezahltes und
  * privat Bezahltes zählen gleich viel; der Rest auf dem Konto wird an die
  * Guthaben ausgezahlt, und was dann noch offen ist, überweist man sich direkt.
+ *
+ * Bar Bezahltes zählt dabei wie aus der Kasse bezahlt — wer noch Bargeld übrig
+ * hat, das gehört rechnerisch also weiter der Kasse, steht dafür als eigener
+ * Hinweis dabei: das Geld muss erst zurück, bevor die Beträge oben stimmen.
  */
-function settlement(trip, contributions, expenses, cur, phase = 'after') {
-  const st = settleUp({ trip, contributions, expenses });
+function settlement(trip, contributions, expenses, cashOuts, cur, phase = 'after') {
+  const st = settleUp({ trip, contributions, expenses, cashOuts });
   const done = phase === 'after';
 
   if (!st.totalSpent && !st.potBalance) {
     return emptyState('Sobald Geld eingezahlt oder ausgegeben ist, steht hier, wer wem noch was schuldet.');
   }
+
+  const openCash = st.rows.filter((r) => r.cashBalance > 0);
 
   const table = h('div.settle',
     ...st.rows.map((r) =>
@@ -218,6 +253,7 @@ function settlement(trip, contributions, expenses, cur, phase = 'after') {
         h('div.settle__nums',
           h('span', `eingezahlt ${money(r.paidIn, cur)}`),
           r.paidPrivate ? h('span', `privat ${money(r.paidPrivate, cur)}`) : null,
+          r.cashBalance > 0 ? h('span', `Bargeld übrig ${money(r.cashBalance, cur)}`) : null,
           h('span.settle__share', `Anteil ${money(r.fairShare, cur)}`),
         ),
         h('div.settle__balance', { class: r.balance < 0 ? 'is-negative' : '' }, moneySigned(r.balance, cur)),
@@ -239,6 +275,11 @@ function settlement(trip, contributions, expenses, cur, phase = 'after') {
   }
   for (const t of st.transfers) {
     actions.push(h('li', h('strong', t.from), ' überweist ', h('strong', money(t.amount, cur)), ' an ', h('strong', t.to), '.'));
+  }
+  // Rechnerisch gehört das noch der Kasse — solange es nicht zurück ist,
+  // stimmen die Beträge oben nur, wenn diese Person es auch wirklich beisteuert.
+  for (const r of openCash) {
+    actions.push(h('li', h('strong', r.name), ' hat noch ', h('strong', money(r.cashBalance, cur)), ' Bargeld übrig — das erst zurück in die Kasse.'));
   }
   if (!actions.length) actions.push(h('li', 'Alles ausgeglichen. Nichts mehr zu überweisen.'));
 

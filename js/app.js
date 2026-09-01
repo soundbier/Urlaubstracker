@@ -6,7 +6,7 @@ import { applyTheme } from './prefs.js';
 import { onInstallabilityChange } from './install.js';
 import { money, number, days } from './format.js';
 import { toast, confirmSheet, promptSheet } from './ui/sheet.js';
-import { expenseSheet, contributionSheet } from './ui/entry-sheets.js';
+import { expenseSheet, contributionSheet, cashOutSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
 import { renderExpenses } from './views/expenses.js';
 import { renderBudget } from './views/budget.js';
@@ -196,6 +196,32 @@ const actions = {
       } else if (result.action === 'delete') {
         const ok = await confirmSheet({ title: 'Einzahlung löschen?', confirmLabel: 'Löschen', danger: true });
         if (ok) await store.deleteContribution(contribution.id);
+      }
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  async addCashOut(defaults = {}) {
+    const result = await cashOutSheet({ trip: state.trip, defaults });
+    if (result?.action !== 'save') return;
+    try {
+      const row = await store.addCashOut(result.values);
+      undoable(`${money(row.amount, state.trip.currency)} Bargeld ausgezahlt`, () => store.deleteCashOut(row.id));
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  async editCashOut(cashOut) {
+    const result = await cashOutSheet({ trip: state.trip, cashOut });
+    if (!result) return;
+    try {
+      if (result.action === 'save') {
+        await store.updateCashOut(cashOut.id, result.values);
+      } else if (result.action === 'delete') {
+        const ok = await confirmSheet({ title: 'Bargeld-Auszahlung löschen?', confirmLabel: 'Löschen', danger: true });
+        if (ok) await store.deleteCashOut(cashOut.id);
       }
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });

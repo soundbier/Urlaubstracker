@@ -2,7 +2,7 @@
 import { h, icon } from '../dom.js';
 import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
-import { CATEGORIES, POT, parseAmount, todayISO, addDays } from '../calc.js';
+import { CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
 /**
@@ -204,13 +204,24 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
   // Beim Bearbeiten zählt, was am Eintrag steht; nur beim Neuanlegen springt
   // der zuletzt gewählte Zahler ein.
   let payer = expense?.payer || defaults.payer || (editing ? POT : lastPayer);
+  // Ob eine Person aus eigener Tasche oder aus ihrem Bargeld zahlt, merkt sich
+  // getrennt vom Namen — wechselt man die Person, bleibt die zuletzt gewählte
+  // Geldform stehen, statt bei jedem Tipp auf „privat“ zurückzuspringen.
+  let payKind = isCashPayer(payer) ? 'cash' : 'private';
   let planned = expense ? expense.planned === true : defaults.planned === true || date > today;
   let plannedTouched = editing || defaults.planned !== undefined;
   const amount = amountField(expense?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: expense?.note || '', placeholder: 'z. B. Abendessen am Hafen', maxlength: 120, enterkeyhint: 'done' });
 
   const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
-  const payerName = (id) => payers.find((p) => p.id === id)?.label || 'Kasse';
+  // Welcher Chip aktiv ist: Bargeld ist derselbe Chip wie die Person, nur mit
+  // dem Umschalter daneben — sonst stünde jede Person doppelt in der Reihe.
+  const chipFor = (id) => (id === POT ? POT : cashPayerPerson(id) || id);
+  const payerName = (id) => {
+    if (id === POT) return 'Kasse';
+    const name = payers.find((p) => p.id === chipFor(id))?.label || 'Kasse';
+    return isCashPayer(id) ? `Bargeld · ${name}` : name;
+  };
 
   return openSheet({
     title: editing ? 'Eintrag bearbeiten' : 'Was kostet euch das?',
@@ -257,13 +268,25 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         h('button.segmented__btn', { type: 'button', onclick: () => { plannedTouched = true; setPlanned(true); } }, 'Verplant'),
       ];
 
+      // Nur eine Person hat Bargeld, das die Kasse ihr schon ausgezahlt hat —
+      // steht „Kasse“, gibt es nichts umzuschalten, deshalb bleibt die Zeile
+      // dann versteckt statt ausgegraut.
+      const moneyKindButtons = [
+        h('button.segmented__btn', { type: 'button', onclick: () => setPayKind('private') }, 'Privat'),
+        h('button.segmented__btn', { type: 'button', onclick: () => setPayKind('cash') }, 'Bargeld'),
+      ];
+      const moneyKind = h('div.segmented', ...moneyKindButtons);
+
       const details = disclosure('Details', detailSummary,
         h('div.field',
           h('span.field__label', 'Status'),
           h('div.segmented', ...kindButtons),
           kindNote,
         ),
-        h('label.field', payerLabelEl, chipRow(payers, payer, (id) => { payer = id; syncKind(); })),
+        h('label.field', payerLabelEl, chipRow(payers, chipFor(payer), (id) => {
+          payer = id === POT ? POT : (payKind === 'cash' ? cashPayerFor(id) : id);
+          syncKind();
+        }), moneyKind),
         field('Notiz', note),
       );
 
@@ -275,6 +298,13 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         syncKind();
       }
 
+      /** Wechselt die Geldform der schon gewählten Person, nicht die Person selbst. */
+      function setPayKind(kind) {
+        payKind = kind;
+        if (payer !== POT) payer = kind === 'cash' ? cashPayerFor(chipFor(payer)) : chipFor(payer);
+        syncKind();
+      }
+
       function syncKind() {
         kindButtons[0].classList.toggle('is-active', !planned);
         kindButtons[1].classList.toggle('is-active', planned);
@@ -283,6 +313,9 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         kindNote.textContent = planned
           ? 'Wird vom verfügbaren Geld abgezogen, zählt aber erst als Ausgabe, wenn ihr sie als bezahlt eintragt.'
           : 'Ist bezahlt und zählt sofort zu den Ausgaben.';
+        moneyKind.hidden = payer === POT;
+        moneyKindButtons[0].classList.toggle('is-active', !isCashPayer(payer));
+        moneyKindButtons[1].classList.toggle('is-active', isCashPayer(payer));
         // Zugeklappt muss ablesbar bleiben, was drinsteht.
         detailSummary.textContent = planned ? `verplant · ${payerName(payer)}` : payerName(payer);
         submit.replaceChildren(editing ? 'Speichern' : planned ? 'Vormerken' : 'Eintragen');
@@ -334,6 +367,51 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
         field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
+        field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
+        field('Notiz', note),
+        h('div.entry__actions',
+          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
+        ),
+      );
+    },
+  });
+}
+
+/**
+ * Bargeld aus der Kasse an eine Person ausgezahlt.
+ *
+ * Anders als eine Einzahlung fließt hier nichts dazu — das Geld war schon in
+ * der Kasse, es wechselt nur die Form. Deshalb zählt der Eintrag auch nicht
+ * als Ausgabe: erst wenn die Person davon etwas bezahlt, trägt man das als
+ * eigene Ausgabe mit „Bargeld“ als Zahler ein.
+ */
+export function cashOutSheet({ trip, cashOut = null, defaults = {} }) {
+  const editing = Boolean(cashOut);
+  let personId = cashOut?.personId || defaults.personId || trip.people[0]?.id;
+  let date = cashOut?.date || defaults.date || todayISO();
+  const amount = amountField(cashOut?.amount || 0, trip.currency);
+  const note = h('input.field__input', { type: 'text', value: cashOut?.note || '', placeholder: 'z. B. vom Automaten geholt', maxlength: 120 });
+
+  return openSheet({
+    title: editing ? 'Bargeld-Auszahlung bearbeiten' : 'Bargeld ausgezahlt',
+    subtitle: 'Wer hat wie viel Bargeld aus der Kasse bekommen?',
+    fullHeight: true,
+    bodyClass: 'sheet__body--entry',
+    build: (close) => {
+      const save = () => {
+        const cents = amount.getCents();
+        if (!(cents > 0)) {
+          amount.focusHint.textContent = 'Bitte einen Betrag eingeben';
+          amount.focusHint.classList.add('is-error');
+          return;
+        }
+        close({ action: 'save', values: { amount: cents, date, personId, note: note.value } });
+      };
+
+      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        amount.el,
+        field('An wen?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
         field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
         field('Notiz', note),
         h('div.entry__actions',

@@ -6,7 +6,7 @@
  * Sicherheitsregeln), die Trip-Kennung und den Einladungscode. Er steht im
  * Fragment der URL — das schickt der Browser nie an einen Server.
  */
-import { CATEGORY_BY_ID, POT, isValidDate } from './calc.js';
+import { CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson } from './calc.js';
 
 function toBase64Url(str) {
   const bytes = new TextEncoder().encode(str);
@@ -45,7 +45,7 @@ export function clearInviteFromLocation() {
 }
 
 /** Vollständige Sicherungskopie als JSON-Datei. */
-export function buildExport({ trip, contributions, expenses }) {
+export function buildExport({ trip, contributions, expenses, cashOuts = [] }) {
   return JSON.stringify(
     {
       format: 'urlaubstracker',
@@ -54,6 +54,7 @@ export function buildExport({ trip, contributions, expenses }) {
       trip,
       contributions,
       expenses,
+      cashOuts,
     },
     null,
     2,
@@ -83,6 +84,9 @@ export function parseImport(text) {
   if (!people.length) throw new Error('In der Datei steht keine einzige Person.');
 
   const knownPerson = new Set(people.map((p) => p.id));
+  // Ein Bargeld-Zahler ohne bekannte Person dahinter ist so unbrauchbar wie
+  // jeder andere unbekannte Zahler — fällt zurück auf die Kasse.
+  const validPayer = (payer) => payer === POT || knownPerson.has(payer) || (isCashPayer(payer) && knownPerson.has(cashPayerPerson(payer)));
   // Beträge sind ganzzahlige Cent; alles andere würde sich durch die ganze
   // Rechnung ziehen und dort als NaN wieder auftauchen.
   const usableAmount = (v) => Number.isInteger(v) && v !== 0;
@@ -97,12 +101,14 @@ export function parseImport(text) {
       budgetMode: t.budgetMode === 'fixed' ? 'fixed' : 'dynamic',
       people,
     },
-    // Einzahlungen ohne bekannte Person würden in der Abrechnung Geld erfinden.
+    // Einzahlungen und Auszahlungen ohne bekannte Person würden in der
+    // Abrechnung Geld erfinden bzw. verschwinden lassen.
     contributions: rows(data.contributions, (c) => knownPerson.has(c.personId)),
+    cashOuts: rows(data.cashOuts, (c) => knownPerson.has(c.personId)),
     expenses: rows(data.expenses, () => true).map((e) => ({
       ...e,
       category: CATEGORY_BY_ID[e.category] ? e.category : 'other',
-      payer: e.payer === POT || knownPerson.has(e.payer) ? e.payer : POT,
+      payer: validPayer(e.payer) ? e.payer : POT,
       // Nur eine echte Marke zählt; alles andere ist eine bezahlte Ausgabe.
       planned: e.planned === true,
       fromPlan: e.fromPlan === true && e.planned !== true,
@@ -111,23 +117,30 @@ export function parseImport(text) {
 }
 
 /** Ausgaben als CSV, für Tabellenkalkulationen. */
-export function buildCsv({ trip, expenses, contributions }) {
+export function buildCsv({ trip, expenses, contributions, cashOuts = [] }) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const money = (cents) => (cents / 100).toFixed(2).replace('.', ',');
   const personName = (id) => trip.people.find((p) => p.id === id)?.name || 'Unbekannt';
   // In der Tabelle stehen die Namen, die auch in der App stehen — nicht die
   // internen Kennungen wie `food` oder `pot`.
   const categoryLabel = (id) => (CATEGORY_BY_ID[id] || CATEGORY_BY_ID.other).label;
+  const payerLabel = (payer) => {
+    if (payer === POT) return 'Gemeinsame Kasse';
+    if (isCashPayer(payer)) return `Bargeld (${personName(cashPayerPerson(payer))})`;
+    return personName(payer);
+  };
   const lines = [['Art', 'Datum', 'Betrag', 'Kategorie', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
 
   for (const c of [...contributions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     lines.push(['Einzahlung', c.date, money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
   }
+  for (const c of [...cashOuts].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+    lines.push(['Bargeld ausgezahlt', c.date, money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
+  }
   for (const e of [...expenses].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    const payer = e.payer === POT ? 'Gemeinsame Kasse' : personName(e.payer);
     // Vorgemerktes steht mit eigener Art da — sonst zählte eine Tabelle Geld
     // mit, das noch gar nicht ausgegeben ist.
-    lines.push([e.planned === true ? 'Verplant' : 'Ausgabe', e.date, money(e.amount), categoryLabel(e.category), payer, e.note].map(esc).join(';'));
+    lines.push([e.planned === true ? 'Verplant' : 'Ausgabe', e.date, money(e.amount), categoryLabel(e.category), payerLabel(e.payer), e.note].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';

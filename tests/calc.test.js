@@ -8,6 +8,7 @@ import {
   totalSpent, totalPlanned, plannedOnly, paidOnly,
   tripPhase, POT, MAX_PEOPLE, PERSON_COLORS, nextPersonColor, personEntryCount,
   normalizeShares, averageShare,
+  cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -313,6 +314,58 @@ test('Abrechnung: ungleiche Quote wird berücksichtigt', () => {
   assert.equal(s.rows[0].fairShare + s.rows[1].fairShare, 34000);
   assert.equal(s.rows[0].fairShare, 22667);
   assert.equal(s.rows[0].balance + s.rows[1].balance, s.potBalance);
+});
+
+// -------------------------------------------------------------------- Bargeld
+
+test('Bargeld-Zahler kodiert die Person im Wert', () => {
+  assert.equal(isCashPayer(POT), false);
+  assert.equal(isCashPayer('lukas'), false, 'privat vorgestreckt ist kein Bargeld-Zahler');
+  assert.equal(isCashPayer(cashPayerFor('lukas')), true);
+  assert.equal(cashPayerPerson(cashPayerFor('lukas')), 'lukas');
+  assert.equal(cashPayerPerson('lukas'), null);
+  assert.equal(cashPayerPerson(POT), null);
+});
+
+test('Bargeldbestand: Auszahlung rein, bar bezahlte Ausgabe raus', () => {
+  const cashOuts = [{ id: 'k1', personId: 'lukas', amount: 10000, date: '2026-06-25' }];
+  const expenses = [
+    { id: 'e1', date: '2026-07-01', amount: 3000, category: 'food', payer: cashPayerFor('lukas') },
+    // Privat vorgestreckt ist etwas anderes als bar bezahlt und zählt hier nicht mit.
+    { id: 'e2', date: '2026-07-02', amount: 2000, category: 'food', payer: 'lukas' },
+  ];
+  const [marie, lukas] = cashBalances({ people: TRIP.people, cashOuts, expenses });
+  assert.equal(marie.paidOut, 0);
+  assert.equal(marie.balance, 0);
+  assert.equal(lukas.paidOut, 10000);
+  assert.equal(lukas.spent, 3000);
+  assert.equal(lukas.balance, 7000, '100 € ausgezahlt, 30 € bar ausgegeben');
+});
+
+test('Abrechnung: bar bezahlt zählt wie aus der Kasse, nicht wie privat', () => {
+  const cashOuts = [{ id: 'k1', personId: 'lukas', amount: 10000, date: '2026-06-25' }];
+  const expenses = [{ id: 'e1', date: '2026-07-01', amount: 3000, category: 'food', payer: cashPayerFor('lukas') }];
+  const s = settleUp({ trip: TRIP, contributions: CONTRIB, expenses, cashOuts });
+
+  // Das Geld kam schon aus der Kasse — Lukas bekommt dafür keine Gutschrift,
+  // wie er sie für eine privat vorgestreckte Ausgabe bekäme.
+  assert.equal(s.rows[0].paidPrivate, 0);
+  assert.equal(s.rows[1].paidPrivate, 0);
+  assert.equal(s.rows[0].fairShare + s.rows[1].fairShare, 3000);
+  assert.equal(s.potBalance, 147000, '1500 € eingezahlt, 30 € bar ausgegeben');
+  assert.equal(s.rows.reduce((a, r) => a + r.balance, 0), s.potBalance);
+  assert.equal(s.rows[1].cashBalance, 7000, '70 € Bargeld sind bei Lukas noch übrig');
+  assert.equal(s.rows[0].cashBalance, 0);
+});
+
+test('An wem Bargeld hängt, lässt sich auch zählen', () => {
+  const daten = {
+    contributions: CONTRIB,
+    expenses: [...EXPENSES, { id: 'e4', date: '2026-07-04', amount: 500, category: 'food', payer: cashPayerFor('marie') }],
+    cashOuts: [{ id: 'k1', personId: 'marie', amount: 5000, date: '2026-06-25' }],
+  };
+  assert.equal(personEntryCount('marie', daten), 3, 'Einzahlung, Bargeld-Auszahlung, bar bezahlte Ausgabe');
+  assert.equal(personEntryCount('lukas', daten), 2);
 });
 
 test('Gruppierungen für die Listen', () => {

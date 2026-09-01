@@ -117,6 +117,9 @@ const ICONS = {
   download: ['M12 4v10M8 12l4 4 4-4', 'M5 19h14'],
   upload: ['M12 16V6M8 10l4-4 4 4', 'M5 19h14'],
   wallet: ['M4 8a2 2 0 012-2h12a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2V8z', 'M4 10h16M16 14h.01'],
+  // Ein Geldschein: Rahmen, die Münze in der Mitte, zwei Striche als Kanten —
+  // vom Portemonnaie-Symbol klar unterscheidbar, für „Bargeld“.
+  cash: ['M2.5 7h19v10h-19z', 'M12 9.3a2.7 2.7 0 100 5.4 2.7 2.7 0 000-5.4z', 'M5.5 7v10M18.5 7v10'],
   people: ['M8 11a3 3 0 100-6 3 3 0 000 6z', 'M2 20a6 6 0 0112 0', 'M16 5.2a3 3 0 010 5.6M17 14.3A6 6 0 0122 20'],
   person: ['M12 11.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z', 'M5 20a7 7 0 0114 0'],
   calendar: ['M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z', 'M8 3v4M16 3v4M4 11h16'],
