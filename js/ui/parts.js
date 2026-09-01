@@ -25,6 +25,19 @@ export function sectionTitle(text, action) {
 }
 
 /**
+ * Die Tagesmarke: eine getrackte, tabellarische Meta-Zeile mit
+ * Haarlinien-Trenner statt Satzzeichen — das wiederkehrende Signature
+ * Element der App. Heute nur auf „Heute“ verwendet, aber als Muster gedacht:
+ * jedes übergebene Textstück wird ein Abschnitt, dazwischen steht die Linie.
+ */
+export function daymark(...parts) {
+  const segments = parts.filter(Boolean);
+  const children = segments.flatMap((text, i) =>
+    i === 0 ? [h('span', text)] : [h('span.daymark__sep', { 'aria-hidden': 'true' }), h('span', text)]);
+  return h('p.daymark', ...children);
+}
+
+/**
  * Aufklappbare Zeile für alles, was man selten anfasst.
  *
  * Die Zusammenfassung rechts ist der Preis dafür, dass hier etwas versteckt
