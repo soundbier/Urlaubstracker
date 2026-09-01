@@ -197,8 +197,8 @@ function trendChart(trip, contributions, expenses, today, budget) {
       marker ? s('circle.chart__dot', { cx: x(marker[0]), cy: y(marker[1]), r: 4 }) : null,
     ),
     h('div.chart__legend',
-      h('span.legend__item', h('i.legend__swatch.legend__swatch--actual'), 'tatsächlich übrig'),
-      h('span.legend__item', h('i.legend__swatch.legend__swatch--plan'), 'gleichmäßig geplant'),
+      h('span.legend__item', h('i.legend__swatch.legend__swatch--actual'), 'Ist'),
+      h('span.legend__item', h('i.legend__swatch.legend__swatch--plan'), 'Soll'),
     ),
     h('div.chart__axisLabels', h('span', dayMonthShort(trip.startDate)), h('span', dayMonthShort(trip.endDate))),
   );
