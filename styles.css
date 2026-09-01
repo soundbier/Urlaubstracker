@@ -129,6 +129,16 @@ body.has-sheet { overflow: hidden; }
 h1, h2, h3, p, ul, ol { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
+/*
+ * Ohne das interpretiert der Browser zwei schnelle Tipps auf dieselbe Stelle
+ * als Zoom-Geste statt als zwei Tipps — genau das trifft die Zahlentastatur,
+ * wenn man zügig eine doppelte Ziffer eintippt ("11", "22"). `manipulation`
+ * nimmt nur das Doppeltipp- und das Wisch-zum-Zoomen-Verhalten von diesen
+ * Elementen weg; Zwei-Finger-Pinch bleibt überall auf der Seite möglich —
+ * anders als `user-scalable=no`, das Zoomen komplett abschalten würde und
+ * für Leute mit Sehbeeinträchtigung ein echtes Hindernis ist.
+ */
+button, input, select, textarea { touch-action: manipulation; }
 button { cursor: pointer; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
 strong { font-weight: 600; }
