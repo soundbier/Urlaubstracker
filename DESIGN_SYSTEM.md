@@ -4,9 +4,12 @@ Verbindliche Gestaltungsrichtung für den Urlaubstracker. Dieses Dokument ist
 die Grundlage für alle künftigen visuellen Änderungen — vor jedem Eingriff in
 `styles.css` oder eine View wird hier nachgeschlagen, nicht neu erfunden.
 
-**Status:** Richtung beschlossen, Umsetzung teilweise ausstehend. Wo sich
-Ziel und aktueller Code unterscheiden, steht das explizit dabei — dieses
-Dokument beschreibt nicht nur, was ist, sondern auch, wohin es geht.
+**Status:** Richtung beschlossen. Phase 1 (Farb-Tokens, Typografie-Grundlagen,
+Tagesmarke) ist umgesetzt — siehe Haken unten. Offen bleibt weiterhin die
+zweite Typografie-Stufe (echte Condensed-Grotesk) und das eigentliche
+Screen-Redesign, das auf diesem Fundament aufbaut. Wo sich Ziel und
+aktueller Code unterscheiden, steht das explizit dabei — dieses Dokument
+beschreibt nicht nur, was ist, sondern auch, wohin es geht.
 
 ---
 
@@ -127,15 +130,16 @@ Prinzips, das im Code schon angelegt ist (Kommentar im bestehenden CSS:
 Akzentfarbe wird noch dunkler, noch näher an Tinte gezogen, sodass sie kaum
 als Marke, sondern fast als getönte Tinte wirkt.
 
-| Token | Richtwert hell | Richtwert dunkel |
+| Token | Wert hell | Wert dunkel |
 | --- | --- | --- |
-| `--accent` | `#2c4a44` (sehr dunkles, blaustichiges Tannengrau) | ein entsättigtes, kein leuchtendes Salbeigrün — heller/grauer als das aktuelle `#38bfae`, genauer Wert noch offen |
+| `--accent` | `#2c4a44` (sehr dunkles, blaustichiges Tannengrau, ~168°) | `#7cb6ae` (entsättigtes, nicht leuchtendes Salbeigrün, ~172°) |
 
-Farbton ~172° (blaugrün, kein Gelbstich wie Waldgrün), niedrige Sättigung,
-niedriger Hellwert. Das vermeidet sowohl Camping (kein Gelbstich) als auch
-Fintech (kein heller, satter Ton). **Diese Werte sind Richtwerte, keine
-finalen Tokens — Kontrast gegen Papier/Tinte muss vor dem Einbau geprüft
-werden.**
+Farbton ~168–172° (blaugrün, kein Gelbstich wie Waldgrün), niedrige
+Sättigung. Das vermeidet sowohl Camping (kein Gelbstich) als auch Fintech
+(kein heller, satter Ton). **Umgesetzt und geprüft** (WCAG-Kontrast, jeweils
+die tatsächlich verwendeten Kombinationen): Akzent als Text auf Papier/Grund
+und auf Fläche, sowie Weiß bzw. Tinte (`--on-accent`) auf Akzentfläche —
+beides in hell wie dunkel bei ≥ 7:1, deutlich über der 4.5:1-Mindestgrenze.
 
 ### Ändert sich: Benennung, nicht die Farbe
 
@@ -143,33 +147,36 @@ werden.**
 erdig genug ist. Verworfen wird nur der Name „Sunset Orange“: ein
 Sonnenuntergang ist die klischierteste Reise-App-Dekoration überhaupt, und
 das gilt für die Benennung unabhängig vom Hexwert. Der Token heißt schlicht
-„Amber“ / `--warn`, ohne Szenerie-Assoziation.
+„Amber“ / `--warn`, ohne Szenerie-Assoziation — im CSS-Kommentar
+entsprechend benannt.
 
 ---
 
 ## Signature Element: die Tagesmarke
 
 Die Tagesmarke bleibt das eine wiederkehrende Element — die Grundrichtung
-aus dem vorherigen Durchgang war richtig. Verschärfung gegenüber dem
-aktuellen Stand (`TAG 12 / 14 · 1. SEPTEMBER` in `today.js`):
+aus dem vorherigen Durchgang war richtig. **Umgesetzt:** die Tagesmarke in
+`today.js` (`TAG 05 / 14  1. SEPTEMBER`) hat jetzt:
 
-- Tag-Bruch und Datum bekommen **tabellarische Ziffern**, damit sie über
+- **Tabellarische Ziffern** für Tag-Bruch und Datum, damit sie über
   verschiedene Bildschirme hinweg immer dieselbe Breite einnehmen — das
   Gefühl „gebaut“, nicht „hingeschrieben“.
-- Der Mittelpunkt (`·`) wird zu einer echten, dünnen **vertikalen
-  Haarlinie** statt eines Satzzeichens — dieselbe visuelle Sprache wie der
-  Rest der App (Linien statt Zeichen als Trenner), kein isolierter
+- Statt des Mittelpunkts (`·`) eine echte, dünne **vertikale Haarlinie**
+  (`.daymark__sep`, 1px, `var(--border)`) — dieselbe visuelle Sprache wie
+  der Rest der App (Linien statt Zeichen als Trenner), kein isolierter
   typografischer Trick.
 - Kein Icon, keine Farbe, keine Pillenform. Reiner Text plus eine Linie.
-- Erscheint nur während der laufenden Reise (Phase „during“) — davor und
-  danach hat der Hero bereits einen eigenen Kontextsatz, eine zweite Marke
-  wäre dort Redundanz ohne Zweck.
+- Erscheint weiterhin nur während der laufenden Reise (Phase „during“) —
+  davor und danach hat der Hero bereits einen eigenen Kontextsatz, eine
+  zweite Marke wäre dort Redundanz ohne Zweck.
 
 Wichtig: Das Element ist kein einmaliges Widget, sondern ein
 **wiederverwendbares Muster** — „eine getrackte, tabellarische Meta-Zeile
 mit Haarlinien-Trenner, überall dort, wo ein Bildschirm behaupten muss,
-welcher Tag/Eintrag gemeint ist“. Heute nur auf „Heute“ verwendet, aber als
-Prinzip definiert, nicht als Einzelfall.
+welcher Tag/Eintrag gemeint ist“. Als `daymark(...parts)` in `ui/parts.js`
+umgesetzt: jedes übergebene Textstück wird ein Abschnitt, dazwischen steht
+die Haarlinie. Heute weiterhin nur auf „Heute“ verwendet, aber als
+wiederverwendbare Funktion bereit für weitere Bildschirme.
 
 Route-Punkte (`●────●────●────●`) sind **bewusst nicht** Teil des Systems:
 Sie würden den bereits vorhandenen Tagesbudget-Fortschrittsbalken
@@ -289,15 +296,22 @@ Verbindlich für jede künftige UI-Änderung, konkret und überprüfbar:
 
 ## Offene Umsetzungsschritte
 
-Was dieses Dokument beschließt, aber noch nicht im Code steht:
+**Phase 1 (visuelles Fundament) — umgesetzt:**
 
-- [ ] `--accent` (hell/dunkel) auf die Tannengrau-Richtwerte umstellen,
-      Kontrast gegen Papier/Tinte vorher prüfen.
-- [ ] `--warn`-Kommentar/Namen von „Sunset“-Assoziation lösen (Farbwert
-      bleibt).
-- [ ] Tagesmarke: tabellarische Ziffern, Mittelpunkt durch Haarlinie
-      ersetzen.
-- [ ] Marker-Typografie: Versalien + Sperrung als Sofortlösung (kein neuer
-      Font).
+- [x] `--accent` (hell/dunkel) auf die Tannengrau-Werte umgestellt,
+      Kontrast der tatsächlich verwendeten Kombinationen geprüft.
+- [x] `--warn`-Kommentar von „Sunset“-Assoziation gelöst (Farbwert
+      unverändert, jetzt als „Amber“ kommentiert).
+- [x] Tagesmarke: tabellarische Ziffern, Mittelpunkt durch Haarlinie
+      ersetzt (`.daymark__sep`), als wiederverwendbare `daymark()`-Funktion.
+- [x] Marker-Typografie: Versalien + Sperrung + Gewicht 700 (bereits vorhanden,
+      geprüft und bestätigt — kein neuer Font).
+- [x] Geldbeträge und Kennzahlen durchgängig auf `tabular-nums` + Gewicht 600
+      geprüft; eine Lücke (`.section__meta` bei Summen) geschlossen.
+
+**Noch offen:**
+
 - [ ] Bei Bedarf später, mit eigener Freigabe: echte Condensed-Grotesk für
       Marker-Text einführen.
+- [ ] Das eigentliche Screen-Redesign auf Basis dieses Fundaments (Phase 2+) —
+      noch nicht begonnen, siehe „Layoutprinzipien“ oben.

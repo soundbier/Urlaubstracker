@@ -44,7 +44,7 @@ export function renderExpenses(state, actions) {
     usedCategories.length > 1 ? chips : null,
     planned.length
       ? h('section.section',
-          sectionTitle('Verplant', h('span.section__meta', money(planned.reduce((a, e) => a + e.amount, 0), cur))),
+          sectionTitle('Verplant', h('span.section__meta.section__meta--amount', money(planned.reduce((a, e) => a + e.amount, 0), cur))),
           h('div.list', ...planned.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
         )
       : null,

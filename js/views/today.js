@@ -5,7 +5,7 @@
 import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth } from '../format.js';
-import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar } from '../ui/parts.js';
+import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar, daymark } from '../ui/parts.js';
 
 const TONE = { good: 'good', tight: 'warn', over: 'over', empty: 'muted' };
 
@@ -52,7 +52,7 @@ export function renderToday(state, actions) {
     ),
     due.length
       ? h('section.section',
-          sectionTitle('Fällig', h('span.section__meta', money(due.reduce((a, e) => a + e.amount, 0), cur))),
+          sectionTitle('Fällig', h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur))),
           h('div.list', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
           h('p.section__note', 'Tippt den Haken, sobald bezahlt ist.'),
         )
@@ -61,7 +61,7 @@ export function renderToday(state, actions) {
     h('section.section',
       sectionTitle(
         'Heute eingetragen',
-        todays.length ? h('span.section__meta', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
+        todays.length ? h('span.section__meta.section__meta--amount', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
       ),
       todays.length
         ? h('div.list', ...todays.map((e) => expenseRow(e, trip, rowOpts)))
@@ -145,7 +145,7 @@ function hero(b, cur, actions, today) {
     // Der eine Moment, an dem die App aussieht wie ein Reisetagebuch und nicht
     // wie ein Haushaltsbuch: ein Tagesstempel, kein zweites Mal „Tag X von Y“
     // aus der Kopfzeile — hier steht zusätzlich das Datum, in eigenem Register.
-    h('p.daymark', `Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays} · ${dayMonth(today)}`),
+    daymark(`Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays}`, dayMonth(today)),
     h('p.hero__label', b.leftToday >= 0 ? 'Heute noch übrig' : 'Heute schon drüber'),
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),
     h('p.hero__sub', `von ${money(b.perDayToday, cur)} für heute`),

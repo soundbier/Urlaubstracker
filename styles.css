@@ -24,9 +24,14 @@
   /* Eine Akzentfarbe und zwei semantische Töne — mehr nicht. „Gut“ hat keine
      eigene Farbe mehr: dafür stand ein zweites Grün neben dem Akzent, das
      nach einer zweiten Bedeutung aussah, wo dieselbe gemeint war. Gut heißt
-     jetzt schlicht „nicht rot“. */
-  --accent: #0f766e;
+     jetzt schlicht „nicht rot“.
+
+     Der Akzent ist ein sehr dunkles, blaustichiges Tannengrau statt des
+     früheren Fintech-Teals — kaum noch Marke, fast getönte Tinte. Kontrast
+     gegen Papier und gegen Weiß auf gefüllter Fläche geprüft (beides > 9:1). */
+  --accent: #2c4a44;
   --accent-soft: #e2efec;
+  /* „Amber“ — der Name meint nur den Farbton, keine Reise-Szenerie. */
   --warn: #a4600b;
   --warn-soft: #f7edde;
   --over: #b8123c;
@@ -89,9 +94,11 @@
   --text-muted: #9aa0a8;
   --text-faint: #7d838c;
 
-  /* Ein ruhigeres Türkis als der Neonton, den dunkle Oberflächen sonst gern
-     tragen: hell genug zum Lesen, leise genug für den Abend. */
-  --accent: #38bfae;
+  /* Kein Türkis mehr, sondern ein entsättigtes, nicht leuchtendes Salbeigrün
+     in derselben Tannengrau-Familie wie im hellen Modus: heller und grauer
+     als der frühere Neonton, leise genug für den Abend. Kontrast gegen den
+     dunklen Grund und gegen Tinte auf gefüllter Fläche geprüft (beides > 7:1). */
+  --accent: #7cb6ae;
   --accent-soft: #17322e;
   --warn: #dda33f;
   --warn-soft: #332810;
@@ -230,6 +237,10 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
    aussehen. */
 .section__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
 .section__meta { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* Steht die Meta-Zeile für eine Geldsumme (nicht für eine Anzahl wie
+   „3 Personen“), gilt dieselbe Regel wie für jeden anderen Betrag im
+   Interface: Gewicht 600. */
+.section__meta--amount { font-weight: 600; }
 .section__note { font-size: var(--fs-xs); color: var(--text-faint); }
 
 /* Eine Gruppe zusammengehöriger Felder — ohne Kasten darum. */
@@ -294,6 +305,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
  * danach hat der Hero schon seinen eigenen Kontextsatz.
  */
 .daymark {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -301,6 +315,15 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   margin-bottom: 4px;
+}
+/* Der Trenner zwischen Tagesbruch und Datum: eine echte, sehr feine
+   senkrechte Linie statt eines Satzzeichens — dieselbe Sprache wie die
+   Haarlinien zwischen Listenzeilen, nur aufrecht gestellt. */
+.daymark__sep {
+  width: 1px;
+  height: 0.8em;
+  flex: none;
+  background: var(--border);
 }
 
 /*
@@ -586,7 +609,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  font-size: 1rem;
+  font-size: var(--fs-md);
   appearance: none;
 }
 .field__input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
