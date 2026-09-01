@@ -5,11 +5,11 @@ die Grundlage für alle künftigen visuellen Änderungen — vor jedem Eingriff 
 `styles.css` oder eine View wird hier nachgeschlagen, nicht neu erfunden.
 
 **Status:** Richtung beschlossen. Phase 1 (Farb-Tokens, Typografie-Grundlagen,
-Tagesmarke) ist umgesetzt — siehe Haken unten. Offen bleibt weiterhin die
-zweite Typografie-Stufe (echte Condensed-Grotesk) und das eigentliche
-Screen-Redesign, das auf diesem Fundament aufbaut. Wo sich Ziel und
-aktueller Code unterscheiden, steht das explizit dabei — dieses Dokument
-beschreibt nicht nur, was ist, sondern auch, wohin es geht.
+Tagesmarke) und Phase 2 („Heute“ als Master-Screen) sind umgesetzt — siehe
+Haken unten. Offen bleibt weiterhin die zweite Typografie-Stufe (echte
+Condensed-Grotesk). Wo sich Ziel und aktueller Code unterscheiden, steht das
+explizit dabei — dieses Dokument beschreibt nicht nur, was ist, sondern auch,
+wohin es geht.
 
 ---
 
@@ -309,9 +309,36 @@ Verbindlich für jede künftige UI-Änderung, konkret und überprüfbar:
 - [x] Geldbeträge und Kennzahlen durchgängig auf `tabular-nums` + Gewicht 600
       geprüft; eine Lücke (`.section__meta` bei Summen) geschlossen.
 
+**Phase 2 („Heute“ als Master-Screen) — umgesetzt:**
+
+Die Struktur aus „Layoutprinzipien“ oben war bereits weitgehend angelegt;
+Phase 2 hat die Lücken zwischen Anspruch und Code geschlossen:
+
+- [x] Kopfzeile: Sync-Status ist jetzt wirklich monochrom. „Synchronisiert“,
+      „Verbindet …“ und „Offline — wird nachgereicht“ sind Normalzustände
+      ohne Farbe; nur ein echtes Problem (`sync.error`) bekommt `--over`.
+      Vorher stand „Synchronisiert“ fälschlich in Akzentfarbe, als wäre
+      Farbe hier Marke statt Verdikt.
+- [x] Tagesbudget-Balken ist im Normalfall farblos (`neutral`-Ton), nicht
+      mehr durchgehend akzentgrün eingefärbt. Farbe erscheint erst beim
+      Kippen ins Knappe (Amber) oder Über (Karmesin) — die große Zahl
+      bleibt das einzige laute Element auf dem Screen.
+- [x] Handlungsebene bekommt vor der Kennzahlreihe einen bewusst größeren
+      Abschnittsabstand (`.section--action`) statt des üblichen Zeilenmaßes.
+- [x] „Fällig“ hebt sich von „Heute eingetragen“ ab, wenn wirklich etwas
+      überfällig ist (nicht nur „heute dran“) — derselbe Warnton wie an der
+      einzelnen Zeile (`.tag--due`), keine neue Farbe für denselben Zustand.
+- [x] Touch-Ziel der Chip-Komponente von 40 auf 44 px angehoben — betraf
+      unter anderem die Personen-Auswahl auf „Heute“, wenn das Gerät noch
+      niemandem zugeordnet ist.
+- [x] Vorher/Nachher-Screenshots bei 375 px, hell und dunkel, für alle vier
+      Phasen (leer, davor, laufend, danach) geprüft.
+
 **Noch offen:**
 
 - [ ] Bei Bedarf später, mit eigener Freigabe: echte Condensed-Grotesk für
       Marker-Text einführen.
-- [ ] Das eigentliche Screen-Redesign auf Basis dieses Fundaments (Phase 2+) —
-      noch nicht begonnen, siehe „Layoutprinzipien“ oben.
+- [ ] Dieselbe „farblos im Normalfall“-Regel für den Kassenstand-Balken auf
+      „Budget“ übernehmen — dort zeigt der Balken bei gutem Stand noch
+      durchgehend Akzentfarbe. Heute ist die Referenz; Budget zieht in einer
+      eigenen Änderung nach.

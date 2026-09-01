@@ -209,8 +209,10 @@ strong { font-weight: 600; }
   background: none;
   color: var(--text-faint);
 }
-.syncdot--on { color: var(--accent); }
-.syncdot--pending { color: var(--warn); }
+/* „Synchronisiert“, „Verbindet …“ und „Offline — wird nachgereicht“ sind
+   Normalzustände, kein Verdikt — sie bleiben monochrom wie der Rest der
+   Kopfzeile. Nur ein echtes Problem (Sync stockt, lokal ohne Speichern)
+   bekommt Farbe. */
 .syncdot--error { color: var(--over); }
 
 .main { flex: 1; }
@@ -231,11 +233,18 @@ strong { font-weight: 600; }
 body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
 .section { display: flex; flex-direction: column; gap: 13px; }
+/* Der Sprung von der Kennzahlreihe zur Handlungsebene ist bewusst größer als
+   der übliche Abschnittsabstand: hier endet der Zustand, hier beginnt, was
+   zu tun ist. */
+.section--action { margin-top: 14px; }
 .section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 /* Abschnittsüberschriften in normaler Schreibweise: gesperrte Großbuchstaben
    lassen jede Zwischenüberschrift wie eine Rubrik in einem Auswertungswerkzeug
    aussehen. */
 .section__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
+/* Nicht „heute dran“, sondern wirklich überfällig — derselbe Warnton wie an
+   der einzelnen Zeile (`.tag--due`), keine neue Farbe für denselben Zustand. */
+.section__title--warn { color: var(--warn); }
 .section__meta { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
 /* Steht die Meta-Zeile für eine Geldsumme (nicht für eine Anzahl wie
    „3 Personen“), gilt dieselbe Regel wie für jeden anderen Betrag im
@@ -850,7 +859,7 @@ select.field__input { background-image: none; }
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 40px;
+  min-height: var(--tap);
   padding: 8px 14px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
