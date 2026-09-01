@@ -4,7 +4,7 @@
  */
 import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
-import { money, moneySigned, days, compactDate } from '../format.js';
+import { money, moneySigned, days, compactDate, dayMonth } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar } from '../ui/parts.js';
 
 const TONE = { good: 'good', tight: 'warn', over: 'over', empty: 'muted' };
@@ -23,7 +23,7 @@ export function renderToday(state, actions) {
   const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
 
   return h('div.view',
-    hero(b, cur, actions),
+    hero(b, cur, actions, today),
     knowsMe ? null : whoAmI(trip, actions),
     // Die drei Kennzahlen beantworten, was die große Zahl offenlässt: wie viel
     // insgesamt noch da ist, wie lange es reichen muss, und ob ihr vor oder
@@ -71,7 +71,7 @@ export function renderToday(state, actions) {
         : emptyState('Heute noch nichts eingetragen.'),
     ),
     b.phase === 'after' ? h('div.callout',
-      h('p', 'Der Urlaub ist vorbei. Die Endabrechnung — wer wem noch was überweist — steht unter ', h('strong', 'Budget'), '.'),
+      h('p', 'Der Urlaub ist vorbei. Wer wem noch was überweist, steht unter ', h('strong', 'Budget'), '.'),
       h('button.btn.btn--ghost', { type: 'button', onclick: () => actions.goto('budget') }, 'Zur Abrechnung'),
     ) : null,
   );
@@ -89,7 +89,7 @@ export function renderToday(state, actions) {
 function whoAmI(trip, actions) {
   return h('div.callout',
     h('p.callout__title', 'Wer bist du?'),
-    h('p', 'Die App ordnet privat bezahlte Ausgaben deinem Namen zu — ohne die Angabe fehlen sie in der Endabrechnung.'),
+    h('p', 'Die App ordnet privat bezahlte Ausgaben deinem Namen zu. Ohne die Angabe fehlen sie in der Endabrechnung.'),
     h('div.chips',
       ...trip.people.map((p) =>
         h('button.chip', { type: 'button', onclick: () => actions.setMyPerson(p.id) },
@@ -110,7 +110,7 @@ function whoAmI(trip, actions) {
  * insgesamt verfügbar ist, steht jetzt in der Kennzahlreihe; was heute schon
  * ausgegeben und was verplant ist, steht in den beiden Abschnitten darunter.
  */
-function hero(b, cur, actions) {
+function hero(b, cur, actions, today) {
   if (b.status === 'empty') {
     // Ohne Kasse gibt es keine Zahl. Der Gedankenstrich, der hier stand, war
     // in Zahlengröße gesetzt ein Strich quer über den halben Schirm — der Satz
@@ -142,6 +142,10 @@ function hero(b, cur, actions) {
   const tone = TONE[b.status] || 'good';
 
   return h('div.hero', { class: `hero--${tone}` },
+    // Der eine Moment, an dem die App aussieht wie ein Reisetagebuch und nicht
+    // wie ein Haushaltsbuch: ein Tagesstempel, kein zweites Mal „Tag X von Y“
+    // aus der Kopfzeile — hier steht zusätzlich das Datum, in eigenem Register.
+    h('p.daymark', `Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays} · ${dayMonth(today)}`),
     h('p.hero__label', b.leftToday >= 0 ? 'Heute noch übrig' : 'Heute schon drüber'),
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),
     h('p.hero__sub', `von ${money(b.perDayToday, cur)} für heute`),
