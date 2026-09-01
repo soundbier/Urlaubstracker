@@ -72,11 +72,20 @@ function howItWorks(b, trip, cur) {
   return disclosure('Wie wird gerechnet?', null,
     h('div.stack',
       b.planned
-        ? h('p.field__note', `Von den ${money(b.remaining, cur)} in der Kasse sind ${money(b.planned, cur)} verplant — die sind vergeben, aber noch nicht bezahlt. Frei verfügbar sind ${money(b.free, cur)}.`)
+        ? h('div.stack.stack--tight',
+            h('p.field__note', `${money(b.planned, cur)} von ${money(b.remaining, cur)} in der Kasse sind schon verplant: vergeben, aber noch nicht bezahlt.`),
+            h('p.field__note', `Frei verfügbar sind ${money(b.free, cur)}.`),
+          )
         : null,
-      h('p.field__note', trip.budgetMode === 'fixed'
-        ? `Fester Satz: ${money(b.budgetBase, cur)} geteilt durch ${days(b.totalDays)} macht ${money(b.planPerDay, cur)} pro Tag — jeden Tag denselben Betrag.`
-        : `${money(b.budgetBase, cur)} verteilen sich auf ${days(b.totalDays)}: ${money(b.planPerDay, cur)} pro Tag im Plan. Was heute drin ist, wird jeden Morgen neu gerechnet — Restgeld geteilt durch die verbleibenden Tage.`),
+      trip.budgetMode === 'fixed'
+        ? h('div.stack.stack--tight',
+            h('p.field__note', `${money(b.budgetBase, cur)} ÷ ${days(b.totalDays)} = ${money(b.planPerDay, cur)} pro Tag.`),
+            h('p.field__note', 'Der Betrag bleibt jeden Tag gleich.'),
+          )
+        : h('div.stack.stack--tight',
+            h('p.field__note', `${money(b.budgetBase, cur)} ÷ ${days(b.totalDays)} = ${money(b.planPerDay, cur)} pro Tag im Plan.`),
+            h('p.field__note', 'Jeden Morgen neu: Restgeld ÷ Resttage.'),
+          ),
       b.reserved
         ? h('p.field__note', 'Verplantes Geld läuft am Tagesbudget vorbei, auch nachdem es bezahlt ist: sonst spränge das Tagesbudget genau dann nach oben, wenn das Hotel abgebucht wird.')
         : null,
@@ -231,7 +240,7 @@ function settlement(trip, contributions, expenses, cur, phase = 'after') {
   for (const t of st.transfers) {
     actions.push(h('li', h('strong', t.from), ' überweist ', h('strong', money(t.amount, cur)), ' an ', h('strong', t.to), '.'));
   }
-  if (!actions.length) actions.push(h('li', 'Alles ausgeglichen — nichts mehr zu überweisen.'));
+  if (!actions.length) actions.push(h('li', 'Alles ausgeglichen. Nichts mehr zu überweisen.'));
 
   return h('div',
     table,

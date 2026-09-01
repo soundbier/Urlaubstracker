@@ -41,14 +41,19 @@
      liegt: der schwebende Knopf, das Sheet, die Meldung. */
   --shadow-float: 0 6px 22px -10px rgb(28 26 22 / 40%);
 
-  /* Schriftgrößen als Leiter, damit nicht jede Ansicht ihre eigene erfindet. */
+  /*
+   * Fünf Stufen, mehr nicht: Display für die eine große Zahl des Tages,
+   * Überschrift für Seiten- und Sheet-Titel, Fließtext für Zeileninhalte,
+   * Sekundär für Einordnung, Meta fürs Kleingedruckte. `--fs-xl` bleibt eine
+   * bewusste Zwischengröße nur für die zweiten großen Zahlen (Kassenstand,
+   * Ausgabensumme) — überall sonst gilt eine der fünf.
+   */
   --fs-display: clamp(2.5rem, 12.5vw, 3.2rem);
   --fs-xl: 1.6rem;
-  --fs-lg: 1.05rem;
-  --fs-md: 0.95rem;
-  --fs-sm: 0.85rem;
-  --fs-xs: 0.78rem;
-  --fs-2xs: 0.72rem;
+  --fs-lg: 1.375rem;   /* Überschrift, 22px */
+  --fs-md: 1rem;       /* Fließtext, 16px */
+  --fs-sm: 0.875rem;   /* Sekundär, 14px */
+  --fs-xs: 0.8125rem;  /* Meta, 13px — die einzige kleine Stufe */
 
   --gutter: 16px;
   --tap: 44px;
@@ -126,7 +131,7 @@ ul, ol { padding: 0; list-style: none; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-strong { font-weight: 640; }
+strong { font-weight: 600; }
 
 .icon { flex: none; }
 /* Ohne diese Zeile bliebe ein `hidden` an einem Knopf wirkungslos: `.btn`
@@ -167,7 +172,7 @@ strong { font-weight: 640; }
 .topbar__main { min-width: 0; flex: 1; }
 .topbar__title {
   font-size: var(--fs-lg);
-  font-weight: 640;
+  font-weight: 600;
   letter-spacing: -0.012em;
   white-space: nowrap;
   overflow: hidden;
@@ -197,7 +202,9 @@ strong { font-weight: 640; }
   padding: 4px var(--gutter) calc(var(--nav-h) + var(--safe-b) + 96px);
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  /* Der wichtigste Hebel gegen „gedrängt“: mehr Luft zwischen den
+     Abschnitten selbst, nicht in jeder einzelnen Zeile. */
+  gap: 34px;
 }
 .view--center {
   min-height: 70dvh;
@@ -206,14 +213,14 @@ strong { font-weight: 640; }
 }
 body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
-.section { display: flex; flex-direction: column; gap: 10px; }
+.section { display: flex; flex-direction: column; gap: 13px; }
 .section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 /* Abschnittsüberschriften in normaler Schreibweise: gesperrte Großbuchstaben
    lassen jede Zwischenüberschrift wie eine Rubrik in einem Auswertungswerkzeug
    aussehen. */
-.section__title { font-size: var(--fs-sm); font-weight: 640; color: var(--text); }
+.section__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
 .section__meta { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.section__note { font-size: var(--fs-2xs); color: var(--text-faint); }
+.section__note { font-size: var(--fs-xs); color: var(--text-faint); }
 
 /* Eine Gruppe zusammengehöriger Felder — ohne Kasten darum. */
 .panel { display: flex; flex-direction: column; gap: 16px; }
@@ -236,8 +243,8 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 9px 4px 8px;
+  gap: 4px;
+  padding: 10px 4px 8px;
   border: 0;
   background: none;
   color: var(--text-muted);
@@ -260,13 +267,31 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
-  font-weight: 620;
+  font-weight: 600;
   box-shadow: var(--shadow-float);
 }
 .fab:active { transform: translateY(1px); }
 .fab__label { font-size: 0.92rem; }
 
 /* ----------------------------------------------------- Die große Zahl */
+
+/*
+ * Die Tagesmarke: „TAG 12 / 14 · 25. AUGUST“ über der großen Zahl. Der eine
+ * bewusst grafische Moment der App — sonst gibt es keine Farbverläufe, keine
+ * Icons ohne Funktion, keine Deko. Ein Ticketabschnitt, kein Etikett: klein,
+ * fest getrackt, in Versalien, das einzige Mal, dass ein Text das kräftigste
+ * Gewicht der App trägt. Sie steht nur im laufenden Urlaub — vorher und
+ * danach hat der Hero schon seinen eigenen Kontextsatz.
+ */
+.daymark {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
 
 /*
  * Kein Kasten, keine Tönung, kein Schatten: die Zahl ist groß genug, um für
@@ -277,7 +302,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .hero__label { font-size: var(--fs-sm); color: var(--text-muted); }
 .hero__amount {
   font-size: var(--fs-display);
-  font-weight: 660;
+  font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.04;
   font-variant-numeric: tabular-nums;
@@ -285,7 +310,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .hero__sub { font-size: var(--fs-sm); color: var(--text-faint); margin-top: 2px; }
 .hero--over .hero__amount { color: var(--over); }
 /* Ohne Zahl trägt die Zeile den Titel — dann ist sie die Überschrift der Seite. */
-.hero__title { font-size: 1.25rem; font-weight: 640; letter-spacing: -0.02em; }
+.hero__title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em; }
 .hero__title + .hero__sub { margin-top: 4px; }
 .hero .bar { margin-top: 14px; }
 .hero .btn { margin-top: 14px; align-self: flex-start; }
@@ -297,21 +322,26 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
  * statt durch drei Rahmen — sie sind ein Satz, keine drei Meldungen.
  */
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); }
-.stat { padding-inline: 12px; border-left: 1px solid var(--border); min-width: 0; }
+/* `gap` statt der reinen Zeilenhöhe zwischen Label, Zahl und Einordnung — vorher
+   berührten sich die drei nur über den Zeilenabstand, jetzt trennt sie Luft,
+   die zur Bedeutung passt: knapp unter der Zahl, knapp über der Einordnung. */
+.stat { display: flex; flex-direction: column; gap: 3px; padding-inline: 12px; border-left: 1px solid var(--border); min-width: 0; }
 .stat:first-child { padding-left: 0; border-left: 0; }
 .stat:last-child { padding-right: 0; }
-.stat__label { font-size: var(--fs-2xs); color: var(--text-faint); }
-/* Schrumpft mit, damit auch „− 1.100,00 €“ in einer Zeile in die Spalte passt.
-   Umbrechen darf sie erst, wenn selbst das nicht mehr reicht — sonst steht das
-   Eurozeichen allein auf der zweiten Zeile. */
+.stat__label { font-size: var(--fs-xs); color: var(--text-faint); }
+/* Schrumpft mit der Spaltenbreite; reicht das nicht mehr, wird gekappt statt
+   mitten in die Ziffernfolge umzubrechen — „− 1.100,00 €“ auf zwei Zeilen ist
+   schwerer zu lesen als ein abgeschnittenes Ende, das ohnehin kaum vorkommt. */
 .stat__value {
-  font-size: clamp(0.78rem, 3.6vw, 1rem);
-  font-weight: 620;
+  font-size: clamp(0.75rem, 3.6vw, 1rem);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.015em;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.stat__sub { font-size: var(--fs-2xs); color: var(--text-faint); line-height: 1.3; }
+.stat__sub { font-size: var(--fs-xs); color: var(--text-faint); line-height: 1.3; }
 .stat--over .stat__value { color: var(--over); }
 
 /* --------------------------------------------------------- Kassenstand */
@@ -322,7 +352,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
 .summary { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
 .summary__label { font-size: var(--fs-sm); color: var(--text-muted); }
-.summary__value { font-size: var(--fs-xl); font-weight: 660; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.summary__value { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
 .summary__meta { font-size: var(--fs-xs); color: var(--text-faint); text-align: right; }
 
 /* Ein Hinweis, der zum Umfeld gehört — kein Kasten mit gestrichelter Kante,
@@ -338,7 +368,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   gap: 10px;
   align-items: flex-start;
 }
-.callout__title { font-size: var(--fs-sm); font-weight: 620; color: var(--text); }
+.callout__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
 
 /* --------------------------------------------------------------- Listen */
 
@@ -355,8 +385,8 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 56px;
-  padding: 10px 0;
+  min-height: 58px;
+  padding: 12px 0;
   border: 0;
   background: none;
   text-align: left;
@@ -372,12 +402,12 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   color: var(--text-faint);
 }
 .row__icon--planned { color: var(--accent); }
-.row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 /* Zwei Zeilen statt einer Ellipse: „Ferienwohnung Anz…“ und „Mietwagen Rest…“
    waren auf einem 390-px-Schirm nicht mehr auseinanderzuhalten. */
 .row__title {
   font-size: var(--fs-md);
-  font-weight: 520;
+  font-weight: 500;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -385,7 +415,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   line-clamp: 2;
   overflow-wrap: anywhere;
 }
-.row__sub { font-size: var(--fs-2xs); color: var(--text-faint); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.row__sub { font-size: var(--fs-xs); color: var(--text-faint); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .row__amount { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .row__amount--in { color: var(--accent); }
 .row__amount--planned { color: var(--text-muted); }
@@ -420,8 +450,8 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   display: flex;
   align-items: center;
   gap: 14px;
-  min-height: 56px;
-  padding: 10px 4px 10px 0;
+  min-height: 58px;
+  padding: 12px 4px 12px 0;
   border: 0;
   background: none;
   text-align: left;
@@ -443,8 +473,8 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 /* Ein Beiwort an der Zeile — Zahler, Fälligkeit, Herkunft. Ohne Rahmen:
    zwanzig umrandete Pillen in einer Liste sind zwanzig kleine Kästen. */
 .tag {
-  font-size: var(--fs-2xs);
-  font-weight: 560;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   padding: 1px 7px;
   border-radius: var(--radius-pill);
   background: var(--surface-2);
@@ -458,16 +488,16 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 
 /* ----------------------------------------------------------- Tagesgruppen */
 
-.daygroups { display: flex; flex-direction: column; gap: 24px; }
+.daygroups { display: flex; flex-direction: column; gap: 28px; }
 .daygroup { display: flex; flex-direction: column; gap: 2px; }
 .daygroup__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 6px; }
-.daygroup__title { font-size: var(--fs-md); font-weight: 620; }
+.daygroup__title { font-size: var(--fs-md); font-weight: 600; }
 /* Betrag und Einordnung stehen als Block rechts: eine Kante, an der das Auge
    die Tage untereinander vergleicht. */
 .daygroup__nums { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
-.daygroup__sub { font-size: var(--fs-2xs); color: var(--text-faint); }
+.daygroup__sub { font-size: var(--fs-xs); color: var(--text-faint); }
 .daygroup__sub.is-over { color: var(--over); }
-.daygroup__total { font-weight: 620; font-variant-numeric: tabular-nums; }
+.daygroup__total { font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* --------------------------------------------------------------- Balken */
 
@@ -488,16 +518,16 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .chart__plan { fill: none; stroke: var(--text-faint); stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .chart__actual { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .chart__dot { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
-.chart__legend { display: flex; gap: 16px; font-size: var(--fs-2xs); color: var(--text-muted); }
+.chart__legend { display: flex; gap: 16px; font-size: var(--fs-xs); color: var(--text-muted); }
 .legend__item { display: inline-flex; align-items: center; gap: 6px; }
 .legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
 .legend__swatch--actual { background: var(--accent); }
 .legend__swatch--plan { background: repeating-linear-gradient(90deg, var(--text-faint) 0 4px, transparent 4px 8px); }
-.chart__axisLabels { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--text-faint); }
+.chart__axisLabels { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-faint); }
 
 /* ------------------------------------------------------------ Kategorien */
 
-.catlist { display: flex; flex-direction: column; gap: 14px; }
+.catlist { display: flex; flex-direction: column; gap: 16px; }
 .cat { display: flex; align-items: center; gap: 12px; }
 .cat__icon { width: 22px; display: grid; place-items: center; color: var(--text-faint); }
 .cat__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -525,9 +555,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 }
 .settle__row:first-child { border-top: 0; }
 .settle__who { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.settle__nums { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-2xs); color: var(--text-muted); }
+.settle__nums { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-xs); color: var(--text-muted); }
 .settle__share { color: var(--text-faint); }
-.settle__balance { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 660; font-variant-numeric: tabular-nums; color: var(--accent); }
+.settle__balance { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
 .settle__balance.is-negative { color: var(--over); }
 .settle__todo { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text); }
 .settle__todo li { line-height: 1.4; }
@@ -537,7 +567,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 /* -------------------------------------------------------------- Formulare */
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field__label { font-size: var(--fs-xs); font-weight: 560; color: var(--text-muted); }
+.field__label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
 .field__input {
   width: 100%;
   min-height: var(--tap);
@@ -565,6 +595,9 @@ select.field__input { background-image: none; }
 .field__error { font-size: var(--fs-xs); color: var(--over); min-height: 1.1em; }
 
 .stack { display: flex; flex-direction: column; gap: 12px; }
+/* Für Zeilen, die enger zusammengehören als zwei eigene Gedanken — etwa eine
+   Rechnung und ihre unmittelbare Folge. */
+.stack--tight { gap: 4px; }
 .steps { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-muted); counter-reset: step; }
 .steps li { display: flex; gap: 9px; line-height: 1.4; }
 .steps li::before {
@@ -575,7 +608,7 @@ select.field__input { background-image: none; }
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: var(--fs-2xs);
+  font-size: var(--fs-xs);
   font-weight: 700;
   display: grid; place-items: center;
   margin-top: 1px;
@@ -610,8 +643,8 @@ select.field__input { background-image: none; }
   align-items: center;
   gap: 12px;
   width: 100%;
-  min-height: 52px;
-  padding: 10px 0;
+  min-height: 54px;
+  padding: 12px 0;
   border: 0;
   background: none;
   color: var(--text);
@@ -622,14 +655,20 @@ select.field__input { background-image: none; }
 
 .srow__lead { display: grid; place-items: center; color: var(--text-faint); }
 .srow__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.srow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.srow__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.srow__sub { font-size: var(--fs-2xs); color: var(--text-faint); line-height: 1.35; }
+.srow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+/*
+ * Label dezent, Wert kräftig: vorher standen „Name“ und „Roadtrip Norwegen“
+ * optisch fast gleich da, und das Auge wusste nicht, welches die Frage und
+ * welches die Antwort ist. Die Frage ist hier immer die Nebensache.
+ */
+.srow__label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow__sub { font-size: var(--fs-xs); color: var(--text-faint); line-height: 1.35; }
 .srow__value {
   flex: none;
   max-width: 48%;
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--text);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -642,10 +681,20 @@ select.field__input { background-image: none; }
 .srow--danger { color: var(--over); }
 .srow--danger .srow__lead { color: currentColor; }
 
-/* Auswahlzeile im Sheet: der Erklärsatz darf hier umbrechen. */
+/*
+ * Auswahlzeile im Sheet: hier ist `.srow__label` nicht die leise Bildunter-
+ * schrift wie in den Einstellungen, sondern der Name der Option selbst
+ * („Mitwachsend“, „Euro“) — die Zeile bräuchte sonst dieselbe Zurückhaltung
+ * wie ihre eigene Erklärung darunter und wäre kaum noch zu lesen.
+ */
 .srow--option { align-items: flex-start; }
-.srow--option .srow__label { white-space: normal; font-weight: 560; }
-.srow--option.is-active .srow__label { color: var(--accent); }
+.srow--option .srow__label {
+  white-space: normal;
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--text);
+}
+.srow--option.is-active .srow__label { color: var(--accent); font-weight: 600; }
 
 /* Löschen steht allein, mit Abstand nach oben — nichts daneben, was man
    aus Versehen träfe. */
@@ -666,8 +715,8 @@ select.field__input { background-image: none; }
 .people__name { min-width: 0; }
 .people__you {
   justify-self: center;
-  font-size: var(--fs-2xs);
-  font-weight: 620;
+  font-size: var(--fs-xs);
+  font-weight: 500;
   color: var(--text-faint);
 }
 /* Doppelt benannt: `.icon-btn` steht weiter unten und würde sonst Größe und
@@ -683,7 +732,9 @@ select.field__input { background-image: none; }
 .share { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 4px 0; }
 .share__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
 .share__pct { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: var(--radius-pill); padding: 2px; }
+/* Ein Rechenwerkzeug, kein Filter: `--radius`, nicht die Pille, die sonst
+   Status und Auswahl markiert. */
+.stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: var(--radius); padding: 2px; }
 .stepper__btn {
   width: 40px; height: 40px;
   border: 0; border-radius: 50%;
@@ -693,7 +744,7 @@ select.field__input { background-image: none; }
   line-height: 1;
 }
 .stepper__btn:disabled { opacity: 0.35; }
-.stepper__value { min-width: 18px; text-align: center; font-weight: 620; font-variant-numeric: tabular-nums; }
+.stepper__value { min-width: 18px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 .segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: var(--radius); }
 .segmented--3 { grid-template-columns: repeat(3, 1fr); }
@@ -715,7 +766,7 @@ select.field__input { background-image: none; }
 .status--warn { color: var(--warn); }
 .status--over { color: var(--over); }
 .status--muted { color: var(--text-faint); }
-.status__title { font-weight: 620; font-size: var(--fs-md); color: var(--text); }
+.status__title { font-weight: 600; font-size: var(--fs-md); color: var(--text); }
 .status__text { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* --------------------------------------------------------------- Knöpfe */
@@ -726,12 +777,12 @@ select.field__input { background-image: none; }
   justify-content: center;
   gap: 8px;
   min-height: var(--tap);
-  padding: 12px 18px;
+  padding: 12px 20px;
   border-radius: var(--radius);
   border: 1px solid transparent;
   background: var(--surface-2);
   color: var(--text);
-  font-weight: 620;
+  font-weight: 600;
   font-size: var(--fs-md);
 }
 .btn:active { transform: translateY(1px); }
@@ -773,7 +824,7 @@ select.field__input { background-image: none; }
   background: var(--surface);
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  font-weight: 540;
+  font-weight: 500;
   white-space: nowrap;
 }
 .chip.is-active {
@@ -797,7 +848,7 @@ select.field__input { background-image: none; }
 /* Auf sehr schmalen Geräten passt „Sonstiges“ mit Icon sonst nicht in die
    Zelle und wird abgeschnitten. */
 @media (max-width: 359px) {
-  .chip.catgrid__item { font-size: var(--fs-2xs); gap: 4px; }
+  .chip.catgrid__item { font-size: var(--fs-xs); gap: 4px; }
   .chip.catgrid__item .icon { width: 14px; height: 14px; }
 }
 
@@ -812,7 +863,7 @@ select.field__input { background-image: none; }
 .amount__row { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
 .amount__value {
   font-size: clamp(2.4rem, 12vw, 3rem);
-  font-weight: 660;
+  font-weight: 600;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
 }
@@ -868,7 +919,7 @@ select.field__input { background-image: none; }
 .overlay.is-open .sheet { transform: translateY(0); }
 .sheet--tall { min-height: min(78dvh, 640px); }
 .sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px var(--gutter) 6px; }
-.sheet__title { font-size: var(--fs-lg); font-weight: 640; letter-spacing: -0.012em; }
+.sheet__title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.012em; }
 .sheet__sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 2px; }
 .sheet__body { overflow-y: auto; padding: 10px var(--gutter) 20px; -webkit-overflow-scrolling: touch; }
 
@@ -917,7 +968,7 @@ select.field__input { background-image: none; }
   list-style: none;
 }
 .disclosure__head::-webkit-details-marker { display: none; }
-.disclosure__title { font-size: var(--fs-sm); font-weight: 520; color: var(--text-muted); }
+.disclosure__title { font-size: var(--fs-sm); font-weight: 500; color: var(--text-muted); }
 /* Was zugeklappt drinsteht, muss man trotzdem sehen können — sonst trägt man
    still auf den falschen Namen ein. */
 .disclosure__summary {
@@ -960,7 +1011,7 @@ select.field__input { background-image: none; }
   font-weight: 700;
   margin-bottom: 2px;
 }
-.welcome__title { font-size: 1.5rem; font-weight: 680; letter-spacing: -0.025em; }
+.welcome__title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em; }
 .welcome__text { font-size: var(--fs-md); color: var(--text-muted); max-width: 38ch; }
 .welcome .btn { width: 100%; }
 /* Der zweite Weg unter dem Formular: beitreten statt anlegen. Abgesetzt durch
@@ -1003,7 +1054,7 @@ select.field__input { background-image: none; }
   background: var(--toast-bg);
   color: var(--toast-text);
   font-size: var(--fs-sm);
-  font-weight: 540;
+  font-weight: 500;
   box-shadow: var(--shadow-float);
   opacity: 0;
   pointer-events: none;
