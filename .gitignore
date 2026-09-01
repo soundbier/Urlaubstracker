@@ -3,3 +3,7 @@ node_modules/
 firebase-debug.log
 *.log
 .DS_Store
+
+# Wird beim Cloudflare-Pages-Build aus Variables and secrets erzeugt
+# (siehe tools/write-firebase-config.mjs) — gehört nicht ins Repository.
+firebase-config.json

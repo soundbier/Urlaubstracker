@@ -206,17 +206,26 @@ Ohne diesen Schritt lehnt Firestore alle Zugriffe ab und die App meldet
    bestehende Trip wandert mitsamt allen Einträgen in die Cloud.
 
 Wollt ihr, dass **alle** Geräte das Projekt von selbst kennen — dann reichen zum
-Beitreten wirklich nur Name und Passwort —, legt die Konfiguration einmal neben
-`index.html`:
+Beitreten wirklich nur Name und Passwort —, muss die App unter
+`./firebase-config.json` eine Datei mit diesem Block finden (siehe
+[`firebase-config.example.json`](firebase-config.example.json) als Vorlage).
+Die Werte sind kein Geheimnis: dieselben Angaben stehen bei jeder Web-App im
+Quelltext. Geschützt wird die Kasse über die Sicherheitsregeln und das
+Passwort — trotzdem muss die Datei nicht im Git-Repository liegen, dazu gleich
+mehr bei Cloudflare Pages. Ohne die Datei geht alles wie bisher — dann bringt
+entweder der Einladungslink die Konfiguration mit, oder sie kommt einmal von
+Hand über *Mehr → Mit Firebase verbinden* ins Gerät.
 
-```sh
-cp firebase-config.example.json firebase-config.json   # Werte eintragen, committen
-```
-
-Die Datei ist optional und kein Geheimnis: dieselben Angaben stehen bei jeder
-Web-App im Quelltext. Geschützt wird die Kasse über die Sicherheitsregeln und
-das Passwort. Ohne die Datei geht alles wie bisher — dann bringt der
-Einladungslink die Konfiguration mit.
+- **Deployt ihr über Cloudflare Pages** (siehe unten): die Werte kommen aus
+  *Settings → Environment variables* und werden beim Bauen in die Datei
+  geschrieben. Landen nie im Repository.
+- **Andere Hoster / lokal ausprobieren:** die Datei von Hand neben `index.html`
+  legen und committen —
+  ```sh
+  cp firebase-config.example.json firebase-config.json   # Werte eintragen, committen
+  ```
+  Das ist unbedenklich, weil die Werte ohnehin kein Geheimnis sind — nur eben
+  auch für alle sichtbar, die das Repository einsehen können.
 
 ### 4. Die anderen Geräte dazuholen
 
@@ -262,17 +271,45 @@ das Repository auswählen und einstellen:
 | Feld | Wert |
 | --- | --- |
 | Production branch | `main` |
-| Build command | `npm test` |
+| Build command | `npm run build` |
 | Build output directory | `/` |
 
-Es gibt keinen Build-Schritt — der Browser lädt die ES-Module direkt, das
-Ausgabeverzeichnis ist deshalb die Wurzel. `npm test` als Build-Befehl ist kein
-Bauen, sondern eine Bremse: schlägt ein Test fehl, bricht Cloudflare ab und die
-bisherige Fassung bleibt online.
+Es gibt keinen Build-Schritt im üblichen Sinn — der Browser lädt die
+ES-Module direkt, das Ausgabeverzeichnis ist deshalb die Wurzel. `npm run
+build` macht zwei Dinge: [`tools/write-firebase-config.mjs`](tools/write-firebase-config.mjs)
+schreibt `firebase-config.json` aus Umgebungsvariablen (dazu gleich mehr),
+danach läuft `npm test` als Bremse — schlägt ein Test fehl, bricht Cloudflare
+ab und die bisherige Fassung bleibt online.
 
 Ausgeliefert wird damit auch, was nur zur Entwicklung gehört (`tests/`,
 `tools/`, `package.json`). Das ist harmlos — es steht ohnehin öffentlich auf
 GitHub.
+
+#### Firebase-Konfiguration ohne Git
+
+Damit zum Beitreten wirklich nur Name und Passwort reichen (siehe oben,
+*Gemeinsam nutzen*), ohne die Firebase-Werte im öffentlichen Repository zu
+haben: unter *Workers & Pages → Projekt → Settings → Environment variables*
+diese Variablen für *Production* eintragen (Werte aus der Firebase-Konsole,
+*Projekteinstellungen → Meine Apps → Web-App* — als **Secret** anlegen, dann
+stehen sie nicht einmal im Cloudflare-Dashboard offen im Klartext):
+
+| Variable | Pflicht |
+| --- | --- |
+| `FIREBASE_API_KEY` | ja |
+| `FIREBASE_AUTH_DOMAIN` | ja |
+| `FIREBASE_PROJECT_ID` | ja |
+| `FIREBASE_APP_ID` | ja |
+| `FIREBASE_STORAGE_BUCKET` | nein |
+| `FIREBASE_MESSAGING_SENDER_ID` | nein |
+
+`write-firebase-config.mjs` schreibt daraus bei jedem Build
+`firebase-config.json` neu — die Datei landet nie im Git-Repository (sie
+steht in `.gitignore`) und existiert nur in der jeweiligen Cloudflare-Fassung.
+Sind keine dieser Variablen gesetzt, überspringt das Skript den Schritt
+kommentarlos und alles bleibt beim alten Weg (Einladungslink oder *Mehr → Mit
+Firebase verbinden*). Sind nur einige der Pflichtfelder gesetzt, bricht der
+Build ab — das ist dann eine unvollständige Einrichtung, kein Normalfall.
 
 ### Kopfzeilen
 
@@ -324,7 +361,8 @@ sw.js                 Service Worker: Offline-Betrieb und Update-Steuerung
 manifest.webmanifest  Installation als App
 _headers              Kopfzeilen für Cloudflare Pages
 firestore.rules       Zugriffsregeln für Firestore
-firebase-config.example.json  Vorlage: als firebase-config.json ausliefern, dann
+firebase-config.example.json  Vorlage für firebase-config.json (von Hand kopiert
+                      oder von tools/write-firebase-config.mjs erzeugt) — dann
                       kennt jedes Gerät das Firebase-Projekt der Gruppe
 
 js/
@@ -341,7 +379,7 @@ js/
   views/              die vier Bereiche plus Ersteinrichtung
 
 tests/                Rechenlogik, Im-/Export, Release-Invarianten
-tools/                Icon-Generator, Dev-Server, Firebase-Bündelung
+tools/                Icon-Generator, Dev-Server, Firebase-Bündelung, firebase-config.json aus Env-Variablen
 vendor/firebase.js    gebündeltes Firebase-SDK (kein CDN nötig)
 ```
 
