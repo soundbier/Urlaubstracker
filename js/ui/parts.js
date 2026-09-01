@@ -20,8 +20,13 @@ export function stat(label, value, sub, { tone = '' } = {}) {
   );
 }
 
-export function sectionTitle(text, action) {
-  return h('div.section__head', h('h2.section__title', text), action || null);
+/**
+ * `tone: 'warn'` ist für den einen Fall gedacht, in dem ein Abschnitt selbst
+ * zum Verdikt wird — etwas ist überfällig, nicht nur „heute dran“. Derselbe
+ * Warnton wie an der einzelnen Zeile, keine neue Farbe für denselben Zustand.
+ */
+export function sectionTitle(text, action, { tone = '' } = {}) {
+  return h('div.section__head', h('h2.section__title', { class: tone && `section__title--${tone}` }, text), action || null);
 }
 
 /**

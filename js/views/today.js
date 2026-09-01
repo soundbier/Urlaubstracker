@@ -7,7 +7,10 @@ import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar, daymark } from '../ui/parts.js';
 
-const TONE = { good: 'good', tight: 'warn', over: 'over', empty: 'muted' };
+// Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
+// Verdikt, kein Dauerzustand. Erst beim Kippen ins Knappe oder Über zeigt er
+// Amber bzw. Karmesin; „gut“ braucht dafür keine eigene Farbe.
+const TONE = { good: 'neutral', tight: 'warn', over: 'over' };
 
 export function renderToday(state, actions) {
   const { trip, expenses, contributions } = state;
@@ -20,6 +23,9 @@ export function renderToday(state, actions) {
   // erst nächste Woche dran ist, steht unter „Ausgaben“ — hier wäre es eine
   // zweite Kopie derselben Liste und nichts, was heute jemand anfassen müsste.
   const due = plannedOnly(expenses).filter((e) => e.date <= today);
+  // Nur wirklich überfällig ist ein Verdikt — „heute dran“ ist der Normalfall
+  // und bekommt keine Warnfarbe, sonst würde die Seite jeden Tag Alarm geben.
+  const overdueCount = due.filter((e) => e.date < today).length;
   const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
 
   return h('div.view',
@@ -50,15 +56,21 @@ export function renderToday(state, actions) {
         { tone: b.elapsedDays && b.buffer < 0 ? 'over' : '' },
       ),
     ),
+    // Die Handlungsebene setzt bewusst größeren Abstand zur Kennzahlreihe
+    // darüber ab: dort endete der Zustand, hier beginnt, was zu tun ist.
     due.length
-      ? h('section.section',
-          sectionTitle('Fällig', h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur))),
+      ? h('section.section', { class: 'section--action' },
+          sectionTitle(
+            'Fällig',
+            h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur)),
+            { tone: overdueCount ? 'warn' : '' },
+          ),
           h('div.list', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
           h('p.section__note', 'Tippt den Haken, sobald bezahlt ist.'),
         )
       : null,
 
-    h('section.section',
+    h('section.section', { class: due.length ? '' : 'section--action' },
       sectionTitle(
         'Heute eingetragen',
         todays.length ? h('span.section__meta.section__meta--amount', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
