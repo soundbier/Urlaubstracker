@@ -36,10 +36,15 @@ Weitere Kleinigkeiten:
   Liste.
 - **Hell oder dunkel** — unter *Mehr → Aussehen*. Standard ist „Automatisch“:
   die App folgt dem Handy.
-- **Bezahlt von** — aus der gemeinsamen Kasse oder aus eigener Tasche. Beides
-  zählt in der Endabrechnung richtig. Wer mehrmals hintereinander privat zahlt,
-  stellt das nur einmal um: die Wahl bleibt bis zum nächsten App-Start stehen
-  und steht immer sichtbar in der Detailzeile.
+- **Bezahlt von** — aus der gemeinsamen Kasse, aus eigener Tasche oder aus
+  Bargeld. Alle drei zählen in der Endabrechnung richtig. Wer mehrmals
+  hintereinander privat zahlt, stellt das nur einmal um: die Wahl bleibt bis
+  zum nächsten App-Start stehen und steht immer sichtbar in der Detailzeile.
+- **Bargeld** — nehmt ihr Geld aus der Kasse in bar mit, tragt ihr unter
+  *Budget → Bargeld* ein, wer wie viel bekommen hat. Bar bezahlte Ausgaben
+  ziehen das anschließend automatisch von dieser Person ab — anders als
+  privat vorgestreckt ist das Geld ja schon der Kasse, es steckt nur gerade
+  in der Tasche statt auf dem Konto.
 - **Verplant** — Ausgaben, die feststehen, aber noch nicht bezahlt sind (Hotel,
   Mietwagen, Bootstour). Sie werden vom Tagesbudget abgezogen, bevor geteilt
   wird. Ein Tipp auf den Haken macht daraus eine bezahlte Ausgabe.
@@ -61,9 +66,9 @@ Unter *Mehr → Reisegruppe* lässt sich das jederzeit ändern:
 
 - **Namen ändern** geht immer.
 - **Person hinzufügen**, wenn unterwegs jemand dazukommt.
-- **Person entfernen**, solange kein Geld an ihr hängt. Sobald sie eingezahlt
-  oder etwas privat bezahlt hat, bleibt sie drin — sonst stünde in der
-  Abrechnung eine Einzahlung ohne Einzahler.
+- **Person entfernen**, solange kein Geld an ihr hängt. Sobald sie eingezahlt,
+  etwas privat bezahlt oder Bargeld erhalten bzw. bar bezahlt hat, bleibt sie
+  drin — sonst stünde in der Abrechnung eine Einzahlung ohne Einzahler.
 - **„Das bin ich“** sagt, wer an diesem Gerät sitzt. Fehlt die Angabe (etwa
   direkt nach dem Beitritt über eine Einladung), fragt die App auf *Heute*
   danach — und wer noch gar nicht in der Liste steht, trägt sich dort selbst ein.
@@ -114,6 +119,11 @@ Tasche** bezahlt hat. Fair wäre ihr Anteil an den Gesamtausgaben (standardmäß
 gleichmäßig geteilt, unter *Mehr → Kosten aufteilen* änderbar). Die Differenz ist
 ihr Guthaben — und die Summe aller Guthaben ist genau das, was noch auf dem
 gemeinsamen Konto liegt.
+
+Bar bezahlt zählt dabei wie aus der Kasse bezahlt, nicht wie privat
+vorgestreckt — das Geld war ja schon der Kasse ihres. Wer noch Bargeld übrig
+hat, steht deshalb als eigener Hinweis in der Abrechnung: das muss erst
+zurück in die Kasse, bevor die Beträge oben wirklich stimmen.
 
 Daraus wird eine Liste von Überweisungen: erst geht das Restgeld vom Konto an
 die Guthaben zurück, was dann noch offen ist, überweist man sich direkt.

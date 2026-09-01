@@ -1,6 +1,6 @@
 /** Bausteine, die in mehreren Ansichten vorkommen. */
 import { h, icon } from '../dom.js';
-import { CATEGORY_BY_ID, POT, isFromPlan } from '../calc.js';
+import { CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson } from '../calc.js';
 import { money, dayLabel } from '../format.js';
 import { openSheet } from './sheet.js';
 import { isIOS } from '../install.js';
@@ -45,7 +45,11 @@ export function disclosure(title, summaryEl, ...body) {
 
 export function payerLabel(trip, payer) {
   if (payer === POT) return 'Kasse';
-  return trip.people.find((p) => p.id === payer)?.name || 'Unbekannt';
+  const personId = cashPayerPerson(payer) ?? payer;
+  const name = trip.people.find((p) => p.id === personId)?.name || 'Unbekannt';
+  // Bar bezahlt ist der Kasse ihr Geld, nur unterwegs in der Tasche — anders
+  // als privat vorgestreckt steht das deutlich dabei, nicht nur der Name.
+  return isCashPayer(payer) ? `Bargeld · ${name}` : name;
 }
 
 /**
@@ -146,6 +150,19 @@ export function contributionRow(contribution, trip, onClick) {
       h('span.row__sub', contribution.note || 'Einzahlung'),
     ),
     h('span.row__amount.row__amount--in', `+ ${money(contribution.amount, trip.currency)}`),
+  );
+}
+
+/** Eine Bargeld-Auszahlung — dieselbe Zeile wie eine Einzahlung, nur andersrum. */
+export function cashOutRow(cashOut, trip, onClick) {
+  const person = trip.people.find((p) => p.id === cashOut.personId);
+  return h('button.row', { type: 'button', onclick: () => onClick(cashOut) },
+    h('span.row__icon.row__icon--person', h('span.dot', { style: { background: person?.color || 'var(--text-faint)' } })),
+    h('span.row__main',
+      h('span.row__title', person?.name || 'Unbekannt'),
+      h('span.row__sub', cashOut.note || 'Bargeld ausgezahlt'),
+    ),
+    h('span.row__amount', money(cashOut.amount, trip.currency)),
   );
 }
 

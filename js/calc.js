@@ -24,6 +24,23 @@ export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]
 export const POT = 'pot';
 
 /**
+ * Zahler-Kennung für „aus dem Bargeld dieser Person bezahlt“.
+ *
+ * Anders als bei `payer = personId` (privat vorgestreckt, eigenes Geld) ist
+ * das hier Geld, das vorher schon aus der Kasse ausgezahlt wurde — es gehört
+ * also weiterhin der Gruppe, nur eben in bar statt auf dem Konto. Deshalb ist
+ * das kein eigener Personenwert, sondern derselbe mit einem Präfix: so bleibt
+ * an jeder Ausgabe ablesbar, wessen Bargeld weniger geworden ist, ohne dass
+ * die Abrechnung diese Person dafür wie eine Einzahlerin behandelt.
+ */
+const CASH_PREFIX = 'cash:';
+
+export const cashPayerFor = (personId) => `${CASH_PREFIX}${personId}`;
+export const isCashPayer = (payer) => typeof payer === 'string' && payer.startsWith(CASH_PREFIX);
+/** Die Person hinter einem Bargeld-Zahler, sonst `null`. */
+export const cashPayerPerson = (payer) => (isCashPayer(payer) ? payer.slice(CASH_PREFIX.length) : null);
+
+/**
  * Wie viele Personen eine Kasse haben kann.
  *
  * Die Zahl ist keine technische Grenze, sondern eine des Bildschirms: bei mehr
@@ -81,13 +98,15 @@ export function averageShare(people = []) {
 
 /**
  * Woran hängt eine Person Geld? Genau das steht dem Entfernen im Weg: eine
- * Einzahlung ohne Einzahler oder eine privat bezahlte Ausgabe ohne Zahler
- * würde die Abrechnung still verfälschen.
+ * Einzahlung ohne Einzahler, eine privat bezahlte Ausgabe ohne Zahler oder
+ * eine Bargeld-Auszahlung ohne Empfänger würde die Abrechnung still
+ * verfälschen.
  */
-export function personEntryCount(personId, { contributions = [], expenses = [] } = {}) {
+export function personEntryCount(personId, { contributions = [], expenses = [], cashOuts = [] } = {}) {
   return (
     contributions.filter((c) => c.personId === personId).length +
-    expenses.filter((e) => e.payer === personId).length
+    expenses.filter((e) => e.payer === personId || cashPayerPerson(e.payer) === personId).length +
+    cashOuts.filter((c) => c.personId === personId).length
   );
 }
 
@@ -426,6 +445,27 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
   });
 }
 
+// -------------------------------------------------------------------- Bargeld
+
+/**
+ * Bargeldbestand je Person: was aus der Kasse an sie ausgezahlt wurde, abzüglich
+ * dessen, was davon schon bar ausgegeben ist.
+ *
+ * Das ist ein eigenes, kleines Buch neben der Kasse selbst — eine Auszahlung
+ * verschiebt Geld nur von der Form „auf dem Konto“ in die Form „in der
+ * Tasche“, sie ist keine Ausgabe und keine Einzahlung. Sie taucht deshalb
+ * weder im Tagesbudget noch im Kontostand der Endabrechnung auf; die zählt
+ * erst, wenn das Bargeld tatsächlich für etwas draufgeht.
+ */
+export function cashBalances({ people = [], cashOuts = [], expenses = [] } = {}) {
+  const paid = paidOnly(expenses);
+  return people.map((p) => {
+    const paidOut = sum(cashOuts.filter((c) => c.personId === p.id), (c) => c.amount);
+    const spent = sum(paid.filter((e) => cashPayerPerson(e.payer) === p.id), (e) => e.amount);
+    return { personId: p.id, name: p.name, paidOut, spent, balance: paidOut - spent };
+  });
+}
+
 // ----------------------------------------------------------------- Abrechnung
 
 /**
@@ -439,8 +479,13 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
  * Guthaben — die Summe aller Guthaben ist genau das, was auf dem Konto liegt.
  * Das gilt in beide Richtungen: steht das Konto im Minus, sind auch die
  * Guthaben in der Summe negativ, und `topUps` sagt, wer wie viel nachlegt.
+ *
+ * Bar bezahlt zählt dabei wie aus der Kasse bezahlt, nicht wie privat
+ * vorgestreckt: das Geld war schon der Gruppe ihres, nur eben als Bargeld
+ * unterwegs statt auf dem Konto. Wer noch Bargeld übrig hat, steht zusätzlich
+ * in `cashBalance` — das muss vor dem Auszahlen noch zurück in die Kasse.
  */
-export function settleUp({ trip, contributions = [], expenses = [] }) {
+export function settleUp({ trip, contributions = [], expenses = [], cashOuts = [] }) {
   const people = trip.people || [];
   // Vorgemerktes ist noch nicht geflossen und gehört deshalb nicht in die
   // Abrechnung — sonst schuldete jemand Geld für ein Hotel, das keiner zahlte.
@@ -450,8 +495,9 @@ export function settleUp({ trip, contributions = [], expenses = [] }) {
   const shares = people.map((p) => (typeof p.share === 'number' && p.share > 0 ? p.share : 1));
   const fairShares = allocateByShares(spent, shares);
 
-  const paidIntoPot = sum(paid.filter((e) => e.payer === POT), (e) => e.amount);
+  const paidIntoPot = sum(paid.filter((e) => e.payer === POT || isCashPayer(e.payer)), (e) => e.amount);
   const potBalance = totalContributed(contributions) - paidIntoPot;
+  const cashByPerson = new Map(cashBalances({ people, cashOuts, expenses }).map((c) => [c.personId, c.balance]));
 
   const rows = people.map((p, i) => {
     const paidIn = sum(contributions.filter((c) => c.personId === p.id), (c) => c.amount);
@@ -464,6 +510,7 @@ export function settleUp({ trip, contributions = [], expenses = [] }) {
       contributed: paidIn + paidPrivate,
       fairShare: fairShares[i],
       balance: paidIn + paidPrivate - fairShares[i],
+      cashBalance: cashByPerson.get(p.id) || 0,
     };
   });
 

@@ -20,6 +20,7 @@ let state = {
   trip: null,
   contributions: [],
   expenses: [],
+  cashOuts: [],
   myPersonId: null,
   invite: null, // offene Einladung aus dem Link
   sync: {
@@ -107,6 +108,7 @@ function handleChange(data) {
     myPersonId,
     contributions: sortByDate(data.contributions),
     expenses: sortByDate(data.expenses),
+    cashOuts: sortByDate(data.cashOuts || []),
     // Eine offene Einladung hat Vorrang, sonst würde sie beim nächsten
     // Datenereignis unter dem Finger verschwinden.
     phase: state.invite ? 'onboarding' : trip ? 'ready' : 'onboarding',
@@ -422,7 +424,7 @@ export async function removePerson(personId) {
   const person = people.find((p) => p.id === personId);
   if (!person) return;
   if (people.length <= 1) throw new Error('Eine Person muss bleiben.');
-  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses });
+  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts });
   if (used) {
     throw new Error(
       used === 1
@@ -514,6 +516,41 @@ export async function deleteContribution(id) {
   await backend.removeContribution(id);
 }
 
+// --------------------------------------------------------------- Bargeld
+
+/**
+ * Bargeld aus der Kasse an eine Person ausgezahlt.
+ *
+ * Zählt bewusst nicht als Ausgabe: das Geld ist noch da, es liegt nur nicht
+ * mehr auf dem Konto, sondern in der Tasche dieser Person. Erst eine bar
+ * bezahlte Ausgabe (`payer: cashPayerFor(personId)`) nimmt der Person davon
+ * etwas weg.
+ */
+export async function addCashOut({ personId, amount, date, note }) {
+  const now = Date.now();
+  const row = {
+    id: newId(),
+    personId,
+    amount,
+    date: date || todayISO(),
+    note: (note || '').trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await backend.putCashOut(row);
+  return row;
+}
+
+export async function updateCashOut(id, patch) {
+  const row = state.cashOuts.find((c) => c.id === id);
+  if (!row) return;
+  await backend.putCashOut({ ...row, ...patch, updatedAt: Date.now() });
+}
+
+export async function deleteCashOut(id) {
+  await backend.removeCashOut(id);
+}
+
 // ------------------------------------------------------------------- Sync
 
 /**
@@ -541,7 +578,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
       throw new Error('Unter diesem Namen liegt in diesem Projekt schon eine Kasse. Wähle einen anderen Namen.');
     }
     await cloud.createTrip({ ...state.trip, joinName: name }, { personId: state.myPersonId });
-    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses });
+    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts });
   } catch (err) {
     await afterFailedAttempt(cloud);
     throw err;
@@ -556,7 +593,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
 
 /** Zurück in den lokalen Modus — mit einer Kopie des aktuellen Standes. */
 export async function disconnectCloud() {
-  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses };
+  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts };
   const prefs = getPrefs();
   // Name und Passwort bleiben stehen: wer die Kasse später wieder teilt, soll
   // sich nichts Neues ausdenken müssen.
@@ -623,6 +660,7 @@ export async function importData(payload) {
     trip: { ...payload.trip, updatedAt: Date.now() },
     contributions: payload.contributions,
     expenses: payload.expenses,
+    cashOuts: payload.cashOuts || [],
   });
 }
 
@@ -633,7 +671,7 @@ export async function deleteTrip() {
   const local = new LocalBackend();
   // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
   await local.deleteTrip();
-  set({ trip: null, contributions: [], expenses: [], myPersonId: null, invite: null, phase: 'onboarding' });
+  set({ trip: null, contributions: [], expenses: [], cashOuts: [], myPersonId: null, invite: null, phase: 'onboarding' });
   await useBackend(local);
 }
 

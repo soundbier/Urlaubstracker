@@ -271,9 +271,9 @@ function splitSummary(trip) {
 }
 
 function personSheet(state, person) {
-  const { trip, myPersonId, contributions, expenses } = state;
+  const { trip, myPersonId, contributions, expenses, cashOuts } = state;
   const isMe = myPersonId === person.id;
-  const entries = personEntryCount(person.id, { contributions, expenses });
+  const entries = personEntryCount(person.id, { contributions, expenses, cashOuts });
   const canRemove = trip.people.length > 1 && !entries;
 
   return openSheet({
@@ -767,7 +767,7 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, clo
 // -------------------------------------------------------------------- Daten
 
 function dataGroup(state) {
-  const { trip, contributions, expenses } = state;
+  const { trip, contributions, expenses, cashOuts } = state;
 
   const download = (content, filename, type) => {
     const url = URL.createObjectURL(new Blob([content], { type }));
@@ -803,8 +803,8 @@ function dataGroup(state) {
   } });
 
   return group('Daten', {},
-    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions }), `${slug}.csv`, 'text/csv;charset=utf-8')),
-    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses }), `${slug}-sicherung.json`, 'application/json')),
+    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions, cashOuts }), `${slug}.csv`, 'text/csv;charset=utf-8')),
+    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses, cashOuts }), `${slug}-sicherung.json`, 'application/json')),
     actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
     importFile,
   );
