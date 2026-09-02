@@ -1,6 +1,6 @@
 {
   "name": "urlaubstracker",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "private": true,
   "description": "Gemeinsame Urlaubskasse als PWA: einzahlen, Tagesbudget sehen, Ausgaben eintragen.",
   "type": "module",
