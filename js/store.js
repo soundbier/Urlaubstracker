@@ -9,7 +9,7 @@
 import { LocalBackend } from './backend-local.js';
 import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.js';
 import { newId } from './ids.js';
-import { joinKeysFor, joinProofFor, checkJoinName, checkPassword } from './join.js';
+import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
 import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare } from './calc.js';
 
 let backend = null;
@@ -259,7 +259,7 @@ export async function createTrip({ name, startDate, endDate, currency, budgetMod
 
   const nameProblem = checkJoinName(joinName);
   if (nameProblem) throw new Error(nameProblem);
-  const passwordProblem = checkPassword(password);
+  const passwordProblem = checkNewPassword(password);
   if (passwordProblem) throw new Error(passwordProblem);
 
   const config = firebaseConfig || cloudConfig();
@@ -569,7 +569,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
   const secret = String(password || prefs.tripRef?.joinPassword || '');
   const nameProblem = checkJoinName(name);
   if (nameProblem) throw new Error(nameProblem);
-  const passwordProblem = checkPassword(secret);
+  const passwordProblem = checkNewPassword(secret);
   if (passwordProblem) throw new Error(passwordProblem);
 
   const cloud = await openCloudTrip(firebaseConfig, name, secret);
@@ -613,7 +613,7 @@ export async function disconnectCloud() {
 export async function changeJoinPassword(password) {
   const prefs = getPrefs();
   if (prefs.tripRef?.mode !== 'cloud') throw new Error('Die Kasse liegt gar nicht in der Cloud.');
-  const problem = checkPassword(password);
+  const problem = checkNewPassword(password);
   if (problem) throw new Error(problem);
 
   const name = joinName();

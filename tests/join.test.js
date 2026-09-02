@@ -10,7 +10,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeJoinName, checkJoinName, checkPassword, tripIdForName, joinProofFor, suggestPassword } from '../js/join.js';
+import { normalizeJoinName, checkJoinName, checkPassword, checkNewPassword, tripIdForName, joinProofFor, suggestPassword } from '../js/join.js';
 
 test('der Name wird so eingeebnet, wie Leute ihn tippen', () => {
   assert.equal(normalizeJoinName('  Roadtrip   Süd 2026 '), 'roadtrip sud 2026');
@@ -64,5 +64,33 @@ test('der Vorschlag lässt sich vorlesen', () => {
     const suggestion = suggestPassword();
     assert.equal(checkPassword(suggestion), null);
     assert.match(suggestion, /^[a-z]+-[a-z]+-\d\d$/);
+  }
+});
+
+test('ein neues Passwort braucht mehr als ein bestehendes', () => {
+  // Ein altes, gültiges Passwort darf beim Beitreten weiter funktionieren —
+  // checkPassword bleibt deshalb bei sechs Zeichen stehen.
+  assert.equal(checkPassword('kurz12'), null);
+  // Frisch vergeben gilt die schärfere Grenze.
+  assert.match(checkNewPassword('kurz12'), /mindestens 10/);
+  assert.equal(checkNewPassword('kurz123456'), null);
+});
+
+test('naheliegende neue Passwörter fallen auf, auch bei ausreichender Länge', () => {
+  assert.match(checkNewPassword(''), /Passwort eintragen/);
+  assert.match(checkNewPassword('0123456789'), /leicht erraten/);
+  assert.match(checkNewPassword('aaaaaaaaaa'), /leicht erraten/);
+  assert.match(checkNewPassword('abcdefghij'), /leicht erraten/);
+  assert.match(checkNewPassword('jihgfedcba'), /leicht erraten/);
+  assert.match(checkNewPassword('Passwort123'), /leicht erraten/);
+  // Groß-/Kleinschreibung und ß/ss zählen bei der Erkennung nicht.
+  assert.match(checkNewPassword('PASSWORT123'), /leicht erraten/);
+  assert.match(checkNewPassword('Paßwort123'), /leicht erraten/);
+  assert.equal(checkNewPassword('sonne-welle-42'), null);
+});
+
+test('der Vorschlag besteht auch die schärfere Prüfung', () => {
+  for (let i = 0; i < 20; i++) {
+    assert.equal(checkNewPassword(suggestPassword()), null);
   }
 });
