@@ -796,6 +796,11 @@ select.field__input { background-image: none; }
    so breit sein wie sein Text, nicht so breit wie das Eingabefeld. */
 .field__inline { align-self: flex-start; }
 .field__error { font-size: var(--fs-xs); color: var(--over); min-height: 1.1em; }
+/* Passwortfeld mit Auge: verdeckt wie jedes Passwortfeld, mit Platz rechts
+   fürs Auge, das es bei Bedarf aufdeckt — siehe join-sheet.js, maskedField. */
+.field__reveal { position: relative; }
+.field__reveal .field__input { padding-right: 44px; }
+.field__reveal .field__reveal-btn { position: absolute; top: 50%; right: 2px; transform: translateY(-50%); width: 40px; height: 40px; }
 
 .stack { display: flex; flex-direction: column; gap: var(--sp-3); }
 /* Für Zeilen, die enger zusammengehören als zwei eigene Gedanken. */

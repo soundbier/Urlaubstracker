@@ -11,9 +11,9 @@
 import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
 import { installInstructionsSheet } from '../ui/parts.js';
-import { joinSheet, plainInput } from '../ui/join-sheet.js';
+import { joinSheet, plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
 import { getPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
-import { checkJoinName, checkPassword, suggestPassword } from '../join.js';
+import { checkJoinName, checkNewPassword, suggestPassword } from '../join.js';
 import { buildInviteLink, buildExport, buildCsv, parseImport } from '../link.js';
 import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
 import { days, fullDate, compactDate, plural } from '../format.js';
@@ -521,7 +521,7 @@ function joinDataSheet(state, sharing) {
       h('div.stack',
         readonlyField('Name der Kasse', sharing.joinName),
         sharing.joinPassword
-          ? readonlyField('Passwort', sharing.joinPassword)
+          ? readonlyPasswordField('Passwort', sharing.joinPassword)
           : h('p.field__note', 'Das Passwort steht nur auf den Geräten, die es gesetzt oder eingetippt haben — dieses hier gehört nicht dazu. Wer es kennt, findet es in seinen Einstellungen; sonst setzt ihr unten ein neues.'),
         h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => { close(true); shareJoinData(sharing); } },
           icon('share', 19), 'Beitrittsdaten teilen'),
@@ -529,6 +529,10 @@ function joinDataSheet(state, sharing) {
           icon('copy', 18), 'Stattdessen Einladungslink'),
         h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => { close(true); changePasswordSheet(sharing); } },
           icon('repeat', 18), 'Passwort ändern'),
+        sharing.joinPassword
+          ? h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => { close(true); forgetJoinPassword(sharing); } },
+              icon('trash', 18), 'Passwort auf diesem Gerät vergessen')
+          : null,
         state.trip?.name && state.trip.name !== sharing.joinName
           ? h('p.field__note', `Die Kasse heißt inzwischen „${state.trip.name}“ — zum Beitreten zählt aber der Name von oben.`)
           : h('p.field__note', 'Der Beitrittsname bleibt, auch wenn ihr die Kasse später umbenennt.'),
@@ -545,6 +549,19 @@ function readonlyField(label, value) {
       onclick: (e) => e.target.select(),
     }),
   );
+}
+
+/**
+ * Wie `readonlyField`, aber verdeckt: für das Passwort, das hier sonst dauerhaft
+ * im Klartext stünde — sichtbar für jeden mit kurzem Zugriff aufs Gerät oder auf
+ * einem Bildschirmfoto der Einstellungen. Das Auge deckt es bei Bedarf auf.
+ */
+function readonlyPasswordField(label, value) {
+  const input = h('input.field__input.field__input--code', {
+    type: 'password', value, readonly: true,
+    onclick: (e) => e.target.select(),
+  });
+  return h('label.field', h('span.field__label', label), maskedField(input));
 }
 
 async function shareJoinData(sharing) {
@@ -584,12 +601,12 @@ function changePasswordSheet(sharing) {
     title: 'Passwort ändern',
     subtitle: `Für die Kasse „${sharing.joinName}“.`,
     build: (close) => {
-      const input = plainInput({ maxlength: 60, placeholder: 'Neues Passwort', enterkeyhint: 'go' });
+      const input = maskedInput({ maxlength: 60, placeholder: 'Neues Passwort', enterkeyhint: 'go', autocomplete: 'new-password' });
       const error = h('p.field__error');
       const save = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Passwort ändern');
 
       const go = async () => {
-        const problem = checkPassword(input.value);
+        const problem = checkNewPassword(input.value);
         if (problem) { error.textContent = problem; return; }
         error.textContent = '';
         save.disabled = true;
@@ -604,7 +621,7 @@ function changePasswordSheet(sharing) {
       };
 
       return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
-        h('label.field', h('span.field__label', 'Neues Passwort'), input),
+        h('label.field', h('span.field__label', 'Neues Passwort'), maskedField(input)),
         h('button.btn.btn--ghost.btn--small.field__inline', { type: 'button', onclick: () => { input.value = suggestPassword(); input.focus(); } },
           icon('repeat', 16), 'Vorschlag'),
         h('p.field__note', 'Wer schon dabei ist, bleibt dabei. Mit dem alten Passwort und alten Einladungslinks kommt danach niemand mehr herein.'),
@@ -613,6 +630,24 @@ function changePasswordSheet(sharing) {
       );
     },
   });
+}
+
+/**
+ * Das Passwort aus den geräteeigenen Einstellungen löschen — für alle, denen
+ * der Klartext dort (siehe `prefs.js`) zu weit geht. Die Kasse bleibt
+ * verbunden, nur anzeigen oder weitergeben kann dieses Gerät die
+ * Beitrittsdaten danach nicht mehr.
+ */
+async function forgetJoinPassword(sharing) {
+  const ok = await confirmSheet({
+    title: 'Passwort auf diesem Gerät vergessen?',
+    text: `Dieses Gerät bleibt mit „${sharing.joinName}“ verbunden. Nur anzeigen oder weitergeben lässt sich das Passwort danach nicht mehr — dafür braucht es dann ein neues, über „Passwort ändern“.`,
+    confirmLabel: 'Vergessen',
+    danger: true,
+  });
+  if (!ok) return;
+  store.forgetJoinPassword();
+  toast('Passwort auf diesem Gerät vergessen.');
 }
 
 /**
@@ -731,15 +766,16 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, clo
     value: state.trip?.joinName || prefs.tripRef?.joinName || state.trip?.name || '',
     maxlength: 60, enterkeyhint: 'next',
   });
-  const passwordInput = plainInput({
+  const passwordInput = maskedInput({
     value: prefs.tripRef?.joinPassword || '',
     maxlength: 60, placeholder: 'Passwort ausdenken', enterkeyhint: 'go',
+    autocomplete: 'new-password',
   });
   const error = h('p.field__error');
   const button = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon(confirmIcon, 19), confirmLabel);
 
   const go = async () => {
-    const problem = checkJoinName(nameInput.value) || checkPassword(passwordInput.value);
+    const problem = checkJoinName(nameInput.value) || checkNewPassword(passwordInput.value);
     if (problem) { error.textContent = problem; return; }
     error.textContent = '';
     button.disabled = true;
@@ -755,7 +791,7 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, clo
 
   return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
     h('label.field', h('span.field__label', 'Name der Kasse'), nameInput),
-    h('label.field', h('span.field__label', 'Passwort'), passwordInput),
+    h('label.field', h('span.field__label', 'Passwort'), maskedField(passwordInput)),
     h('button.btn.btn--ghost.btn--small.field__inline', { type: 'button', onclick: () => { passwordInput.value = suggestPassword(); passwordInput.focus(); } },
       icon('repeat', 16), 'Vorschlag'),
     h('p.field__note', 'Der Name muss im Firebase-Projekt einmalig sein — an ihm findet die App die Kasse wieder. Ändern lässt er sich danach nicht mehr.'),

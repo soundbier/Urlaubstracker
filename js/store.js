@@ -623,6 +623,21 @@ export async function changeJoinPassword(password) {
   return password;
 }
 
+/**
+ * Das Passwort auf diesem Gerät vergessen — für alle, denen der Klartext im
+ * `localStorage` zu weit geht (siehe `prefs.js`).
+ *
+ * Verbunden bleibt die Kasse trotzdem: dafür reicht der Nachweis `inviteCode`,
+ * der unverändert stehen bleibt. Nur zeigen oder weitergeben kann dieses
+ * Gerät die Beitrittsdaten danach nicht mehr — dafür braucht es dann ein
+ * neues Passwort (`changeJoinPassword`).
+ */
+export function forgetJoinPassword() {
+  const prefs = getPrefs();
+  if (!prefs.tripRef?.joinPassword) return;
+  setPrefs({ tripRef: { ...prefs.tripRef, joinPassword: '' } });
+}
+
 /** Der Name, mit dem man dieser Kasse beitritt — nicht zwingend die Überschrift. */
 function joinName() {
   const prefs = getPrefs();
