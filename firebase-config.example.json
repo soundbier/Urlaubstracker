@@ -6,12 +6,16 @@
     "Ohne die Datei läuft alles wie bisher: die Konfiguration kommt von Hand hinein",
     "oder über einen Einladungslink. Geheim ist sie nicht; geschützt wird die Kasse",
     "über firestore.rules und das Passwort.",
-    "Unterstriche-Felder wie dieses werden ignoriert."
+    "Unterstriche-Felder wie dieses werden ignoriert.",
+    "appCheckSiteKey ist optional und bremst automatisiertes Durchprobieren von",
+    "Passwörtern — siehe README, Abschnitt „App Check“. Ohne den Schlüssel bleibt",
+    "diese Bremse einfach aus, alles andere läuft unverändert."
   ],
   "apiKey": "AIza…",
   "authDomain": "euer-projekt.firebaseapp.com",
   "projectId": "euer-projekt",
   "storageBucket": "euer-projekt.appspot.com",
   "messagingSenderId": "000000000000",
-  "appId": "1:000000000000:web:0000000000000000000000"
+  "appId": "1:000000000000:web:0000000000000000000000",
+  "appCheckSiteKey": "6Lc…"
 }

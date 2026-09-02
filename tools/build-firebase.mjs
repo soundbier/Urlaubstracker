@@ -29,6 +29,7 @@ export {
   onSnapshot, query, where, orderBy, serverTimestamp, arrayUnion, arrayRemove,
   writeBatch, Timestamp, enableNetwork, disableNetwork
 } from 'firebase/firestore';
+export { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 `;
 
 try {

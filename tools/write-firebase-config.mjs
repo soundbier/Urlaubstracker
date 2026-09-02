@@ -15,6 +15,7 @@
  *   FIREBASE_APP_ID               (Pflicht)
  *   FIREBASE_STORAGE_BUCKET       (optional)
  *   FIREBASE_MESSAGING_SENDER_ID  (optional)
+ *   FIREBASE_APPCHECK_SITE_KEY    (optional, siehe README „App Check“)
  *
  * Ist keine einzige davon gesetzt, tut das Skript nichts — dann liefert
  * Cloudflare wie bisher ohne firebase-config.json aus, und die Konfiguration
@@ -38,6 +39,7 @@ const required = {
 const optional = {
   storageBucket: 'FIREBASE_STORAGE_BUCKET',
   messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
+  appCheckSiteKey: 'FIREBASE_APPCHECK_SITE_KEY',
 };
 
 const requiredKeys = Object.keys(required);
