@@ -4,7 +4,7 @@ import * as store from './store.js';
 import { computeBudget, todayISO } from './calc.js';
 import { applyTheme } from './prefs.js';
 import { onInstallabilityChange } from './install.js';
-import { money, number, days } from './format.js';
+import { money, days, compactDate } from './format.js';
 import { toast, confirmSheet, promptSheet } from './ui/sheet.js';
 import { expenseSheet, contributionSheet, cashOutSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
@@ -260,10 +260,13 @@ function header() {
   const today = todayISO();
   const b = computeBudget({ trip, contributions: state.contributions, expenses: state.expenses, today });
 
+  // Im laufenden Urlaub steht hier der Zeitraum, nicht der Tagesstand: „Tag 5
+  // von 14“ sagt die Datumszeile auf „Heute“ schon, und zweimal dieselbe
+  // Auskunft übereinander ist eine zu viel.
   const subtitle =
     b.phase === 'before' ? (b.daysUntilStart === 0 ? 'ab morgen' : `in ${days(b.daysUntilStart)}`)
     : b.phase === 'after' ? 'abgeschlossen'
-    : `Tag ${number(b.elapsedDays)} von ${number(b.totalDays)}`;
+    : `${compactDate(trip.startDate)} – ${compactDate(trip.endDate)}`;
 
   const syncTone = sync.error ? 'error' : sync.mode !== 'cloud' ? 'off' : sync.connected ? 'on' : 'pending';
   const syncTitle = {
@@ -292,7 +295,7 @@ function fab(tabId) {
     type: 'button',
     onclick: () => actions.addExpense(),
     'aria-label': 'Ausgabe eintragen',
-  }, icon('plus', 26), h('span.fab__label', 'Ausgabe'));
+  }, icon('plus', 24));
 }
 
 function nav(activeId) {

@@ -4,7 +4,7 @@
  */
 import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
-import { money, moneySigned, days, compactDate, dayMonth } from '../format.js';
+import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar, daymark } from '../ui/parts.js';
 
 // Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
@@ -65,7 +65,7 @@ export function renderToday(state, actions) {
             h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur)),
             { tone: overdueCount ? 'warn' : '' },
           ),
-          h('div.list', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId }))),
+          h('div.list', ...due.map((e) => plannedRow(e, trip, today, { onEdit: actions.editExpense, onPaid: actions.markExpensePaid, me: state.myPersonId, markOverdue: false }))),
           h('p.section__note', 'Tippt den Haken, sobald bezahlt ist.'),
         )
       : null,
@@ -153,11 +153,14 @@ function hero(b, cur, actions, today) {
   const usedRatio = b.perDayToday > 0 ? b.spentToday / b.perDayToday : b.spentToday > 0 ? 1 : 0;
   const tone = TONE[b.status] || 'good';
 
+  // Der Zustand steht an der Augenbraue und am Balken. Die Zahl selbst bleibt
+  // Tinte: eine rote Zahl quer über den halben Schirm liest sich wie ein
+  // Fehler, dabei ist „heute drüber“ im Urlaub der halbe Normalfall.
   return h('div.hero', { class: `hero--${tone}` },
     // Der eine Moment, an dem die App aussieht wie ein Reisetagebuch und nicht
     // wie ein Haushaltsbuch: ein Tagesstempel, kein zweites Mal „Tag X von Y“
     // aus der Kopfzeile — hier steht zusätzlich das Datum, in eigenem Register.
-    daymark(`Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays}`, dayMonth(today)),
+    daymark(`Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays}`, `${weekdayShort(today)}, ${dayMonth(today)}`),
     h('p.hero__label', b.leftToday >= 0 ? 'Heute noch übrig' : 'Heute schon drüber'),
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),
     h('p.hero__sub', `von ${money(b.perDayToday, cur)} für heute`),

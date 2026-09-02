@@ -30,16 +30,18 @@ export function sectionTitle(text, action, { tone = '' } = {}) {
 }
 
 /**
- * Die Tagesmarke: eine getrackte, tabellarische Meta-Zeile mit
- * Haarlinien-Trenner statt Satzzeichen — das wiederkehrende Signature
- * Element der App. Heute nur auf „Heute“ verwendet, aber als Muster gedacht:
- * jedes übergebene Textstück wird ein Abschnitt, dazwischen steht die Linie.
+ * Die Tagesmarke: eine getrackte, tabellarische Datumszeile mit
+ * Haarlinien-Trenner statt Satzzeichen, die nach rechts in eine Linie
+ * ausläuft — das wiederkehrende Erkennungszeichen der App. Jedes übergebene
+ * Textstück wird ein Abschnitt, dazwischen steht der Trenner.
  */
 export function daymark(...parts) {
   const segments = parts.filter(Boolean);
   const children = segments.flatMap((text, i) =>
     i === 0 ? [h('span', text)] : [h('span.daymark__sep', { 'aria-hidden': 'true' }), h('span', text)]);
-  return h('p.daymark', ...children);
+  // Die auslaufende Linie bindet die Zeile an den Satzspiegel, statt sie
+  // mitten im Nichts enden zu lassen.
+  return h('p.daymark', ...children, h('span.daymark__rule', { 'aria-hidden': 'true' }));
 }
 
 /**
@@ -96,10 +98,11 @@ function byLabel(expense, trip, me) {
 export function expenseRow(expense, trip, { onEdit, onRepeat = null, me = null } = {}) {
   const cat = CATEGORY_BY_ID[expense.category] || CATEGORY_BY_ID.other;
   const privatelyPaid = expense.payer !== POT;
-  // Ohne Notiz steht die Kategorie schon in der Titelzeile — dann bleibt die
-  // Unterzeile ganz weg, statt als leere Zeile Höhe zu belegen.
+  // Die Kategorie steht schon als Symbol in derselben Zeile — sie ein zweites
+  // Mal auszuschreiben füllte zwanzig Zeilen mit einer Auskunft, die man
+  // ohnehin sieht, und machte aus jeder einzeiligen Zeile eine zweizeilige.
+  // In der Unterzeile steht deshalb nur noch, was das Symbol nicht sagt.
   const sub = [
-    expense.note ? cat.label : null,
     privatelyPaid ? h('span.tag', payerLabel(trip, expense.payer)) : null,
     // War vorgemerkt: zählt zu den Ausgaben, aber nicht zum Tagesbudget.
     isFromPlan(expense) ? h('span.tag.tag--plan', 'war verplant') : null,
@@ -133,17 +136,19 @@ export function expenseRow(expense, trip, { onEdit, onRepeat = null, me = null }
  * Geld abgezogen. Neben dem Eintrag steht ein Haken, mit dem daraus mit einem
  * Tipp eine echte Ausgabe wird — deshalb zwei Knöpfe statt einer Zeile.
  */
-export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null }) {
+export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null, markOverdue = true }) {
   const cat = CATEGORY_BY_ID[expense.category] || CATEGORY_BY_ID.other;
   const overdue = expense.date < today;
   const privatelyPaid = expense.payer !== POT;
+  // Steht schon „Fällig“ über der Liste, sagt das Wort an jeder Zeile nichts
+  // mehr — dann ist das Datum die nützlichere Auskunft.
   return h('div.prow', { class: overdue ? 'is-overdue' : '' },
     h('button.prow__open', { type: 'button', onclick: () => onEdit(expense) },
       h('span.row__icon.row__icon--planned', icon(cat.icon, 20)),
       h('span.row__main',
         h('span.row__title', expense.note || cat.label),
         h('span.row__sub',
-          overdue ? h('span.tag.tag--due', 'fällig') : dayLabel(expense.date, today, { compact: true }),
+          overdue && markOverdue ? h('span.tag.tag--due', 'fällig') : dayLabel(expense.date, today, { compact: true }),
           privatelyPaid ? h('span.tag', payerLabel(trip, expense.payer)) : null,
           byLabel(expense, trip, me),
         ),

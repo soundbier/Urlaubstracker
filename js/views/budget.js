@@ -30,6 +30,15 @@ export function renderBudget(state, actions) {
       howItWorks(b, trip, cur),
     ),
 
+    // „Wer bekommt was, wer zahlt was“ steht jetzt oben statt ganz unten hinter
+    // einer Klappe: das ist die Frage, für die man diese Seite überhaupt
+    // aufmacht. Während der Reise ist es ein Zwischenstand — das sagt der
+    // Nachsatz, nicht ein zugeklappter Deckel darüber.
+    h('section.section',
+      sectionTitle(b.phase === 'after' ? 'Abrechnung' : 'Stand jetzt'),
+      settlement(trip, contributions, expenses, cashOuts, cur, b.phase),
+    ),
+
     b.total ? h('section.section', sectionTitle('Verlauf'), trendChart(trip, contributions, expenses, today, b)) : null,
 
     h('section.section',
@@ -47,18 +56,7 @@ export function renderBudget(state, actions) {
 
     trip.people.length > 1 ? cashSection(trip, cashOuts, expenses, cur, actions) : null,
 
-    expenses.length ? h('section.section', sectionTitle('Wofür ging das Geld?'), categoryList(expenses, b.spent, cur)) : null,
-
-    h('section.section',
-      sectionTitle('Endabrechnung'),
-      // An Tag 6 von 14 ist das keine Anweisung, sondern ein Zwischenstand —
-      // und der ändert sich mit jeder Ausgabe wieder. Aufgeklappt steht er
-      // erst da, wenn er auch gilt.
-      b.phase === 'after'
-        ? settlement(trip, contributions, expenses, cashOuts, cur, b.phase)
-        : disclosure('Zwischenstand ansehen', h('span.disclosure__summary', 'Stand jetzt'),
-            settlement(trip, contributions, expenses, cashOuts, cur, b.phase)),
-    ),
+    expenses.length ? h('section.section', sectionTitle('Wofür'), categoryList(expenses, b.spent, cur)) : null,
   );
 }
 
@@ -98,7 +96,7 @@ function cashSection(trip, cashOuts, expenses, cur, actions) {
  * bleibt hängen.
  */
 function howItWorks(b, trip, cur) {
-  return disclosure('Wie wird gerechnet?', null,
+  return disclosure('Rechenweg', null,
     h('div.stack',
       b.planned
         ? h('div.stack.stack--tight',
@@ -177,21 +175,16 @@ function trendChart(trip, contributions, expenses, today, budget) {
   const actualPts = [[0, startActual], ...series.filter((d) => d.actual !== null).map((d, i) => [i + 1, d.actual])];
 
   const line = (pts) => pts.map(([i, v], k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
-  const area = `${line(actualPts)} L${x(actualPts.at(-1)[0]).toFixed(1)} ${y(0).toFixed(1)} L0 ${y(0).toFixed(1)} Z`;
 
   const todayIdx = series.findIndex((d) => d.isToday);
   const marker = todayIdx >= 0 && series[todayIdx].actual !== null ? [todayIdx + 1, series[todayIdx].actual] : null;
 
   return h('div.chart',
     s('svg.chart__svg', { viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: 'none', role: 'img', 'aria-label': `Kontostand über ${days(n)}` },
-      // Die Farben stehen im Stylesheet (`var()` greift in SVG-Attributen nicht),
-      // die Füllung bleibt als Attribut (`url(#…)` aus externem CSS greift nicht).
-      s('defs', s('linearGradient', { id: 'ut-chart-fill', x1: '0', y1: '0', x2: '0', y2: '1' },
-        s('stop.chart__stopTop', { offset: '0%' }),
-        s('stop.chart__stopBottom', { offset: '100%' }),
-      )),
+      // Die Farben stehen im Stylesheet (`var()` greift in SVG-Attributen nicht).
+      // Die getönte Fläche unter der Kurve ist weg: sie trug keine Auskunft,
+      // die die Linie nicht schon trägt, und war der einzige Verlauf der App.
       s('line.chart__axis', { x1: 0, y1: y(0), x2: W, y2: y(0) }),
-      s('path.chart__area', { d: area, fill: 'url(#ut-chart-fill)' }),
       s('path.chart__plan', { d: line(plannedPts) }),
       s('path.chart__actual', { d: line(actualPts) }),
       marker ? s('circle.chart__dot', { cx: x(marker[0]), cy: y(marker[1]), r: 4 }) : null,
@@ -283,12 +276,12 @@ function settlement(trip, contributions, expenses, cashOuts, cur, phase = 'after
   }
   if (!actions.length) actions.push(h('li', 'Alles ausgeglichen. Nichts mehr zu überweisen.'));
 
-  return h('div',
+  return h('div.stack',
     table,
     h('div.callout',
-      h('p.callout__title', done ? 'Zum Ausgleich' : 'Stand jetzt'),
-      done ? null : h('p.settle__hint', 'Würdet ihr heute abrechnen:'),
+      h('p.callout__title', 'Zum Ausgleich'),
       h('ul.settle__todo', ...actions),
+      done ? null : h('p.settle__hint', 'Mitten im Urlaub ist das eine Momentaufnahme: jede Ausgabe verschiebt sie wieder.'),
     ),
   );
 }

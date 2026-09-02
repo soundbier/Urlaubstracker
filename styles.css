@@ -1,117 +1,146 @@
 /*
- * Urlaubstracker — mobil zuerst, große Tippflächen, wenig Dekor.
+ * Urlaubstracker — Papier und Tinte, mobil zuerst.
  *
- * Die Gestaltung trägt hier nichts bei, was die Zahlen nicht selbst sagen:
- * Struktur entsteht über Abstand, Schriftgröße und Haarlinien, nicht über
- * Kästen. Ein Rahmen steht nur dort, wo etwas wirklich zusammengehört; ein
- * Schatten nur dort, wo etwas tatsächlich über dem Inhalt schwebt.
+ * Die Gestaltung trägt nichts bei, was die Zahlen nicht selbst sagen. Struktur
+ * entsteht über Linien, Abstand und Schriftgröße — nicht über Kästen. Drei
+ * Regeln, aus denen alles Weitere folgt:
+ *
+ * 1. Eine Linie statt einer Fläche. Ein Rahmen steht nur, wo etwas wirklich
+ *    zusammengehört; eine Fläche nur, wo etwas über der Seite schwebt (Sheet,
+ *    Meldung, schwebender Knopf).
+ * 2. Genau eine laute Zahl pro Bildschirm. Alles andere ordnet sich über
+ *    Größe und Gewicht unter, nie über eine zweite Farbe.
+ * 3. Farbe ist Verdikt, nie Schmuck. Sie erscheint selten und heißt dann
+ *    etwas Bestimmtes: knapp, drüber, offen.
  */
 
 /* ------------------------------------------------------------ Grundlagen */
 
 :root {
-  /* Farben. Der Grund ist ein warmes Papierweiß statt des üblichen kühlen
-     Grau — dieselbe Helligkeit, aber die App sieht damit nach Reise aus und
-     nicht nach Verwaltungsoberfläche. */
-  --bg: #f8f7f4;
-  --surface: #ffffff;
-  --surface-2: #efece6;
-  --border: #e3ded5;
-  --text: #1b1a17;
-  --text-muted: #6b655c;
-  --text-faint: #8f887d;
+  /*
+   * Papier und Tinte. Der Grund ist ein warmes, leicht gebrochenes Weiß statt
+   * des üblichen kühlen Grau — dieselbe Helligkeit, aber die App sieht damit
+   * nach Notizbuch aus und nicht nach Verwaltungsoberfläche.
+   */
+  --bg: #f7f5f0;
+  --surface: #fffdf9;
+  --surface-2: #edeae2;
+  /* Zwei Linienstärken: `--rule` trennt Bedeutungseinheiten (Abschnittskopf,
+     Kennzahlband), `--border` nur Zeilen innerhalb einer Liste. */
+  --rule: #ccc4b5;
+  --border: #e0dad0;
+  --text: #1a1815;
+  --text-muted: #6a6459;
+  /* Auch die blasseste Stufe muss lesbar bleiben: Augenbrauen und Meta-Zeilen
+     stehen in 11 px, und die tragen hier echte Auskunft. Beide Grautöne sind
+     gegen den Grund geprüft (4.5:1 aufwärts). */
+  --text-faint: #766f63;
 
-  /* Eine Akzentfarbe und zwei semantische Töne — mehr nicht. „Gut“ hat keine
-     eigene Farbe mehr: dafür stand ein zweites Grün neben dem Akzent, das
-     nach einer zweiten Bedeutung aussah, wo dieselbe gemeint war. Gut heißt
-     jetzt schlicht „nicht rot“.
-
-     Der Akzent ist ein sehr dunkles, blaustichiges Tannengrau statt des
-     früheren Fintech-Teals — kaum noch Marke, fast getönte Tinte. Kontrast
-     gegen Papier und gegen Weiß auf gefüllter Fläche geprüft (beides > 9:1). */
+  /*
+   * Eine Akzentfarbe und zwei semantische Töne — mehr nicht. „Gut“ hat keine
+   * eigene Farbe: gut heißt schlicht „nicht markiert“. Der Akzent ist ein sehr
+   * dunkles, blaustichiges Tannengrau, kaum Marke, fast getönte Tinte.
+   * „Über“ ist ein gedecktes Ochsenblut statt eines Signalrots: Ein Urlaub,
+   * der einen Tag über dem Schnitt liegt, ist kein Fehler, sondern eine
+   * Auskunft.
+   */
   --accent: #2c4a44;
-  --accent-soft: #e2efec;
-  /* „Amber“ — der Name meint nur den Farbton, keine Reise-Szenerie. */
-  --warn: #a4600b;
-  --warn-soft: #f7edde;
-  --over: #b8123c;
+  --accent-soft: #e3ebe7;
+  --warn: #9a6216;
+  --warn-soft: #f3eade;
+  --over: #9d2b32;
 
-  /* Wenige, bewusste Radien: 10 für Flächen und Knöpfe, 6 für Kleinteile,
-     rund nur dort, wo die Form etwas bedeutet (Punkt, Chip, Meldung). */
-  --radius: 10px;
-  --radius-sm: 6px;
+  /* Zurückhaltende Radien: 8 für Flächen und Knöpfe, 4 für Kleinteile, rund
+     nur dort, wo die Form etwas bedeutet (Punkt, schwebender Knopf, Meldung). */
+  --radius: 8px;
+  --radius-sm: 4px;
   --radius-pill: 999px;
 
   /* Der einzige Schatten der App — für das, was wirklich über dem Inhalt
-     liegt: der schwebende Knopf, das Sheet, die Meldung. */
-  --shadow-float: 0 6px 22px -10px rgb(28 26 22 / 40%);
+     liegt. Bewusst flach: er soll Ebene zeigen, nicht Tiefe behaupten. */
+  --shadow-float: 0 8px 24px -14px rgb(26 24 21 / 45%);
 
   /*
-   * Fünf Stufen, mehr nicht: Display für die eine große Zahl des Tages,
-   * Überschrift für Seiten- und Sheet-Titel, Fließtext für Zeileninhalte,
-   * Sekundär für Einordnung, Meta fürs Kleingedruckte. `--fs-xl` bleibt eine
-   * bewusste Zwischengröße nur für die zweiten großen Zahlen (Kassenstand,
-   * Ausgabensumme) — überall sonst gilt eine der fünf.
+   * Zwei Schriften aus dem System, kein Download: die Grotesk trägt alles,
+   * was gelesen oder gerechnet wird, die Serife nur Titel und Datumszeilen.
+   * Der Wechsel ist das, was die App wie ein Reisetagebuch aussehen lässt und
+   * nicht wie ein Formular — er kostet nichts und funktioniert offline.
    */
-  --fs-display: clamp(2.5rem, 12.5vw, 3.2rem);
-  --fs-xl: 1.6rem;
-  --fs-lg: 1.375rem;   /* Überschrift, 22px */
-  --fs-md: 1rem;       /* Fließtext, 16px */
-  --fs-sm: 0.875rem;   /* Sekundär, 14px */
-  --fs-xs: 0.8125rem;  /* Meta, 13px — die einzige kleine Stufe */
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-display: ui-serif, Georgia, "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
 
-  --gutter: 16px;
+  /*
+   * Sechs Stufen: Display für die eine große Zahl, XL für zweite große Zahlen,
+   * LG für Titel, MD für Zeileninhalte, SM für Einordnung, XS fürs
+   * Kleingedruckte. Dazu die Augenbraue — die kleine, gesperrte Versalzeile,
+   * die in dieser App jeden Abschnitt eröffnet.
+   */
+  --fs-display: clamp(2.6rem, 13vw, 3.4rem);
+  --fs-xl: 1.5rem;
+  --fs-lg: 1.25rem;
+  --fs-md: 1rem;
+  --fs-sm: 0.875rem;
+  --fs-xs: 0.8125rem;
+  --fs-eyebrow: 0.6875rem;
+
+  /* Abstände als Leiter, damit „größer“ immer dieselbe Bedeutung hat:
+     zwischen Abschnitten mehr als innerhalb, innerhalb mehr als in der Zeile. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 40px;
+
+  --gutter: 20px;
   --tap: 44px;
-  --nav-h: 60px;
+  --nav-h: 58px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --page: min(560px, 100%);
 
-  /* Schrift auf gefüllten Flächen (Akzent, Warnung, Fehler). Ein Wert für
-     alle drei: hell sind sie dunkel genug für Weiß, dunkel hell genug für
-     Tinte. */
-  --on-accent: #ffffff;
+  --on-accent: #f8f7f3;
   --toast-bg: #26241f;
   --toast-text: #f7f6f3;
-  --scrim: rgb(28 26 22 / 42%);
+  --scrim: rgb(26 24 21 / 38%);
 
   color-scheme: light;
 }
 
 /*
- * Dunkle Fassung — dieselbe App, andere Farben.
+ * Dunkle Fassung — dieselbe App, andere Farben. Warmes Dunkelgrau statt
+ * Blauschwarz: abends soll die Seite wie Papier im Lampenlicht aussehen.
  *
  * Welche gilt, steht als `data-theme` am <html>: gesetzt vom Startschnipsel in
  * index.html, noch bevor das Stylesheet geladen ist, damit abends nicht erst
- * eine weiße Seite aufblitzt. „Automatisch“ löst dort schon zu `light` oder
- * `dark` auf — hier steht deshalb nur ein Block statt zweier gleicher.
+ * eine weiße Seite aufblitzt.
  */
 :root[data-theme='dark'] {
-  --bg: #14161a;
-  --surface: #1b1e23;
-  --surface-2: #24282f;
-  --border: #2f343c;
-  --text: #e9eaec;
-  --text-muted: #9aa0a8;
-  --text-faint: #7d838c;
+  --bg: #171614;
+  --surface: #201e1b;
+  --surface-2: #2a2724;
+  --rule: #46413a;
+  --border: #322e29;
+  --text: #ece7dd;
+  --text-muted: #a19a8c;
+  --text-faint: #8a8377;
 
-  /* Kein Türkis mehr, sondern ein entsättigtes, nicht leuchtendes Salbeigrün
-     in derselben Tannengrau-Familie wie im hellen Modus: heller und grauer
-     als der frühere Neonton, leise genug für den Abend. Kontrast gegen den
-     dunklen Grund und gegen Tinte auf gefüllter Fläche geprüft (beides > 7:1). */
-  --accent: #7cb6ae;
-  --accent-soft: #17322e;
-  --warn: #dda33f;
-  --warn-soft: #332810;
-  --over: #ef7489;
+  /* Ein entsättigtes Salbeigrün statt eines leuchtenden Türkis: hell genug
+     zum Lesen, leise genug für den Abend. */
+  --accent: #8ab8ad;
+  --accent-soft: #22302c;
+  --warn: #d3a154;
+  --warn-soft: #322a1c;
+  --over: #d98189;
 
-  /* Auf hellem Türkis, hellem Bernstein und hellem Rosé liest sich Weiß
-     nicht mehr — dort steht jetzt Tinte. */
-  --on-accent: #06211e;
-  --toast-bg: #2b3038;
-  --toast-text: #f1f2f4;
+  /* Auf hellem Salbei, hellem Bernstein und hellem Rosé liest sich Weiß nicht
+     mehr — dort steht Tinte. */
+  --on-accent: #16201e;
+  --toast-bg: #2b2825;
+  --toast-text: #f1efe9;
   --scrim: rgb(0 0 0 / 62%);
 
-  --shadow-float: 0 8px 26px -12px rgb(0 0 0 / 75%);
+  --shadow-float: 0 10px 28px -16px rgb(0 0 0 / 80%);
 
   color-scheme: dark;
 }
@@ -124,8 +153,8 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-  font-size: 16px;
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
@@ -141,9 +170,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
  * als Zoom-Geste statt als zwei Tipps — genau das trifft die Zahlentastatur,
  * wenn man zügig eine doppelte Ziffer eintippt ("11", "22"). `manipulation`
  * nimmt nur das Doppeltipp- und das Wisch-zum-Zoomen-Verhalten von diesen
- * Elementen weg; Zwei-Finger-Pinch bleibt überall auf der Seite möglich —
- * anders als `user-scalable=no`, das Zoomen komplett abschalten würde und
- * für Leute mit Sehbeeinträchtigung ein echtes Hindernis ist.
+ * Elementen weg; Zwei-Finger-Pinch bleibt überall auf der Seite möglich.
  */
 button, input, select, textarea { touch-action: manipulation; }
 button { cursor: pointer; }
@@ -157,8 +184,37 @@ strong { font-weight: 600; }
 [hidden] { display: none !important; }
 .muted { color: var(--text-muted); }
 .small { font-size: var(--fs-xs); }
-/* Ein Nachsatz unter einer Zahl oder einem Abschnitt. */
 .note { font-size: var(--fs-xs); color: var(--text-muted); }
+
+/*
+ * Die Augenbraue: kleine, gesperrte Versalzeile. Sie eröffnet jeden Abschnitt
+ * und jede Kennzahl und ist zusammen mit der Haarlinie das eine wiederkehrende
+ * Erkennungszeichen der App — Fahrplan und Frachtbrief, nicht Dashboard.
+ * Versalien sind ihr vorbehalten; normaler UI-Text bekommt sie nie.
+ */
+.eyebrow,
+.section__title,
+.stat__label,
+.hero__label,
+.summary__label,
+.field__label,
+.daterow__label,
+.topbar__sub {
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Zahlen sind überall tabellarisch und tragen Gewicht 600: ein Betrag sieht in
+   jeder Komponente gleich aus, egal wo er steht. */
+.hero__amount, .stat__value, .summary__value, .row__amount, .daygroup__total,
+.cat__amount, .split__value, .settle__balance, .stepper__value, .amount__value,
+.section__meta, .key, .share__pct, .pot__meta, .settle__nums {
+  font-variant-numeric: tabular-nums;
+}
 
 :where(button, a, summary, input, select, textarea):focus-visible {
   outline: 2px solid var(--accent);
@@ -175,30 +231,36 @@ strong { font-weight: 600; }
   flex-direction: column;
 }
 
+/*
+ * Kopfzeile: der Name der Kasse in der Serife, darunter die zeitliche Position
+ * als Augenbraue. Beides beantwortet „welche Reise, wie weit“ — mehr steht hier
+ * nie, damit die Zeile über allen vier Tabs ruhig bleibt.
+ */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: calc(env(safe-area-inset-top, 0px) + 14px) var(--gutter) 10px;
+  gap: var(--sp-3);
+  padding: calc(env(safe-area-inset-top, 0px) + 18px) var(--gutter) 14px;
   /* Deckend, damit beim Scrollen nichts durch die Kopfzeile schimmert. */
   background: var(--bg);
 }
-.topbar__main { min-width: 0; flex: 1; }
+.topbar__main { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
 .topbar__title {
+  font-family: var(--font-display);
   font-size: var(--fs-lg);
   font-weight: 600;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.005em;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.topbar__sub { font-size: var(--fs-xs); color: var(--text-muted); }
 
-/* Der Zustand der Synchronisierung. Ohne Kreis und ohne Rahmen: solange
-   alles läuft, muss hier nichts leuchten. */
+/* Der Zustand der Synchronisierung. Ohne Kreis und ohne Rahmen: solange alles
+   läuft, muss hier nichts leuchten — Farbe bekommt nur ein echtes Problem. */
 .syncdot {
   display: grid;
   place-items: center;
@@ -209,51 +271,47 @@ strong { font-weight: 600; }
   background: none;
   color: var(--text-faint);
 }
-/* „Synchronisiert“, „Verbindet …“ und „Offline — wird nachgereicht“ sind
-   Normalzustände, kein Verdikt — sie bleiben monochrom wie der Rest der
-   Kopfzeile. Nur ein echtes Problem (Sync stockt, lokal ohne Speichern)
-   bekommt Farbe. */
 .syncdot--error { color: var(--over); }
 
 .main { flex: 1; }
 
 .view {
-  padding: 4px var(--gutter) calc(var(--nav-h) + var(--safe-b) + 96px);
+  padding: var(--sp-1) var(--gutter) calc(var(--nav-h) + var(--safe-b) + 96px);
   display: flex;
   flex-direction: column;
-  /* Der wichtigste Hebel gegen „gedrängt“: mehr Luft zwischen den
-     Abschnitten selbst, nicht in jeder einzelnen Zeile. */
-  gap: 34px;
+  /* Der wichtigste Hebel gegen „gedrängt“: viel Luft zwischen den Abschnitten,
+     wenig innerhalb der Zeile. */
+  gap: var(--sp-6);
 }
 .view--center {
   min-height: 70dvh;
   justify-content: center;
-  padding-bottom: 40px;
+  padding-bottom: var(--sp-7);
 }
-body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
+body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 
-.section { display: flex; flex-direction: column; gap: 13px; }
-/* Der Sprung von der Kennzahlreihe zur Handlungsebene ist bewusst größer als
-   der übliche Abschnittsabstand: hier endet der Zustand, hier beginnt, was
-   zu tun ist. */
-.section--action { margin-top: 14px; }
-.section__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-/* Abschnittsüberschriften in normaler Schreibweise: gesperrte Großbuchstaben
-   lassen jede Zwischenüberschrift wie eine Rubrik in einem Auswertungswerkzeug
-   aussehen. */
-.section__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text-muted); }
-/* Nicht „heute dran“, sondern wirklich überfällig — derselbe Warnton wie an
-   der einzelnen Zeile (`.tag--due`), keine neue Farbe für denselben Zustand. */
+.section { display: flex; flex-direction: column; gap: var(--sp-3); }
+/*
+ * Jeder Abschnitt beginnt mit Augenbraue und Linie. Diese eine Geste ersetzt
+ * überall die Karte: sie gruppiert, ohne einen Kasten zu ziehen.
+ */
+.section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--rule);
+}
 .section__title--warn { color: var(--warn); }
-.section__meta { font-size: var(--fs-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-/* Steht die Meta-Zeile für eine Geldsumme (nicht für eine Anzahl wie
-   „3 Personen“), gilt dieselbe Regel wie für jeden anderen Betrag im
-   Interface: Gewicht 600. */
-.section__meta--amount { font-weight: 600; }
+.section__meta { font-size: var(--fs-sm); color: var(--text-muted); }
+.section__meta--amount { font-weight: 600; color: var(--text); }
 .section__note { font-size: var(--fs-xs); color: var(--text-faint); }
+/* Dort, wo aus Zustand Handlung wird, steht mehr Luft als zwischen zwei
+   Zustandsblöcken. */
+.section--action { margin-top: var(--sp-4); }
 
-/* Eine Gruppe zusammengehöriger Felder — ohne Kasten darum. */
-.panel { display: flex; flex-direction: column; gap: 16px; }
+.panel { display: flex; flex-direction: column; gap: var(--sp-4); }
 
 /* ----------------------------------------------------------- Navigation */
 
@@ -266,7 +324,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   padding-bottom: var(--safe-b);
-  background: var(--surface);
+  background: var(--bg);
   border-top: 1px solid var(--border);
 }
 .nav__item {
@@ -274,150 +332,170 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 10px 4px 8px;
+  padding: 9px 4px 7px;
   border: 0;
   background: none;
-  color: var(--text-muted);
+  color: var(--text-faint);
   height: var(--nav-h);
 }
 .nav__item.is-active { color: var(--accent); }
-.nav__label { font-size: 0.69rem; font-weight: 600; }
+.nav__label { font-size: var(--fs-eyebrow); font-weight: 600; letter-spacing: 0.01em; }
 
 .fab {
   position: fixed;
   right: max(var(--gutter), calc(50% - var(--page) / 2 + var(--gutter)));
   bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
   z-index: 31;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 52px;
-  padding: 0 20px 0 16px;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
   border: 0;
   border-radius: var(--radius-pill);
   background: var(--accent);
   color: var(--on-accent);
-  font-weight: 600;
   box-shadow: var(--shadow-float);
 }
 .fab:active { transform: translateY(1px); }
-.fab__label { font-size: 0.92rem; }
 
-/* ----------------------------------------------------- Die große Zahl */
+/* -------------------------------------------------------- Die Tagesmarke */
 
 /*
- * Die Tagesmarke: „TAG 12 / 14 · 25. AUGUST“ über der großen Zahl. Der eine
- * bewusst grafische Moment der App — sonst gibt es keine Farbverläufe, keine
- * Icons ohne Funktion, keine Deko. Ein Ticketabschnitt, kein Etikett: klein,
- * fest getrackt, in Versalien, das einzige Mal, dass ein Text das kräftigste
- * Gewicht der App trägt. Sie steht nur im laufenden Urlaub — vorher und
- * danach hat der Hero schon seinen eigenen Kontextsatz.
+ * „TAG 05 / 14 │ MITTWOCH, 2. SEPTEMBER ─────“ über der großen Zahl: die
+ * Datumszeile der App. Getrackte Versalien, tabellarische Ziffern, eine feine
+ * senkrechte Linie als Trenner und eine waagerechte, die den Rest der Zeile
+ * ausläuft — Fahrplan, kein Etikett. Sie steht nur im laufenden Urlaub;
+ * davor und danach hat der Hero schon seinen eigenen Kontextsatz.
  */
 .daymark {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  letter-spacing: 0.07em;
+  gap: var(--sp-2);
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--text-muted);
   font-variant-numeric: tabular-nums;
-  margin-bottom: 4px;
+  margin-bottom: var(--sp-3);
 }
-/* Der Trenner zwischen Tagesbruch und Datum: eine echte, sehr feine
-   senkrechte Linie statt eines Satzzeichens — dieselbe Sprache wie die
-   Haarlinien zwischen Listenzeilen, nur aufrecht gestellt. */
 .daymark__sep {
   width: 1px;
-  height: 0.8em;
+  height: 0.85em;
   flex: none;
+  background: var(--rule);
+}
+/* Die auslaufende Linie: sie füllt, was der Text übrig lässt, und bindet die
+   Zeile an den Satzspiegel — dieselbe Haarlinie wie überall sonst. */
+.daymark__rule {
+  flex: 1;
+  min-width: var(--sp-4);
+  height: 1px;
   background: var(--border);
 }
 
+/* ----------------------------------------------------- Die große Zahl */
+
 /*
  * Kein Kasten, keine Tönung, kein Schatten: die Zahl ist groß genug, um für
- * sich zu stehen. Farbe bekommt sie nur, wenn sie etwas bedeutet — über dem
- * Tagesbudget. Der Balken darunter trägt den Zustand.
+ * sich zu stehen. Auch im Überzug bleibt sie Tinte — das Verdikt trägt die
+ * Augenbraue darüber und der Balken darunter. Eine rote Zahl quer über den
+ * halben Schirm liest sich wie ein Fehler, dabei ist sie nur eine Auskunft.
  */
-.hero { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 2px; }
-.hero__label { font-size: var(--fs-sm); color: var(--text-muted); }
+.hero { display: flex; flex-direction: column; gap: var(--sp-1); }
 .hero__amount {
   font-size: var(--fs-display);
   font-weight: 600;
-  letter-spacing: -0.035em;
-  line-height: 1.04;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1.02;
 }
-.hero__sub { font-size: var(--fs-sm); color: var(--text-faint); margin-top: 2px; }
-.hero--over .hero__amount { color: var(--over); }
+.hero__sub { font-size: var(--fs-sm); color: var(--text-muted); }
+.hero--over .hero__label { color: var(--over); }
+.hero--warn .hero__label { color: var(--warn); }
 /* Ohne Zahl trägt die Zeile den Titel — dann ist sie die Überschrift der Seite. */
-.hero__title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em; }
-.hero__title + .hero__sub { margin-top: 4px; }
-.hero .bar { margin-top: 14px; }
-.hero .btn { margin-top: 14px; align-self: flex-start; }
+.hero__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.hero__title + .hero__sub { margin-top: var(--sp-1); }
+.hero--muted .hero__sub { max-width: 42ch; }
+.hero .bar { margin-top: var(--sp-4); }
+.hero .btn { margin-top: var(--sp-4); align-self: flex-start; }
 
-/* ------------------------------------------------------- Kennzahlreihe */
+/* ------------------------------------------------------- Kennzahlband */
 
 /*
- * Drei Zahlen, die die große darüber einordnen. Getrennt durch einen Strich
- * statt durch drei Rahmen — sie sind ein Satz, keine drei Meldungen.
+ * Drei Zahlen, die die große darüber einordnen — als Band zwischen zwei
+ * Linien, nicht als drei Kacheln. Kacheln behaupten drei gleich wichtige
+ * Meldungen; das Band sagt: eine Zeile Zusatz zur Zahl oben.
  */
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); }
-/* `gap` statt der reinen Zeilenhöhe zwischen Label, Zahl und Einordnung — vorher
-   berührten sich die drei nur über den Zeilenabstand, jetzt trennt sie Luft,
-   die zur Bedeutung passt: knapp unter der Zahl, knapp über der Einordnung. */
-.stat { display: flex; flex-direction: column; gap: 3px; padding-inline: 12px; border-left: 1px solid var(--border); min-width: 0; }
+.hero + .stats { margin-top: calc(var(--sp-4) - var(--sp-6)); }
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-3) 0;
+}
+.stat { display: flex; flex-direction: column; gap: 3px; padding-inline: var(--sp-3); border-left: 1px solid var(--border); min-width: 0; }
 .stat:first-child { padding-left: 0; border-left: 0; }
 .stat:last-child { padding-right: 0; }
-.stat__label { font-size: var(--fs-xs); color: var(--text-faint); }
 /* Schrumpft mit der Spaltenbreite; reicht das nicht mehr, wird gekappt statt
-   mitten in die Ziffernfolge umzubrechen — „− 1.100,00 €“ auf zwei Zeilen ist
-   schwerer zu lesen als ein abgeschnittenes Ende, das ohnehin kaum vorkommt. */
+   mitten in die Ziffernfolge umzubrechen. */
 .stat__value {
-  font-size: clamp(0.75rem, 3.6vw, 1rem);
+  font-size: clamp(0.8125rem, 3.7vw, 1rem);
   font-weight: 600;
-  font-variant-numeric: tabular-nums;
   letter-spacing: -0.015em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .stat__sub { font-size: var(--fs-xs); color: var(--text-faint); line-height: 1.3; }
-.stat--over .stat__value { color: var(--over); }
+.stat--over .stat__sub { color: var(--over); }
 
 /* --------------------------------------------------------- Kassenstand */
 
-.potblock { display: flex; flex-direction: column; gap: 14px; }
-.pot { display: flex; flex-direction: column; gap: 1px; }
+.potblock { display: flex; flex-direction: column; gap: var(--sp-4); }
+.pot { display: flex; flex-direction: column; gap: var(--sp-1); }
 .pot__meta { font-size: var(--fs-xs); color: var(--text-faint); }
 
-.summary { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.summary__label { font-size: var(--fs-sm); color: var(--text-muted); }
-.summary__value { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
-.summary__meta { font-size: var(--fs-xs); color: var(--text-faint); text-align: right; }
+.summary { display: flex; flex-direction: column; gap: 2px; }
+.summary__value { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; }
+.summary__meta { font-size: var(--fs-xs); color: var(--text-faint); }
 
-/* Ein Hinweis, der zum Umfeld gehört — kein Kasten mit gestrichelter Kante,
-   sondern eine ruhig abgesetzte Fläche. */
+/*
+ * Ein Hinweis, der zum Umfeld gehört: zwischen zwei Linien statt in einer
+ * getönten Fläche. Eine Fläche würde behaupten, hier schwebe etwas über der
+ * Seite — dabei steht der Satz einfach da.
+ */
 .callout {
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  padding: 14px 16px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-4) 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--sp-3);
   align-items: flex-start;
 }
-.callout__title { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.callout__title {
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
 
 /* --------------------------------------------------------------- Listen */
 
 /*
  * Listen stehen direkt auf der Seite. Eine Haarlinie zwischen zwei Einträgen
- * sagt dasselbe wie ein Rahmen um die ganze Liste — nur eben ohne den Rahmen,
- * und über sieben Tagesgruppen sind das sieben Kästen weniger.
+ * sagt dasselbe wie ein Rahmen um die ganze Liste — nur ohne den Rahmen, und
+ * über sieben Tagesgruppen sind das sieben Kästen weniger.
  */
 .list { display: flex; flex-direction: column; }
 .list > * + * { border-top: 1px solid var(--border); }
@@ -426,30 +504,31 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 58px;
-  padding: 12px 0;
+  gap: var(--sp-3);
+  min-height: 54px;
+  padding: var(--sp-3) 0;
   border: 0;
   background: none;
   text-align: left;
   color: inherit;
 }
 .row:active { background: var(--surface-2); }
-/* Nur das Symbol, kein gefülltes Kästchen darum: über zwanzig Zeilen war das
+/* Nur das Symbol, kein gefülltes Kästchen darum: über zwanzig Zeilen wäre das
    eine zweite Spalte aus grauen Quadraten. */
 .row__icon {
   flex: none;
-  width: 22px; height: 22px;
+  width: 20px; height: 20px;
   display: grid; place-items: center;
   color: var(--text-faint);
 }
-.row__icon--planned { color: var(--accent); }
-.row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.row__icon--planned { color: var(--text-muted); }
+.row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /* Zwei Zeilen statt einer Ellipse: „Ferienwohnung Anz…“ und „Mietwagen Rest…“
-   waren auf einem 390-px-Schirm nicht mehr auseinanderzuhalten. */
+   wären auf einem 390-px-Schirm nicht mehr auseinanderzuhalten. */
 .row__title {
   font-size: var(--fs-md);
   font-weight: 500;
+  line-height: 1.3;
   overflow: hidden;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -457,43 +536,53 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
   line-clamp: 2;
   overflow-wrap: anywhere;
 }
-.row__sub { font-size: var(--fs-xs); color: var(--text-faint); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.row__amount { font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.row__sub { font-size: var(--fs-xs); color: var(--text-faint); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+/* Beträge stehen in einer Spalte, an der das Auge sie untereinander vergleicht:
+   rechtsbündig, tabellarisch, mit einer Mindestbreite, damit die Kante auch bei
+   kurzen Beträgen steht. */
+.row__amount {
+  flex: none;
+  min-width: 5.5ch;
+  text-align: right;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
 .row__amount--in { color: var(--accent); }
-.row__amount--planned { color: var(--text-muted); }
+.row__amount--planned { color: var(--text-muted); font-weight: 500; }
 /* Wer den Eintrag getippt hat — auf dem anderen Handy die Antwort auf „hat das
    schon jemand eingetragen?“. */
 .row__by { display: inline-flex; align-items: center; gap: 5px; }
 
-/* Bezahlte Ausgaben: antippen bearbeitet, der Knopf rechts trägt dieselbe
-   Ausgabe noch einmal ein. Bewusst blasser als der Haken bei den Vormerkungen —
-   das hier ist eine Abkürzung, keine Aufgabe. */
+/*
+ * Bezahlte Ausgaben: antippen bearbeitet, der Knopf rechts trägt dieselbe
+ * Ausgabe noch einmal ein. Bewusst blass: das ist eine Abkürzung, keine
+ * Aufgabe, und sie steht zwanzigmal untereinander.
+ */
 .erow { display: flex; align-items: stretch; }
-.erow > .row { flex: 1; width: auto; min-width: 0; padding-right: 4px; }
+.erow > .row { flex: 1; width: auto; min-width: 0; padding-right: var(--sp-1); }
 .erow__again {
   flex: none;
-  width: 48px;
+  width: 40px;
   display: grid;
   place-items: center;
   border: 0;
   background: none;
   color: var(--text-faint);
+  opacity: 0.5;
 }
-.erow__again:active { color: var(--accent); }
+.erow__again:active { color: var(--accent); opacity: 1; }
 
-/* Vorgemerkte Ausgaben: die Zeile trägt zwei Knöpfe — antippen zum Bearbeiten,
-   der Haken rechts trägt sie als bezahlt ein. Die Tönung, die früher über der
-   ganzen Liste lag, ist weg: der Haken und das Symbol im Akzentton sagen schon,
-   dass hier noch etwas offen ist. */
+/* Vorgemerkte Ausgaben: antippen bearbeitet, der Haken rechts trägt sie als
+   bezahlt ein. */
 .prow { display: flex; align-items: stretch; }
 .prow__open {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 14px;
-  min-height: 58px;
-  padding: 12px 4px 12px 0;
+  gap: var(--sp-3);
+  min-height: 54px;
+  padding: var(--sp-3) var(--sp-1) var(--sp-3) 0;
   border: 0;
   background: none;
   text-align: left;
@@ -502,7 +591,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .prow__open:active { background: var(--surface-2); }
 .prow__done {
   flex: none;
-  width: 48px;
+  width: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -512,109 +601,181 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + 40px); }
 .prow__done:active { background: var(--accent-soft); border-radius: var(--radius-sm); }
 .prow.is-overdue .row__icon--planned { color: var(--warn); }
 
-/* Ein Beiwort an der Zeile — Zahler, Fälligkeit, Herkunft. Ohne Rahmen:
-   zwanzig umrandete Pillen in einer Liste sind zwanzig kleine Kästen. */
-.tag {
-  font-size: var(--fs-xs);
-  font-weight: 500;
-  padding: 1px 7px;
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  color: var(--text-muted);
+/* Ein Beiwort an der Zeile — Zahler, Fälligkeit, Herkunft. Ohne Fläche und
+   ohne Rahmen: zwanzig umrandete Pillen in einer Liste sind zwanzig kleine
+   Kästen. Was sie vom Text daneben abhebt, ist die Sperrung. */
+.tag { font-size: var(--fs-xs); color: var(--text-faint); }
+.tag--due {
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--warn);
 }
-.tag--due { background: var(--warn-soft); color: var(--warn); }
 
-.empty { padding: 18px 0 20px; }
+.empty { padding: var(--sp-4) 0 var(--sp-5); }
 .empty__text { font-size: var(--fs-sm); color: var(--text-faint); }
-.empty .btn { margin-top: 14px; }
+.empty .btn { margin-top: var(--sp-4); }
 
 /* ----------------------------------------------------------- Tagesgruppen */
 
-.daygroups { display: flex; flex-direction: column; gap: 28px; }
+/*
+ * Ein Reisetag als Eintrag im Tagebuch: das Datum in der Serife, der
+ * Tagesbetrag rechts auf derselben Grundlinie, darunter die Linie und die
+ * Einträge. Die Einordnung („über dem Schnitt“) steht als leise Meta-Zeile
+ * darunter — sie färbt sich nur, wenn der Tag wirklich drüber liegt.
+ */
+.daygroups { display: flex; flex-direction: column; gap: var(--sp-6); }
 .daygroup { display: flex; flex-direction: column; gap: 2px; }
-.daygroup__head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding-bottom: 6px; }
-.daygroup__title { font-size: var(--fs-md); font-weight: 600; }
-/* Betrag und Einordnung stehen als Block rechts: eine Kante, an der das Auge
-   die Tage untereinander vergleicht. */
-.daygroup__nums { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; text-align: right; }
+.daygroup__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--rule);
+}
+.daygroup__line { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); }
+.daygroup__title {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+/*
+ * Die Einordnung des Tages steht unter dem Datum, noch über der Linie — sonst
+ * sieht sie aus, als gehörte sie zur ersten Ausgabe darunter.
+ *
+ * Und sie ist nicht rot: Ein Tag über dem Schnitt ist im Urlaub der halbe
+ * Normalfall, und fünf rote Zeilen in einer Liste sagen am Ende nichts mehr.
+ * Was drüber liegt, steht in Tinte, der Rest bleibt blass — das Verdikt trägt
+ * die große Zahl auf „Heute“.
+ */
 .daygroup__sub { font-size: var(--fs-xs); color: var(--text-faint); }
-.daygroup__sub.is-over { color: var(--over); }
-.daygroup__total { font-weight: 600; font-variant-numeric: tabular-nums; }
+.daygroup__sub.is-over { color: var(--text-muted); font-weight: 500; }
+.daygroup__total { font-weight: 600; }
 
 /* --------------------------------------------------------------- Balken */
 
-.bar { height: 5px; border-radius: var(--radius-pill); background: var(--surface-2); overflow: hidden; }
-.bar__fill { height: 100%; border-radius: var(--radius-pill); background: var(--accent); transition: width 0.3s ease; }
+/*
+ * Haarlinie statt Fortschrittsbalken: 3 px hoch, ohne Rundung, in der Farbe
+ * der Linien. Im Normalfall trägt er keine Farbe — er zeigt nur, wie weit der
+ * Tag ist. Farbe bekommt er erst beim Kippen ins Knappe oder Über.
+ */
+.bar { height: 2px; background: var(--border); overflow: hidden; }
+.bar__fill { height: 100%; background: var(--text-faint); transition: width 0.3s ease; }
 .bar--warn .bar__fill { background: var(--warn); }
 .bar--over .bar__fill { background: var(--over); }
-.bar--neutral .bar__fill { background: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.bar--neutral .bar__fill { background: var(--text-faint); }
+.bar--good .bar__fill { background: var(--accent); }
 
 /* ---------------------------------------------------------------- Chart */
 
-.chart { display: flex; flex-direction: column; gap: 8px; }
-.chart__svg { width: 100%; height: 130px; display: block; }
+/*
+ * Soll gegen Ist als Haarlinien-Diagramm: eine Linie für das Geld, das
+ * wirklich noch da ist, eine gestrichelte für „gleichmäßig ausgeben“. Keine
+ * Fläche, kein Verlauf — die Fläche unter einer Kurve trägt hier keine
+ * Information, sie füllt nur Platz.
+ */
+.chart { display: flex; flex-direction: column; gap: var(--sp-2); }
+.chart__svg { width: 100%; height: 120px; display: block; }
 .chart__axis { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.chart__area { stroke: none; }
-.chart__stopTop { stop-color: var(--accent); stop-opacity: 0.22; }
-.chart__stopBottom { stop-color: var(--accent); stop-opacity: 0.02; }
-.chart__plan { fill: none; stroke: var(--text-faint); stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
-.chart__actual { fill: none; stroke: var(--accent); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chart__plan { fill: none; stroke: var(--text-faint); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
+.chart__actual { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .chart__dot { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
-.chart__legend { display: flex; gap: 16px; font-size: var(--fs-xs); color: var(--text-muted); }
+.chart__legend { display: flex; gap: var(--sp-4); font-size: var(--fs-xs); color: var(--text-muted); }
 .legend__item { display: inline-flex; align-items: center; gap: 6px; }
-.legend__swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend__swatch { width: 14px; height: 2px; display: inline-block; }
 .legend__swatch--actual { background: var(--accent); }
-.legend__swatch--plan { background: repeating-linear-gradient(90deg, var(--text-faint) 0 4px, transparent 4px 8px); }
-.chart__axisLabels { display: flex; justify-content: space-between; font-size: var(--fs-xs); color: var(--text-faint); }
+.legend__swatch--plan { background: repeating-linear-gradient(90deg, var(--text-faint) 0 3px, transparent 3px 7px); }
+.chart__axisLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--fs-eyebrow);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ------------------------------------------------------------ Kategorien */
 
-.catlist { display: flex; flex-direction: column; gap: 16px; }
-.cat { display: flex; align-items: center; gap: 12px; }
-.cat__icon { width: 22px; display: grid; place-items: center; color: var(--text-faint); }
-.cat__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
-.cat__top { display: flex; justify-content: space-between; gap: 10px; font-size: var(--fs-sm); }
+/*
+ * Wofür das Geld ging: Betrag rechts, darunter ein Anteilsbalken als
+ * Haarlinie. Der Balken ist der Anteil — eine Prozentzahl daneben wäre
+ * dieselbe Auskunft ein zweites Mal.
+ */
+.catlist { display: flex; flex-direction: column; gap: var(--sp-4); }
+.cat { display: flex; align-items: center; gap: var(--sp-3); }
+.cat__icon { width: 20px; display: grid; place-items: center; color: var(--text-faint); }
+.cat__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.cat__top { display: flex; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-sm); }
 .cat__label { color: var(--text-muted); }
-.cat__amount { font-weight: 600; font-variant-numeric: tabular-nums; }
+.cat__amount { font-weight: 600; }
 
 /* ------------------------------------------------------------ Abrechnung */
 
-.split { display: flex; gap: 18px; padding-top: 12px; flex-wrap: wrap; }
+.split { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); padding-top: var(--sp-3); }
 .split__item { display: flex; align-items: center; gap: 7px; font-size: var(--fs-sm); }
 .split__name { color: var(--text-muted); }
-.split__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.split__value { font-weight: 600; }
 
-.dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
-.dot--lg { width: 13px; height: 13px; }
+/* Die Personenfarben stammen aus den Daten und sind bewusst kräftig, damit man
+   sie klein noch unterscheidet. Auf Papier neben Tinte wären sie der lauteste
+   Ton der Seite — deshalb nimmt der Filter ihnen einen Teil der Sättigung ab,
+   ohne den Farbton zu verändern, an dem man die Person erkennt. */
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+  filter: saturate(0.68);
+}
+.dot--lg { width: 12px; height: 12px; }
 
+/*
+ * „Wer bekommt was, wer zahlt was“ — die Frage, für die man am Ende in die
+ * App schaut. Deshalb steht sie als Tabelle da: Name links, Saldo rechts an
+ * einer Kante, Vorzeichen immer sichtbar.
+ */
 .settle { display: flex; flex-direction: column; }
 .settle__row {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 4px 12px;
-  padding: 12px 0;
+  gap: var(--sp-1) var(--sp-3);
+  padding: var(--sp-3) 0;
   border-top: 1px solid var(--border);
 }
 .settle__row:first-child { border-top: 0; }
-.settle__who { display: flex; align-items: center; gap: 8px; font-weight: 600; }
-.settle__nums { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: var(--fs-xs); color: var(--text-muted); }
+.settle__who { display: flex; align-items: center; gap: var(--sp-2); font-weight: 500; }
+.settle__nums { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 2px var(--sp-3); font-size: var(--fs-xs); color: var(--text-faint); }
 .settle__share { color: var(--text-faint); }
-.settle__balance { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--accent); }
+.settle__balance {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: baseline;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--accent);
+}
 .settle__balance.is-negative { color: var(--over); }
-.settle__todo { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text); }
-.settle__todo li { line-height: 1.4; }
+/* Was tatsächlich zu tun ist: keine Tabelle, sondern Sätze — jeder eine
+   Überweisung. */
+.settle__todo { display: flex; flex-direction: column; gap: var(--sp-3); font-size: var(--fs-sm); color: var(--text); }
+.settle__todo li { line-height: 1.45; padding-left: var(--sp-4); text-indent: calc(var(--sp-4) * -1); }
 /* Mitten im Urlaub ist die Liste eine Momentaufnahme, keine Anweisung. */
-.settle__hint { font-size: var(--fs-xs); color: var(--text-muted); }
+.settle__hint { font-size: var(--fs-xs); color: var(--text-faint); }
 
 /* -------------------------------------------------------------- Formulare */
 
-.field { display: flex; flex-direction: column; gap: 6px; }
-.field__label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); }
+.field { display: flex; flex-direction: column; gap: var(--sp-2); }
 .field__input {
   width: 100%;
   min-height: var(--tap);
-  padding: 11px 13px;
-  border-radius: var(--radius);
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
@@ -627,7 +788,7 @@ select.field__input { background-image: none; }
 /* `min-width: 0` ist Pflicht: Rasterzellen sind sonst mindestens so breit wie
    ihr Inhalt, und `input[type=date]` bringt eine feste Mindestbreite mit —
    damit stand die Seite 29 px über dem Rand und ließ sich seitwärts schieben. */
-.field__pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.field__pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .field__pair > * { min-width: 0; }
 .field__pair .field__input { min-width: 0; }
 .field__note { font-size: var(--fs-xs); color: var(--text-muted); }
@@ -636,57 +797,42 @@ select.field__input { background-image: none; }
 .field__inline { align-self: flex-start; }
 .field__error { font-size: var(--fs-xs); color: var(--over); min-height: 1.1em; }
 
-.stack { display: flex; flex-direction: column; gap: 12px; }
-/* Für Zeilen, die enger zusammengehören als zwei eigene Gedanken — etwa eine
-   Rechnung und ihre unmittelbare Folge. */
-.stack--tight { gap: 4px; }
-.steps { display: flex; flex-direction: column; gap: 8px; font-size: var(--fs-sm); color: var(--text-muted); counter-reset: step; }
-.steps li { display: flex; gap: 9px; line-height: 1.4; }
+.stack { display: flex; flex-direction: column; gap: var(--sp-3); }
+/* Für Zeilen, die enger zusammengehören als zwei eigene Gedanken. */
+.stack--tight { gap: var(--sp-1); }
+.steps { display: flex; flex-direction: column; gap: var(--sp-2); font-size: var(--fs-sm); color: var(--text-muted); counter-reset: step; }
+.steps li { display: flex; gap: var(--sp-3); line-height: 1.45; }
 .steps li::before {
   counter-increment: step;
   content: counter(step);
   flex: none;
-  width: 20px; height: 20px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  display: grid; place-items: center;
-  margin-top: 1px;
+  width: 18px;
+  color: var(--text-faint);
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  padding-top: 3px;
 }
 
-/* -------------------------------------------------------- Aktionszeilen */
-
-/*
- * Sichern, Einspielen, Löschen: Handlungen, die man selten braucht und nie
- * verwechseln darf. Als Zeilen untereinander statt als fünf gleich große
- * Knöpfe — so bleibt die eine hervorgehobene Aktion darüber die einzige, die
- * sich meldet.
- */
 /* ------------------------------------------------- Einstellungs-Zeilen */
 
 /*
  * Die Einstellungen sind eine Liste, keine Formularseite: jede Zeile nennt
- * links, worum es geht, und rechts, wie es steht. Der Pfeil führt zum Sheet,
- * in dem geändert wird.
+ * links, worum es geht, und rechts, wie es steht. Haarlinien statt fünf weißer
+ * Karten untereinander — die Überschrift ist schon die Gruppe.
  */
-/* Wie die Ausgabenliste: Haarlinien statt Kasten. Fünf weiße Karten
-   untereinander wären auf dieser Seite die auffälligste Struktur — dabei ist
-   die Überschrift schon die Gruppe. */
 .rows { display: flex; flex-direction: column; }
 /* Die Zeile selbst setzt `border: 0` (Knopf-Reset). Bei gleicher Spezifität
-   gewinnt die spätere Regel — die Trennlinie braucht deshalb beide Klassen,
-   sonst laufen die Zeilen ohne Kante ineinander. */
+   gewinnt die spätere Regel — die Trennlinie braucht deshalb beide Klassen. */
 .rows > .srow + .srow { border-top: 1px solid var(--border); }
 
 .srow {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--sp-3);
   width: 100%;
-  min-height: 54px;
-  padding: 12px 0;
+  min-height: 52px;
+  padding: var(--sp-3) 0;
   border: 0;
   background: none;
   color: var(--text);
@@ -696,14 +842,14 @@ select.field__input { background-image: none; }
 .srow:active { background: var(--surface-2); }
 
 .srow__lead { display: grid; place-items: center; color: var(--text-faint); }
-.srow__dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.srow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.srow__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; filter: saturate(0.68); }
+.srow__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 /*
- * Label dezent, Wert kräftig: vorher standen „Name“ und „Roadtrip Norwegen“
- * optisch fast gleich da, und das Auge wusste nicht, welches die Frage und
- * welches die Antwort ist. Die Frage ist hier immer die Nebensache.
+ * Label dezent, Wert kräftig: „Name“ und „Roadtrip Norwegen“ standen optisch
+ * fast gleich da, und das Auge wusste nicht, welches die Frage und welches die
+ * Antwort ist. Die Frage ist hier immer die Nebensache.
  */
-.srow__label { font-size: var(--fs-xs); font-weight: 500; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.srow__label { font-size: var(--fs-sm); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .srow__sub { font-size: var(--fs-xs); color: var(--text-faint); line-height: 1.35; }
 .srow__value {
   flex: none;
@@ -725,40 +871,35 @@ select.field__input { background-image: none; }
 
 /*
  * Auswahlzeile im Sheet: hier ist `.srow__label` nicht die leise Bildunter-
- * schrift wie in den Einstellungen, sondern der Name der Option selbst
- * („Mitwachsend“, „Euro“) — die Zeile bräuchte sonst dieselbe Zurückhaltung
- * wie ihre eigene Erklärung darunter und wäre kaum noch zu lesen.
+ * schrift wie in den Einstellungen, sondern der Name der Option selbst.
  */
 .srow--option { align-items: flex-start; }
 .srow--option .srow__label {
   white-space: normal;
   font-size: var(--fs-md);
-  font-weight: 500;
   color: var(--text);
 }
 .srow--option.is-active .srow__label { color: var(--accent); font-weight: 600; }
 
-/* Löschen steht allein, mit Abstand nach oben — nichts daneben, was man
-   aus Versehen träfe. */
-.danger { margin-top: 10px; }
-.about { gap: 4px; text-align: center; }
+/* Löschen steht allein, mit Abstand nach oben — nichts daneben, was man aus
+   Versehen träfe. */
+.danger { margin-top: var(--sp-3); }
+.about { gap: var(--sp-1); text-align: center; }
 
 /* ---------------------------------------------------------- Reisegruppe */
 
-/* Namensfelder beim Anlegen: Farbpunkt, Feld, und rechts entweder das „Du“
-   oder der Knopf, mit dem die Zeile wieder verschwindet. Ein Raster statt
-   flex, damit alle Felder gleich breit bleiben — sonst wandert die rechte
-   Kante mit der Länge des Namens. */
-.people { display: flex; flex-direction: column; gap: 8px; }
+.people { display: flex; flex-direction: column; gap: var(--sp-2); }
 /* Die letzte Spalte hat eine feste Breite: „Du“ und der Entfernen-Knopf sind
    unterschiedlich breit, und mit `auto` stünde jedes Namensfeld anders weit
    nach rechts — bei drei Zeilen sieht das aus wie ein Fehler. */
-.people__row { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
+.people__row { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: var(--sp-3); }
 .people__name { min-width: 0; }
 .people__you {
   justify-self: center;
-  font-size: var(--fs-xs);
-  font-weight: 500;
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--text-faint);
 }
 /* Doppelt benannt: `.icon-btn` steht weiter unten und würde sonst Größe und
@@ -770,39 +911,45 @@ select.field__input { background-image: none; }
 
 /* Kostenaufteilung ab drei Personen: Anteile statt Prozentfelder, die
    zusammen 100 ergeben müssen. Die Prozentzahl steht als Ergebnis daneben. */
-.shares { display: flex; flex-direction: column; gap: 4px; }
-.share { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 4px 0; }
+.shares { display: flex; flex-direction: column; gap: var(--sp-1); }
+.share { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: var(--sp-3); padding: var(--sp-1) 0; }
 .share__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-md); }
-.share__pct { font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
-/* Ein Rechenwerkzeug, kein Filter: `--radius`, nicht die Pille, die sonst
-   Status und Auswahl markiert. */
-.stepper { display: flex; align-items: center; gap: 2px; background: var(--surface-2); border-radius: var(--radius); padding: 2px; }
+.share__pct { font-size: var(--fs-xs); color: var(--text-muted); }
+/* Ein Rechenwerkzeug: Haarlinie außen herum statt getönter Fläche. */
+.stepper { display: flex; align-items: center; gap: 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 2px; }
 .stepper__btn {
-  width: 40px; height: 40px;
-  border: 0; border-radius: 50%;
+  width: 38px; height: 38px;
+  border: 0; border-radius: var(--radius-sm);
   background: none;
   color: var(--text);
-  font-size: 1.05rem;
+  font-size: var(--fs-lg);
   line-height: 1;
 }
-.stepper__btn:disabled { opacity: 0.35; }
-.stepper__value { min-width: 18px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.stepper__btn:active { background: var(--surface-2); }
+.stepper__btn:disabled { opacity: 0.3; }
+.stepper__value { min-width: 20px; text-align: center; font-weight: 600; }
 
-.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: var(--surface-2); border-radius: var(--radius); }
+/*
+ * Umschalter als Reiter, nicht als Schalter in einer getönten Rinne: Text auf
+ * Papier, der aktive bekommt eine Linie darunter. Das ist dieselbe Sprache wie
+ * die Filterreiter über der Ausgabenliste.
+ */
+.segmented { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
 .segmented--3 { grid-template-columns: repeat(3, 1fr); }
 .segmented__btn {
-  min-height: 42px;
-  padding: 8px;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-1);
   border: 0;
-  border-radius: var(--radius-sm);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   background: none;
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  font-weight: 600;
+  font-weight: 500;
 }
-.segmented__btn.is-active { background: var(--surface); color: var(--text); }
+.segmented__btn.is-active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 
-.status { display: flex; gap: 12px; align-items: flex-start; }
+.status { display: flex; gap: var(--sp-3); align-items: flex-start; }
 .status .icon { margin-top: 2px; }
 .status--good { color: var(--accent); }
 .status--warn { color: var(--warn); }
@@ -813,28 +960,44 @@ select.field__input { background-image: none; }
 
 /* --------------------------------------------------------------- Knöpfe */
 
+/*
+ * Drei Stufen, klar unterscheidbar: gefüllt für die eine Handlung, die den
+ * Bildschirm abschließt; Haarlinie für die Alternative daneben; reiner Text
+ * für alles, was nur mitläuft.
+ */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--sp-2);
   min-height: var(--tap);
-  padding: 12px 20px;
+  padding: var(--sp-3) var(--sp-5);
   border-radius: var(--radius);
-  border: 1px solid transparent;
-  background: var(--surface-2);
+  border: 1px solid var(--border);
+  background: none;
   color: var(--text);
   font-weight: 600;
   font-size: var(--fs-md);
 }
 .btn:active { transform: translateY(1px); }
-.btn:disabled { opacity: 0.55; }
-.btn--primary { background: var(--accent); color: var(--on-accent); }
-.btn--ghost { background: transparent; border-color: var(--border); color: var(--text); }
-.btn--danger { color: var(--over); border-color: color-mix(in srgb, var(--over) 30%, var(--border)); }
-.btn--primary.btn--danger { background: var(--over); color: var(--on-accent); border-color: transparent; }
+.btn:disabled { opacity: 0.5; }
+.btn--primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.btn--ghost { background: none; border-color: var(--border); color: var(--text); }
+.btn--danger { color: var(--over); border-color: color-mix(in srgb, var(--over) 28%, var(--border)); }
+.btn--primary.btn--danger { background: var(--over); border-color: var(--over); color: var(--on-accent); }
 .btn--wide { width: 100%; }
-.btn--small { min-height: 38px; padding: 6px 12px; font-size: var(--fs-xs); border-radius: var(--radius-sm); }
+/* Die dritte Stufe: kein Rahmen, keine Fläche — ein Wort mit Symbol, das neben
+   einer Überschrift stehen kann, ohne mit ihr zu konkurrieren. */
+.btn--small {
+  min-height: 36px;
+  padding: var(--sp-1) 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.btn--small:active { opacity: 0.6; }
 
 .icon-btn {
   display: grid; place-items: center;
@@ -846,7 +1009,12 @@ select.field__input { background-image: none; }
 }
 .icon-btn:active { background: var(--surface-2); }
 
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+/*
+ * Auswahl in Sheets (Zahler, Person): Haarlinie statt gefüllter Pille. Gewählt
+ * wird über Tinte und Rahmen, nicht über eine dunkle Fläche — sonst steht in
+ * jeder Maske ein schwarzer Balken, der lauter ist als der Betrag darüber.
+ */
+.chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .chips--scroll {
   flex-wrap: nowrap;
   overflow-x: auto;
@@ -860,74 +1028,148 @@ select.field__input { background-image: none; }
   align-items: center;
   gap: 6px;
   min-height: var(--tap);
-  padding: 8px 14px;
-  border-radius: var(--radius-pill);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: none;
   color: var(--text-muted);
   font-size: var(--fs-sm);
   font-weight: 500;
   white-space: nowrap;
 }
 .chip.is-active {
-  background: var(--accent);
   border-color: var(--accent);
-  color: var(--on-accent);
+  color: var(--accent);
   font-weight: 600;
 }
 .chip .icon { margin-left: -2px; }
 .chip--date { position: relative; overflow: hidden; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 
-/* Kategorien im Eingabe-Sheet: gleich breite Felder, feste Plätze. */
-.catgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
-/* Doppelt benannt, weil `.chip` weiter unten steht: bei gleicher Spezifität
-   gewinnt sonst die spätere Regel und das Raster bekäme die Chip-Maße. */
-/* 44 px, nicht die 39, die aus der kleineren Schrift fielen: das hier wird
-   im Gehen, einhändig und mit dem Daumen getroffen. */
-.chip.catgrid__item { justify-content: center; gap: 5px; min-width: 0; min-height: var(--tap); padding-inline: 5px; font-size: var(--fs-xs); border-radius: var(--radius); }
-.chip.catgrid__item .icon { margin-left: 0; }
-/* Auf sehr schmalen Geräten passt „Sonstiges“ mit Icon sonst nicht in die
+/*
+ * Filterreiter über der Ausgabenliste: Text auf Papier, der aktive mit einer
+ * Linie darunter. Vorher waren das gefüllte Pillen — zehn Stück nebeneinander
+ * sahen aus wie zehn Knöpfe, dabei ist es eine einzige Auswahl.
+ */
+.tabs {
+  display: flex;
+  gap: var(--sp-5);
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--border);
+  margin-inline: calc(var(--gutter) * -1);
+  padding-inline: var(--gutter);
+}
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap);
+  padding: 0 0 var(--sp-2);
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.tab.is-active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+/*
+ * Kategorien im Eingabe-Sheet: gleich breite Felder, feste Plätze — man trifft
+ * „Essen“ irgendwann ohne hinzusehen. Ohne Kasten: gewählt heißt Tinte plus
+ * Linie darunter, nicht eine gefüllte dunkle Fläche.
+ */
+.catgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-1) var(--sp-3); }
+/* Doppelt benannt, weil `.chip` weiter oben steht: bei gleicher Spezifität
+   gewänne sonst die spätere Regel und das Raster bekäme die Chip-Maße. */
+.chip.catgrid__item {
+  justify-content: flex-start;
+  gap: 6px;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: var(--sp-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+.chip.catgrid__item.is-active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.chip.catgrid__item .icon { margin-left: 0; color: var(--text-faint); }
+.chip.catgrid__item.is-active .icon { color: var(--accent); }
+/* Auf sehr schmalen Geräten passt „Sonstiges“ mit Symbol sonst nicht in die
    Zelle und wird abgeschnitten. */
 @media (max-width: 359px) {
   .chip.catgrid__item { font-size: var(--fs-xs); gap: 4px; }
   .chip.catgrid__item .icon { width: 14px; height: 14px; }
 }
 
-.daterow { display: flex; flex-direction: column; gap: 6px; }
-.daterow__quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 48px; gap: 8px; }
-.daterow__quick > .chip { justify-content: center; min-width: 0; min-height: var(--tap); padding-inline: 6px; border-radius: var(--radius); }
-.daterow__label { font-size: var(--fs-xs); color: var(--text-muted); }
+.daterow { display: flex; flex-direction: column; gap: var(--sp-2); }
+.daterow__quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 44px; gap: var(--sp-3); border-bottom: 1px solid var(--border); }
+.daterow__quick > .chip {
+  justify-content: center;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: var(--sp-2) 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  margin-bottom: -1px;
+}
+.daterow__quick > .chip.is-active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.daterow__label { color: var(--text-faint); }
 
 /* ------------------------------------------------------------ Zahlenfeld */
 
-.amount { display: flex; flex-direction: column; gap: 4px; }
-.amount__row { display: flex; align-items: baseline; justify-content: center; gap: 6px; }
+/*
+ * Der Betrag ist der Fokus der Maske: groß, tabellarisch, mittig, mit der
+ * Währung als kleinem Beisatz. Alles darunter ist Zubehör.
+ */
+.amount { display: flex; flex-direction: column; gap: var(--sp-1); }
+.amount__row { display: flex; align-items: baseline; justify-content: center; gap: var(--sp-2); }
 .amount__value {
-  font-size: clamp(2.4rem, 12vw, 3rem);
+  font-size: clamp(2.5rem, 13vw, 3.2rem);
   font-weight: 600;
-  letter-spacing: -0.03em;
-  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
 }
 .amount__value.is-empty { color: var(--text-faint); }
-.amount__cur { font-size: 1.4rem; font-weight: 600; color: var(--text-muted); }
+.amount__cur { font-size: var(--fs-xl); font-weight: 500; color: var(--text-faint); }
 .amount__hint { text-align: center; font-size: var(--fs-xs); color: var(--text-faint); min-height: 1.2em; }
 .amount__hint.is-error { color: var(--over); }
 
-.keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+/*
+ * Die Tastatur: zwölf Tippflächen, getrennt durch Haarlinien statt durch zwölf
+ * graue Kacheln. Dieselbe Trefferfläche, ein Zwölftel des optischen Gewichts —
+ * die Zahl darüber bleibt das Lauteste im Sheet.
+ */
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
 .key {
-  min-height: 52px;
-  padding: 10px 0;
-  border-radius: var(--radius);
+  min-height: 56px;
+  padding: var(--sp-3) 0;
   border: 0;
-  background: var(--surface-2);
-  font-size: 1.3rem;
-  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+  background: none;
+  color: var(--text);
+  font-size: var(--fs-xl);
+  font-weight: 500;
   display: grid;
   place-items: center;
-  font-variant-numeric: tabular-nums;
 }
-.key:active { background: var(--accent-soft); }
+.key:nth-child(3n) { border-right: 0; }
+.key:active { background: var(--surface-2); }
 .key--muted { color: var(--text-muted); }
 
 /* ----------------------------------------------------------- Bottom-Sheet */
@@ -951,7 +1193,7 @@ select.field__input { background-image: none; }
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border-radius: 14px 14px 0 0;
+  border-radius: var(--radius) var(--radius) 0 0;
   border-top: 1px solid var(--border);
   box-shadow: var(--shadow-float);
   transform: translateY(14px);
@@ -960,38 +1202,32 @@ select.field__input { background-image: none; }
 }
 .overlay.is-open .sheet { transform: translateY(0); }
 .sheet--tall { min-height: min(78dvh, 640px); }
-.sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px var(--gutter) 6px; }
-.sheet__title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.012em; }
-.sheet__sub { font-size: var(--fs-xs); color: var(--text-muted); margin-top: 2px; }
-.sheet__body { overflow-y: auto; padding: 10px var(--gutter) 20px; -webkit-overflow-scrolling: touch; }
+.sheet__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); padding: var(--sp-5) var(--gutter) var(--sp-2); }
+.sheet__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.sheet__sub { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-1); }
+.sheet__body { overflow-y: auto; padding: var(--sp-3) var(--gutter) var(--sp-5); -webkit-overflow-scrolling: touch; }
 
-.entry { display: flex; flex-direction: column; gap: 18px; }
+.entry { display: flex; flex-direction: column; gap: var(--sp-5); }
 
-/* Der Speichern-Knopf bleibt stehen.
-   Vorher lag er bei einer neuen Ausgabe rund 350 px unterhalb des Randes: für
-   den häufigsten Handgriff der App musste man erst scrollen. Das eigene
-   Polster wandert dafür von der Sheet-Fläche in die Leiste, damit sie unten
-   bündig klebt statt über einem Streifen Luft zu schweben. */
+/* Der Speichern-Knopf bleibt stehen. Vorher lag er bei einer neuen Ausgabe rund
+   350 px unterhalb des Randes: für den häufigsten Handgriff der App musste man
+   erst scrollen. */
 .sheet__body--entry { padding-bottom: 0; }
 .entry__actions {
   position: sticky;
   bottom: 0;
   z-index: 2;
   display: flex;
-  gap: 10px;
+  gap: var(--sp-3);
   align-items: center;
-  padding: 10px 0 18px;
+  padding: var(--sp-3) 0 var(--sp-5);
   background: var(--bg);
-}
-/* Weicher Übergang nach oben, damit Inhalt nicht an einer Kante abgeschnitten
-   wirkt, wenn er darunter durchscrollt. */
-.entry__actions::before {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 100%;
-  height: 20px;
-  background: linear-gradient(to top, var(--bg), transparent);
-  pointer-events: none;
 }
 .entry__actions .btn--wide { flex: 1; }
 
@@ -1003,14 +1239,20 @@ select.field__input { background-image: none; }
 .disclosure__head {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-3);
   min-height: 48px;
-  padding: 12px 0;
+  padding: var(--sp-3) 0;
   cursor: pointer;
   list-style: none;
 }
 .disclosure__head::-webkit-details-marker { display: none; }
-.disclosure__title { font-size: var(--fs-sm); font-weight: 500; color: var(--text-muted); }
+.disclosure__title {
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
 /* Was zugeklappt drinsteht, muss man trotzdem sehen können — sonst trägt man
    still auf den falschen Namen ein. */
 .disclosure__summary {
@@ -1028,42 +1270,49 @@ select.field__input { background-image: none; }
 .disclosure__body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 2px 0 18px;
+  gap: var(--sp-4);
+  padding: var(--sp-1) 0 var(--sp-5);
 }
 
-.confirm { display: flex; flex-direction: column; gap: 18px; }
+.confirm { display: flex; flex-direction: column; gap: var(--sp-5); }
 .confirm__text { font-size: var(--fs-md); color: var(--text-muted); }
-.confirm__actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.confirm__actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 
 /* --------------------------------------------------------------- Willkommen */
 
-.welcome { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 28px 0 16px; }
+.welcome { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-6) 0 var(--sp-4); }
 .view--center .welcome { align-items: center; text-align: center; }
-.welcome--compact { padding-bottom: 8px; }
+.welcome--compact { padding-bottom: var(--sp-2); }
 /* Das Zeichen aus dem App-Symbol, flach: ein schwebendes Logo mit Schlagschatten
-   ist ein Startbildschirm-Motiv, kein Formularkopf. */
+   wäre ein Startbildschirm-Motiv, kein Formularkopf. */
 .welcome__mark {
-  width: 44px; height: 44px;
-  border-radius: var(--radius);
+  width: 40px; height: 40px;
+  border-radius: var(--radius-sm);
   display: grid; place-items: center;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-bottom: 2px;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  margin-bottom: var(--sp-1);
 }
-.welcome__title { font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em; }
+.welcome__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
 .welcome__text { font-size: var(--fs-md); color: var(--text-muted); max-width: 38ch; }
 .welcome .btn { width: 100%; }
 /* Der zweite Weg unter dem Formular: beitreten statt anlegen. Abgesetzt durch
-   einen Strich, damit er nicht wie der nächste Schritt des Formulars aussieht. */
+   eine Linie, damit er nicht wie der nächste Schritt des Formulars aussieht. */
 .welcome__foot {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 26px;
-  padding-top: 18px;
+  gap: var(--sp-2);
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-4);
   border-top: 1px solid var(--border);
   text-align: center;
 }
@@ -1071,7 +1320,7 @@ select.field__input { background-image: none; }
 /* ------------------------------------------------------------- Kleinkram */
 
 .spinner {
-  width: 28px; height: 28px;
+  width: 26px; height: 26px;
   margin: 0 auto;
   border-radius: 50%;
   border: 2px solid var(--border);
@@ -1083,20 +1332,19 @@ select.field__input { background-image: none; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--nav-h) + var(--safe-b) + 84px);
+  bottom: calc(var(--nav-h) + var(--safe-b) + 80px);
   transform: translate(-50%, 12px);
   z-index: 80;
   width: max-content;
   max-width: min(420px, calc(100vw - 32px));
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 12px 18px;
-  border-radius: var(--radius-pill);
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius);
   background: var(--toast-bg);
   color: var(--toast-text);
   font-size: var(--fs-sm);
-  font-weight: 500;
   box-shadow: var(--shadow-float);
   opacity: 0;
   pointer-events: none;
@@ -1108,19 +1356,19 @@ select.field__input { background-image: none; }
 .toast__action {
   pointer-events: auto;
   flex: none;
-  margin: -6px -8px -6px 4px;
+  margin: -6px -8px -6px var(--sp-1);
   padding: 6px 10px;
   border: 0;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-sm);
   background: none;
   color: inherit;
   font-size: var(--fs-sm);
-  font-weight: 700;
+  font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 .toast__action:active { opacity: 0.7; }
-.toast--error { background: var(--over); color: var(--on-accent); }
+.toast--error { background: var(--over); color: #fff; }
 .toast--success { background: var(--accent); color: var(--on-accent); }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1129,6 +1377,6 @@ select.field__input { background-image: none; }
 
 @media (min-width: 620px) {
   .app { border-inline: 1px solid var(--border); min-height: 100dvh; }
-  .view { padding-inline: 24px; }
-  .chips--scroll { margin-inline: -24px; padding-inline: 24px; }
+  .view { padding-inline: var(--sp-6); }
+  .chips--scroll, .tabs { margin-inline: calc(var(--sp-6) * -1); padding-inline: var(--sp-6); }
 }

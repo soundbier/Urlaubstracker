@@ -28,20 +28,22 @@ export function renderExpenses(state, actions) {
 
   const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
 
-  const chips = h('div.chips.chips--scroll',
-    filterChip('all', 'Alles', null, actions),
-    ...usedCategories.map((c) => filterChip(c.id, c.short, c.icon, actions)),
+  // Reiter, keine Pillenreihe: das ist eine einzige Auswahl, keine zehn Knöpfe.
+  const tabs = h('div.tabs', { role: 'tablist' },
+    filterTab('all', 'Alles', null, actions),
+    ...usedCategories.map((c) => filterTab(c.id, c.short, c.icon, actions)),
   );
 
   return h('div.view',
+    // Summe, Beschriftung, Anzahl — untereinander an derselben Kante. Die
+    // Anzahl stand vorher rechts auf halber Höhe der Zahl und sah aus wie ein
+    // zweiter, kleinerer Wert.
     h('div.summary',
-      h('div',
-        h('p.summary__label', filter === 'all' ? 'Bisher ausgegeben' : CATEGORY_BY_ID[filter].label),
-        h('p.summary__value', money(shownTotal, cur)),
-      ),
+      h('p.summary__label', filter === 'all' ? 'Bisher ausgegeben' : CATEGORY_BY_ID[filter].label),
+      h('p.summary__value', money(shownTotal, cur)),
       h('p.summary__meta', plural(shown.length, 'Eintrag', 'Einträge')),
     ),
-    usedCategories.length > 1 ? chips : null,
+    usedCategories.length > 1 ? tabs : null,
     planned.length
       ? h('section.section',
           sectionTitle('Verplant', h('span.section__meta.section__meta--amount', money(planned.reduce((a, e) => a + e.amount, 0), cur))),
@@ -55,9 +57,11 @@ export function renderExpenses(state, actions) {
   );
 }
 
-function filterChip(id, label, iconName, actions) {
-  return h('button.chip', {
+function filterTab(id, label, iconName, actions) {
+  return h('button.tab', {
     type: 'button',
+    role: 'tab',
+    'aria-selected': filter === id ? 'true' : 'false',
     class: filter === id ? 'is-active' : '',
     onclick: () => { filter = id; actions.rerender(); },
   }, iconName ? icon(iconName, 16) : null, label);
@@ -91,15 +95,17 @@ function dayGroup(group, trip, budget, today, rowOpts) {
   const inTrip = group.date >= trip.startDate && group.date <= trip.endDate;
   const compare = inTrip && budget.planPerDay > 0;
 
+  const note = compare
+    ? h('p.daygroup__sub', { class: everydayTotal > budget.planPerDay ? 'is-over' : '' }, dayNote(everydayTotal, budget, group.date, today, cur))
+    : inTrip ? null : h('p.daygroup__sub', 'außerhalb des Urlaubs');
+
   return h('section.daygroup',
     h('header.daygroup__head',
-      h('h3.daygroup__title', dayLabel(group.date, today)),
-      h('div.daygroup__nums',
-        h('p.daygroup__total', money(group.total, cur)),
-        compare
-          ? h('p.daygroup__sub', { class: everydayTotal > budget.planPerDay ? 'is-over' : '' }, dayNote(everydayTotal, budget, group.date, today, cur))
-          : inTrip ? null : h('p.daygroup__sub', 'außerhalb des Urlaubs'),
+      h('div.daygroup__line',
+        h('h3.daygroup__title', dayLabel(group.date, today)),
+        h('span.daygroup__total', money(group.total, cur)),
       ),
+      note,
     ),
     h('div.list', ...group.items.map((e) => expenseRow(e, trip, rowOpts))),
   );

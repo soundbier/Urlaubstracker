@@ -53,10 +53,15 @@ export const MAX_PEOPLE = 8;
  * Die Farben, an denen man die Personen in Listen und Abrechnung auseinander
  * hält. Acht Stück, deutlich verschiedene Farbtöne — auf hellem wie dunklem
  * Grund lesbar.
+ *
+ * Gedeckt statt leuchtend: Diese Punkte stehen neben Tinte auf Papier, und in
+ * Neon waren sie der lauteste Ton auf jedem Bildschirm, obwohl sie nur sagen,
+ * wer gemeint ist. Bestehende Kassen behalten ihre gespeicherten Farben —
+ * diese Liste gilt für alle, die neu dazukommen.
  */
 export const PERSON_COLORS = [
-  '#f472b6', '#38bdf8', '#a3e635', '#fbbf24',
-  '#c084fc', '#2dd4bf', '#fb7185', '#94a3b8',
+  '#b5654e', '#4a7a8c', '#7d8b52', '#c08a3e',
+  '#8a6a9c', '#4f8a7b', '#a8556a', '#7b7468',
 ];
 
 /** Die nächste freie Farbe — nach einem Wechsel in der Gruppe kann eine mittendrin frei werden. */
