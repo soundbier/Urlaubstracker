@@ -277,7 +277,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
       ];
       const moneyKind = h('div.segmented', ...moneyKindButtons);
 
-      const details = disclosure('Details', detailSummary,
+      const details = disclosure('Details (optional)', detailSummary,
         h('div.field',
           h('span.field__label', 'Status'),
           h('div.segmented', ...kindButtons),
