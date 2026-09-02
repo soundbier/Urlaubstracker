@@ -30,3 +30,31 @@
 
 /firebase-config.json
   Cache-Control: no-cache, max-age=0
+
+# Sicherheits-Kopfzeilen für alle Pfade.
+#
+# Bekannt ist aktuell kein Angriffsweg dagegen — js/dom.js setzt bewusst
+# nirgends innerHTML mit fremdem Text. Das hier ist die zweite
+# Verteidigungslinie, falls sich das einmal ändert.
+#
+# Zur Content-Security-Policy:
+#   script-src   nur eigene Dateien, das eine Inline-Skript oben in
+#                index.html (per Hash — ändert sich der Text dort, muss der
+#                Hash neu gerechnet werden, sonst startet die App nicht mehr),
+#                und reCAPTCHA für App Check (siehe README, „App Check“).
+#   style-src    'unsafe-inline' ist hier bewusst dabei: die App setzt Farben
+#                (Personen, Diagramme) über style-Objekte in js/dom.js, nicht
+#                über feste Klassen. Reines CSS-Risiko ohne Codeausführung,
+#                kein Nachteil gegenüber dem heutigen Zustand ganz ohne CSP.
+#   connect-src  *.googleapis.com für Firestore/Auth, google.com für den
+#                reCAPTCHA-Nachweis von App Check — beides nur gebraucht, wenn
+#                die Kasse geteilt wird bzw. App Check eingerichtet ist.
+# Firebase/Firestore läuft immer über *.googleapis.com, unabhängig vom
+# eigenen Projekt — deshalb reicht die eine Zeile für jede Einrichtung.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-VcwLFoAlojYNATs6Q4NYMLTSfWWwzZ/Ufq8DnAR7xqo=' https://www.gstatic.com https://www.google.com; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://*.googleapis.com https://www.google.com; frame-src https://www.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), magnetometer=(), gyroscope=(), accelerometer=(), midi=(), interest-cohort=(), browsing-topics=()
