@@ -254,7 +254,10 @@ Kasse.
   Kasse umbenennen geht trotzdem, zum Beitreten zählt dann weiter der alte Name.
 - Beim **Passwort** zählt jedes Zeichen. Es steht nirgends in der Datenbank:
   dorthin wandert nur ein daraus gerechneter Nachweis (PBKDF2), den die
-  Sicherheitsregeln vergleichen.
+  Sicherheitsregeln vergleichen. Neu vergeben (beim Anlegen, beim Ändern, beim
+  erstmaligen Teilen) braucht es mindestens zehn Zeichen und darf nicht auf der
+  Liste der naheliegendsten Passwörter stehen — ein bestehendes, kürzeres
+  Passwort funktioniert zum Beitreten weiterhin.
 - **Mehr → Beitrittsdaten → Passwort ändern** sperrt alle aus, die es noch nicht
   benutzt haben. Wer schon dabei ist, bleibt dabei.
 - Der **Einladungslink** gibt es weiterhin (*Beitrittsdaten → Stattdessen
@@ -263,6 +266,40 @@ Kasse.
 
 > Name und Passwort sind zusammen der Schlüssel zur Kasse. Sie gehören in einen
 > privaten Chat oder ins Gespräch, nicht in eine öffentliche Gruppe.
+
+### 5. Automatisiertes Ausprobieren erschweren (App Check)
+
+Der Name einer Kasse ergibt über eine feste Rechenvorschrift ihre Kennung in
+Firestore (siehe [`js/join.js`](js/join.js)) — praktisch beim Beitreten, aber
+es heißt auch: wer den Namen kennt oder errät, kann Passwörter dagegen
+offline durchprobieren und die Nachweise beliebig oft gegen die Kasse testen.
+Firestore selbst bremst das nicht; ein langes, neu vergebenes Passwort (siehe
+oben) macht Erfolg unwahrscheinlich, verhindert das Durchprobieren aber nicht.
+
+**Firebase App Check** schiebt davor eine zusätzliche Prüfung ein: Firestore
+nimmt dann nur noch Anfragen an, die zusätzlich zum Nachweis ein Ticket von
+Google reCAPTCHA v3 mitbringen — ein Ticket bekommt nur, wer die Seite
+tatsächlich im Browser lädt, kein Skript, das nur Passwörter durchprobiert.
+
+1. In der Firebase-Konsole: **Build → App Check**, die Web-App auswählen und
+   als Anbieter **reCAPTCHA v3** registrieren. Firebase zeigt dabei einen
+   **Site-Schlüssel** (beginnt meist mit `6L…`).
+2. Diesen Schlüssel als `appCheckSiteKey` in die Firebase-Konfiguration
+   aufnehmen — im eingefügten Block, in `firebase-config.json` (siehe
+   [`firebase-config.example.json`](firebase-config.example.json)) oder bei
+   Cloudflare Pages als Variable `FIREBASE_APPCHECK_SITE_KEY`.
+3. Ein paar Tage im Modus **Überwachen** laufen lassen (App Check zeigt dort,
+   wie viele Anfragen ein gültiges Ticket hätten) und erst danach in der
+   Konsole auf **Erzwingen** stellen — für **Firestore Database** und, wer
+   mag, zusätzlich für **Authentication**. Vor „Erzwingen“ sollten alle
+   Geräte der Gruppe einmal die neue Fassung geladen haben, sonst hängen sie
+   kurzzeitig ohne Zugriff da.
+
+Ohne diesen Schritt läuft alles wie gehabt — er ist eine zusätzliche Bremse,
+keine Voraussetzung. Wichtig beim lokalen Entwickeln (`npm start`,
+`localhost`): reCAPTCHA v3 muss die Domain kennen, unter der es läuft; dafür
+in der reCAPTCHA-Administration von Google `localhost` bei den erlaubten
+Domains eintragen, oder App Check dort im Debug-Modus laufen lassen.
 
 ---
 
@@ -312,6 +349,7 @@ stehen sie nicht einmal im Cloudflare-Dashboard offen im Klartext):
 | `FIREBASE_APP_ID` | ja |
 | `FIREBASE_STORAGE_BUCKET` | nein |
 | `FIREBASE_MESSAGING_SENDER_ID` | nein |
+| `FIREBASE_APPCHECK_SITE_KEY` | nein, siehe *App Check* oben |
 
 `write-firebase-config.mjs` schreibt daraus bei jedem Build
 `firebase-config.json` neu — die Datei landet nie im Git-Repository (sie
@@ -327,6 +365,18 @@ Build ab — das ist dann eine unvollständige Einrichtung, kein Normalfall.
 Manifest nicht aus einem Zwischenspeicher kommen. Ohne das könnte Cloudflare
 eine alte `sw.js` ausliefern — und dann bemerkt niemand, dass es eine neue
 Fassung gibt.
+
+Für alle Pfade (`/*`) stehen dort außerdem Sicherheits-Kopfzeilen: eine
+Content-Security-Policy (erlaubt eigene Dateien, das eine Inline-Skript in
+`index.html` per Hash, sowie Firebase/Firestore und — nur falls eingerichtet —
+reCAPTCHA für App Check), dazu Strict-Transport-Security,
+X-Content-Type-Options, Referrer-Policy und Permissions-Policy. Bekannt ist
+aktuell kein Angriffsweg dagegen (`js/dom.js` setzt bewusst nirgends
+`innerHTML` mit fremdem Text) — das hier ist die zweite Verteidigungslinie,
+falls sich das einmal ändert. Wer eine eigene Firebase-Konfiguration per Hand
+einträgt statt über `firebase-config.json`, ist von der CSP nicht betroffen:
+Firestore und Auth laufen über `https://*.googleapis.com`, unabhängig vom
+Projekt.
 
 Eine `_redirects`-Datei gibt es bewusst **nicht**. Die App routet über das
 Fragment (`#/budget`), es wird also nie ein anderer Pfad als `/` angefragt. Ein
