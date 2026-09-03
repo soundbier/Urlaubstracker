@@ -23,7 +23,9 @@ import * as fb from '../vendor/firebase.js';
 const APP_NAME = 'urlaubstracker';
 
 /** Felder des Trips, die der App gehören — Sync-Felder rühren wir nicht an. */
-const TRIP_FIELDS = ['name', 'joinName', 'startDate', 'endDate', 'currency', 'budgetMode', 'people', 'updatedAt'];
+// `dataRegion` gehört dazu: wo die Kasse liegt, muss jedes Gerät sehen können —
+// sonst weiß nur dasjenige Bescheid, das sie eingerichtet hat (siehe privacy.js).
+const TRIP_FIELDS = ['name', 'joinName', 'startDate', 'endDate', 'currency', 'budgetMode', 'people', 'dataRegion', 'updatedAt'];
 
 function pickTripFields(trip) {
   const out = {};

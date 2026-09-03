@@ -4,6 +4,8 @@ import { CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson } from '.
 import { money, dayLabel } from '../format.js';
 import { openSheet } from './sheet.js';
 import { isIOS } from '../install.js';
+import { privacySections } from '../privacy.js';
+import * as store from '../store.js';
 
 /**
  * Eine Kennzahl in der Zeile unter der großen Zahl.
@@ -231,4 +233,35 @@ export function bufferLabel(buffer, currency) {
   // als wären es 40 € zu wenig drüber. Dieselben Worte wie auf der
   // Polster-Kachel, damit nicht zwei Formulierungen dieselbe Zahl beschreiben.
   return `${money(Math.abs(buffer), currency)} ${buffer > 0 ? 'unter' : 'über'} dem Plan`;
+}
+
+/**
+ * Die Angaben nach Art. 13 DSGVO, aufgeschrieben in ganzen Sätzen.
+ *
+ * Steht hier und nicht in den Einstellungen, weil sie auch am ersten
+ * Bildschirm erreichbar sein müssen: Wer noch gar keine Kasse hat, soll vor
+ * dem Eintippen des ersten Namens nachlesen können, was damit passiert.
+ */
+export function privacySheet({ region = null, mode = 'local' } = {}) {
+  const sections = privacySections({
+    contact: store.cloudConfig()?.privacyContact || '',
+    region,
+    mode,
+  });
+
+  return openSheet({
+    title: 'Datenschutz',
+    subtitle: 'Kurz und vollständig — kein Kleingedrucktes.',
+    fullHeight: true,
+    build: () =>
+      h('div.stack',
+        ...sections.map((s) =>
+          h('div.field',
+            h('span.field__label', s.title),
+            h('p.field__note', s.text),
+          ),
+        ),
+        h('p.muted.small', 'Nutzt ihr die Kasse nur privat in Familie oder Freundeskreis, greift die Haushaltsausnahme (Art. 2 Abs. 2 lit. c DSGVO) und diese Pflichten treffen euch nicht. Stellt jemand die Seite für wechselnde oder größere Gruppen bereit, gelten sie.'),
+      ),
+  });
 }

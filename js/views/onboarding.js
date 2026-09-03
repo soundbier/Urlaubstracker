@@ -1,7 +1,7 @@
 /** Erster Start: Urlaubskasse anlegen — oder einer Einladung folgen. */
 import { h, icon } from '../dom.js';
 import { toast } from '../ui/sheet.js';
-import { installInstructionsSheet } from '../ui/parts.js';
+import { installInstructionsSheet, privacySheet } from '../ui/parts.js';
 import { joinSheet, plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
 import { checkJoinName, checkNewPassword, suggestPassword } from '../join.js';
 import { todayISO, addDays, daysInclusive, isValidDate, MAX_PEOPLE, PERSON_COLORS } from '../calc.js';
@@ -50,6 +50,7 @@ function inviteScreen(state) {
         type: 'button',
         onclick: async () => { if (canPromptInstall()) await promptInstall(); else installInstructionsSheet(); },
       }, icon('download', 16), 'Als App installieren'),
+      h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => privacySheet({ mode: 'cloud' }) }, 'Datenschutz'),
     ),
   );
 }
@@ -256,6 +257,9 @@ function createScreen() {
       h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => joinSheet({ name: values.name }) },
         icon('people', 18), 'Einer Kasse beitreten'),
       h('p.muted.small', 'Es gibt die Kasse schon? Dann brauchst du nur ihren Namen und ihr Passwort.'),
+      // Vor dem ersten Namen, nicht erst danach: wer wissen will, was mit den
+      // Eingaben passiert, soll nicht erst eine Kasse anlegen müssen.
+      h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => privacySheet() }, 'Datenschutz'),
     ),
   );
 }
