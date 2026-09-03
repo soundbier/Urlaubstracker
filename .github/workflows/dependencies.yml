@@ -6,7 +6,6 @@
 # hängen bleiben. Was hier rot wird, ist eine Nachricht an die Wartung, kein
 # Deployment-Stopp (veröffentlicht wird ohnehin über Cloudflare Pages).
 name: Abhängigkeiten
-
 on:
   schedule:
     - cron: '17 5 * * 1' # montags früh
@@ -19,29 +18,26 @@ on:
       - vendor/firebase.lock.json
       - tools/check-deps.mjs
       - tools/firebase-bundle.mjs
-
 permissions:
   contents: read
-
 jobs:
   audit:
     name: Bekannte Lücken und neue Fassungen
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
       - run: npm ci
       - run: npm run check:deps
-
   reproducible:
     name: Bündel neu bauen und vergleichen
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
