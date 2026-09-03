@@ -36,6 +36,9 @@ Weitere Kleinigkeiten:
   Liste.
 - **Hell oder dunkel** — unter *Mehr → Aussehen*. Standard ist „Automatisch“:
   die App folgt dem Handy.
+- **App-Sperre** — ein Zifferncode (wahlweise Fingerabdruck oder Gesicht) vor
+  der Kasse, unter *Mehr → App-Sperre*. Gedacht für den Fall, dass das Handy
+  liegen bleibt oder wegkommt.
 - **Bezahlt von** — aus der gemeinsamen Kasse, aus eigener Tasche oder aus
   Bargeld. Alle drei zählen in der Endabrechnung richtig. Wer mehrmals
   hintereinander privat zahlt, stellt das nur einmal um: die Wahl bleibt bis
@@ -200,6 +203,12 @@ npx firebase-tools deploy --only firestore:rules
 Ohne diesen Schritt lehnt Firestore alle Zugriffe ab und die App meldet
 „Kein Zugriff auf diese Kasse“.
 
+> **Bei einem bestehenden Projekt:** Die Regeln haben sich mit Fassung 1.19.0
+> geändert — sie erlauben jetzt das Aussperren eines verlorenen Geräts und
+> verlangen vor dem Löschen einer geteilten Kasse eine Bedenkzeit. Beides
+> braucht ein erneutes Veröffentlichen; bis dahin läuft die App weiter, nur
+> weist der Server die beiden neuen Handlungen mit „Kein Zugriff“ ab.
+
 ### 3. Web-App anlegen und Konfiguration einfügen
 
 1. In der Konsole: *Projektübersicht → Zahnrad → Projekteinstellungen →
@@ -305,6 +314,54 @@ keine Voraussetzung. Wichtig beim lokalen Entwickeln (`npm start`,
 in der reCAPTCHA-Administration von Google `localhost` bei den erlaubten
 Domains eintragen, oder App Check dort im Debug-Modus laufen lassen.
 
+### 6. Ein verlorenes Gerät aussperren
+
+Die Anmeldung an Firebase ist anonym und gilt dauerhaft — genau deshalb muss
+niemand im Urlaub Passwörter tippen. Für ein verlorenes Handy hieß das früher:
+Es bleibt drin, und die Gruppe kann nichts dagegen tun.
+
+Jetzt steht unter *Mehr → Gemeinsam nutzen → **Verbundene Geräte*** die Liste
+aller Geräte, die an der Kasse hängen — mit der Person dahinter und dem
+Zeitpunkt, an dem sie zuletzt verbunden waren. Ein Tipp auf **Aussperren**
+erledigt zwei Dinge zusammen:
+
+1. Das Gerät fliegt aus `memberUids` — ab dann kommt es an keinen Eintrag mehr.
+2. Das **Passwort der Kasse wird gewechselt**. Ohne das wäre der erste Schritt
+   wirkungslos: Das Gerät kennt den Beitrittsnachweis ja noch und stünde beim
+   nächsten Start wieder in der Liste.
+
+Alle anderen Geräte bleiben verbunden und merken nichts davon; nur wer danach
+**neu** beitritt, braucht das neue Passwort (*Beitrittsdaten*). Geräte, auf
+denen noch das alte gespeichert ist, zeigen es nicht mehr an, statt es falsch
+weiterzusagen.
+
+> Umgekehrt gilt: **Jedes** Mitglied kann jedes andere Gerät aussperren — die
+> Regeln können nicht unterscheiden, wer im Recht ist. Bei acht Leuten, die
+> zusammen verreisen, ist das die kleinere Sorge als ein Gerät, das man nicht
+> mehr loswird.
+
+*Mehr → Synchronisierung beenden* trägt das eigene Gerät ebenfalls aus der
+Liste aus (früher hörte es nur auf zuzuhören und blieb serverseitig
+zugriffsberechtigt).
+
+### 7. Die App auf dem Gerät sperren
+
+*Mehr → App-Sperre* legt einen Zifferncode vor die Kasse; wo das Gerät es
+anbietet, geht danach auch Fingerabdruck oder Gesicht (WebAuthn). Zugesperrt
+wird beim Start und, je nach Einstellung, sofort oder einige Minuten nachdem
+die App in den Hintergrund gegangen ist.
+
+- Der Code steht **nirgends** — gespeichert wird nur ein PBKDF2-Wert mit
+  zufälligem Salz (200 000 Runden), wie beim Beitrittspasswort.
+- Nach ein paar Fehlversuchen wird gewartet, exponentiell länger.
+- **Was das nicht ist:** eine Verschlüsselung. Die Daten liegen weiterhin im
+  Speicher des Browsers; wer sich auskennt und das Gerät entsperrt in der Hand
+  hält, kommt daran vorbei. Der eigentliche Schutz bleibt die Sperre des
+  Geräts selbst — diese hier ist die zweite Tür.
+- Vergessen heißt: Die Sperre lässt sich nur mit den Daten dieses Geräts
+  zusammen loswerden (Browserdaten der Seite löschen). Danach führt der Weg
+  über Name und Passwort wieder in die Kasse.
+
 ---
 
 ## Veröffentlichen (Cloudflare Pages)
@@ -402,14 +459,21 @@ npx firebase-tools deploy --only firestore:rules
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml) prüft bei jedem Push und
 Pull Request. Veröffentlicht wird dort nichts mehr; das macht Cloudflare.
 
+[`.github/workflows/dependencies.yml`](.github/workflows/dependencies.yml) läuft
+zusätzlich einmal pro Woche und fragt nach bekannten Sicherheitslücken im
+gebündelten Firebase-SDK (siehe *Abhängigkeiten* weiter unten).
+
 ---
 
 ## Entwickeln
 
 ```sh
-npm test      # Tests (node --test, ohne Abhängigkeiten)
+npm test      # Tests (node --test, läuft ohne npm install)
 npm start     # lokaler Server auf http://localhost:8080
 ```
+
+Für die App selbst wird nichts installiert; `npm ci` braucht nur, wer
+`vendor/firebase.js` neu bauen oder `npm run check:deps` laufen lassen will.
 
 Es gibt keinen Build-Schritt: der Browser lädt die ES-Module direkt. Auf
 `localhost` ist der Service Worker abgeschaltet — Änderungen sind sofort nach
@@ -438,14 +502,19 @@ js/
   prefs.js            geräteeigene Einstellungen (auch hell/dunkel)
   privacy.js          Datenschutz: Speicherorte, Aufbewahrungsfrist, Art.-13-Text
   join.js             Name + Passwort → Kennung und Nachweis der Kasse
+  lock.js             Gerätesperre: Code, Biometrie, Zusperren im Hintergrund
+  trash.js            die Kopie, die das Löschen sieben Tage lang auffängt
   link.js             Einladungslinks, CSV- und JSON-Export
   dom.js  format.js   kleine Helfer
   ui/                 Sheets, Zahlentastatur, wiederkehrende Bausteine
   views/              die vier Bereiche plus Ersteinrichtung
 
-tests/                Rechenlogik, Im-/Export, Release-Invarianten
-tools/                Icon-Generator, Dev-Server, Firebase-Bündelung, firebase-config.json aus Env-Variablen
+tests/                Rechenlogik, Im-/Export, Release-Invarianten, Sperre,
+                      Löschschutz, Sicherheitsregeln, Abhängigkeiten
+tools/                Icon-Generator, Dev-Server, Firebase-Bündelung, Abhängigkeitsprüfung,
+                      firebase-config.json aus Env-Variablen
 vendor/firebase.js    gebündeltes Firebase-SDK (kein CDN nötig)
+vendor/firebase.lock.json  welche Fassung darin steckt und ihr Fingerabdruck
 ```
 
 Beträge liegen überall als **ganzzahlige Cent** vor, Datumsangaben als
@@ -501,11 +570,50 @@ funktioniert das Aktualisieren auch ohne Empfang.
 python3 tools/make-icons.py
 ```
 
-### Firebase-SDK aktualisieren
+### Abhängigkeiten und das gebündelte Firebase-SDK
+
+Zur Laufzeit hat die App keine Abhängigkeiten: `vendor/firebase.js` ist ein
+gebündeltes Firebase-Web-SDK und liegt fertig im Repository, damit alles ohne
+CDN und offline läuft. Das ist bequem — und war lange der blinde Fleck: Die
+Fassung stand nur als Zahl im Bau-Skript, es gab kein Lockfile, keine
+Prüfsumme und niemanden, der nach Sicherheitslücken fragt. Ein Update fiel
+auf, wenn jemand zufällig daran dachte.
+
+Jetzt hängt das an vier Stellen zusammen:
+
+| Wo | Was dort steht |
+| --- | --- |
+| `package.json` → `devDependencies` | die **exakte** Fassung (kein `^`), aus der gebaut wird |
+| `package-lock.json` | der ganze Baum darunter, mit Prüfsummen |
+| `vendor/firebase.lock.json` | welche Fassung im Bündel steckt und ihr sha256 |
+| `.github/dependabot.yml` | Dependabot schlägt neue Fassungen als Pull Request vor |
+
+Neu bauen (nach einem Dependabot-Pull-Request oder von Hand):
 
 ```sh
-npm run build:firebase        # oder: node tools/build-firebase.mjs 12.18.0
+npm ci                    # genau die Fassungen aus package-lock.json
+npm run build:firebase    # baut vendor/firebase.js + firebase.lock.json daraus
+npm test                  # prüft, dass beides zusammenpasst
 ```
+
+Danach `APP_VERSION` hochzählen (siehe unten) — sonst bekommt kein Gerät das
+neue SDK, weil der Service Worker aus seinem Paket ausliefert.
+
+`npm test` besteht nur, wenn `vendor/firebase.js` byteweise zu der Fassung
+gehört, die in `package.json` steht. Ein Pull Request, der nur die Zahl anhebt,
+wird also rot — genau das ist der Sinn: Die App liefe sonst weiter mit dem
+alten SDK, inklusive der Lücke, wegen der die neue Fassung erschienen ist.
+
+Wöchentlich (und bei jeder Änderung an diesen Dateien) läuft zusätzlich
+[`.github/workflows/dependencies.yml`](.github/workflows/dependencies.yml):
+
+```sh
+npm run check:deps        # npm audit + „gibt es etwas Neueres?“ + Fingerabdruck
+```
+
+Der zweite Job dort baut das Bündel neu und vergleicht es mit dem
+eingecheckten. Kommt etwas anderes heraus, beschreibt `package-lock.json` nicht
+mehr, was ausgeliefert wird.
 
 ---
 
@@ -577,7 +685,29 @@ der Frist unter *Mehr → Aufbewahrung* daran und bietet dort den Weg zum
 Löschen; die Frist steht als `RETENTION_DAYS` in `js/privacy.js`.
 
 *Mehr → Urlaubskasse löschen* entfernt den Trip samt allen Einträgen — im
-geteilten Betrieb für alle Geräte. Betroffenenrechte (Art. 15–21 DSGVO) decken
-die vorhandenen Funktionen ab: Auskunft und Datenübertragbarkeit über *Als CSV*
-bzw. *Sicherungskopie speichern*, Berichtigung über das Bearbeiten jedes
-Eintrags, Löschung über die beiden Wege oben.
+geteilten Betrieb für alle Geräte. Weil das früher zwei Tipps und keinen Weg
+zurück bedeutete, stehen jetzt drei Hürden davor, jede gegen einen anderen
+Fehler:
+
+1. **Den Namen der Kasse abtippen** — gegen den Fehlgriff in der Liste.
+2. **24 Stunden Bedenkzeit**, sobald mehr als ein Gerät an der Kasse hängt: Der
+   Löschauftrag steht sichtbar in der App (ein Balken über jeder Ansicht), und
+   **jedes** Gerät kann ihn mit einem Tipp stoppen. Erst danach lässt sich die
+   Kasse wirklich löschen. Erzwungen wird das nicht nur von der App, sondern
+   von [`firestore.rules`](firestore.rules) — und die Uhr dafür ist die des
+   Servers (`request.time`), nicht die des Geräts.
+3. **Eine Kopie**, die die App beim Löschen selbst auf dem löschenden Gerät
+   ablegt. Sieben Tage lang steht sie auf dem Anfangsbildschirm zum
+   Zurückholen; danach räumt die App sie von selbst weg, und *Endgültig
+   entfernen* tut es sofort. Dieselbe Datei bekommt ihr über *Sicherungskopie
+   speichern* auch von Hand.
+
+Läuft die Kasse nur auf einem Gerät, entfällt die Bedenkzeit — dort gibt es
+niemanden, den sie schützen würde.
+
+Betroffenenrechte (Art. 15–21 DSGVO) decken die vorhandenen Funktionen ab:
+Auskunft und Datenübertragbarkeit über *Als CSV* bzw. *Sicherungskopie
+speichern*, Berichtigung über das Bearbeiten jedes Eintrags, Löschung über die
+Wege oben. Wer nur sein eigenes Gerät herausnehmen will, nutzt
+*Synchronisierung beenden* — das trägt es aus der Kasse aus, ohne den anderen
+etwas wegzunehmen.

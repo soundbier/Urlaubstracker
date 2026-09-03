@@ -5,48 +5,57 @@
  * Damit braucht die App zur Laufzeit kein CDN: der Service Worker kann das SDK
  * mit dem restlichen App-Shell cachen und alles läuft offline.
  *
- *   node tools/build-firebase.mjs [version]
+ * Gebaut wird aus dem, was `package.json` und `package-lock.json` festnageln —
+ * nicht aus „was gerade neu ist“. Vorher installierte das Skript sich seine
+ * Abhängigkeiten in ein Temp-Verzeichnis: jeder Lauf konnte ein anderes Bündel
+ * ergeben, ohne dass irgendwo stand, welches gerade ausgeliefert wird. Jetzt:
+ *
+ *   npm ci                    # genau die Fassungen aus package-lock.json
+ *   npm run build:firebase    # baut vendor/firebase.js daraus
+ *
+ * Danach steht in `vendor/firebase.lock.json`, welche Fassung drinsteckt und
+ * welchen Fingerabdruck die Datei hat. `npm test` prüft beides gegeneinander,
+ * `npm run check:deps` fragt zusätzlich nach bekannten Sicherheitslücken.
  */
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { build } from 'esbuild';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { ROOT, BUNDLE_FILE, LOCK_FILE, ENTRY, fingerprint, readPkg } from './firebase-bundle.mjs';
 
-const root = dirname(dirname(fileURLToPath(import.meta.url)));
-const version = process.argv[2] || '12.18.0';
-const work = mkdtempSync(join(tmpdir(), 'fb-'));
+const pkg = readPkg();
+const wanted = pkg.devDependencies.firebase;
+const installed = (() => {
+  try {
+    return JSON.parse(readFileSync(join(ROOT, 'node_modules', 'firebase', 'package.json'), 'utf8')).version;
+  } catch {
+    return null;
+  }
+})();
 
-const entry = `
-export { initializeApp, getApps, deleteApp } from 'firebase/app';
-export {
-  getAuth, signInAnonymously, onAuthStateChanged, setPersistence,
-  browserLocalPersistence, signOut
-} from 'firebase/auth';
-export {
-  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, collection, setDoc, updateDoc, deleteDoc, getDoc, getDocs,
-  onSnapshot, query, where, orderBy, serverTimestamp, arrayUnion, arrayRemove,
-  writeBatch, Timestamp, enableNetwork, disableNetwork
-} from 'firebase/firestore';
-export { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
-`;
-
-try {
-  writeFileSync(join(work, 'package.json'), JSON.stringify({ name: 'fb-bundle', private: true }));
-  writeFileSync(join(work, 'entry.js'), entry);
-  const run = (cmd, args) =>
-    execFileSync(cmd, args, { cwd: work, stdio: 'inherit', shell: process.platform === 'win32' });
-
-  run('npm', ['install', '--no-audit', '--no-fund', `firebase@${version}`, 'esbuild']);
-  run('npx', [
-    'esbuild', 'entry.js', '--bundle', '--format=esm', '--minify',
-    '--target=es2020', '--legal-comments=none', '--outfile=firebase.js',
-  ]);
-
-  copyFileSync(join(work, 'firebase.js'), join(root, 'vendor', 'firebase.js'));
-  console.log(`\nvendor/firebase.js aktualisiert (firebase@${version}).`);
-  console.log('Nicht vergessen: CACHE_VERSION in sw.js hochzählen.');
-} finally {
-  rmSync(work, { recursive: true, force: true });
+if (installed !== wanted) {
+  console.error(
+    installed
+      ? `node_modules hat firebase@${installed}, package.json nennt ${wanted}. Erst „npm ci“, dann noch einmal.`
+      : 'Es fehlt node_modules. Erst „npm ci“, dann „npm run build:firebase“.',
+  );
+  process.exit(1);
 }
+
+const result = await build({
+  stdin: { contents: ENTRY, resolveDir: ROOT, sourcefile: 'entry.js', loader: 'js' },
+  bundle: true,
+  format: 'esm',
+  minify: true,
+  target: 'es2020',
+  legalComments: 'none',
+  write: false,
+});
+
+const bundle = Buffer.from(result.outputFiles[0].contents);
+writeFileSync(BUNDLE_FILE, bundle);
+const lock = fingerprint(bundle, pkg);
+writeFileSync(LOCK_FILE, `${JSON.stringify(lock, null, 2)}\n`);
+
+console.log(`vendor/firebase.js aktualisiert: firebase@${lock.firebase}, ${(lock.bytes / 1024).toFixed(0)} KB.`);
+console.log(`sha256 ${lock.sha256}`);
+console.log('Nicht vergessen: APP_VERSION in sw.js hochzählen.');

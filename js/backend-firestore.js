@@ -34,6 +34,18 @@ function pickTripFields(trip) {
 }
 
 /**
+ * Der Löschauftrag kommt als Firestore-`Timestamp` herein; im Rest der App
+ * sind Zeitpunkte Millisekunden. Umgerechnet wird hier, einmal, beim Lesen —
+ * geschrieben wird er nie von hier aus (siehe `requestDelete`), sondern immer
+ * als Serverzeit.
+ */
+function normalizeTrip(trip) {
+  const at = trip.deleteRequestedAt;
+  if (at && typeof at.toMillis === 'function') return { ...trip, deleteRequestedAt: at.toMillis() };
+  return trip;
+}
+
+/**
  * Der Name bestimmt die Kennung des Dokuments (siehe `join.js`) — steht dort
  * schon eine fremde Kasse, weist der Server das Anlegen ab. Dieselbe Antwort
  * käme, wenn die Sicherheitsregeln nie veröffentlicht wurden; deshalb steht
@@ -46,7 +58,7 @@ export const NAME_TAKEN =
 export function describeError(err) {
   const code = err?.code || '';
   if (code.includes('permission-denied')) {
-    return 'Kein Zugriff auf diese Kasse. Stimmen Name und Passwort? Und sind die Sicherheitsregeln aus firestore.rules veröffentlicht?';
+    return 'Kein Zugriff auf diese Kasse. Wurde dieses Gerät ausgesperrt oder das Passwort gewechselt, kommt es mit den neuen Beitrittsdaten wieder herein. (Ist das Firebase-Projekt frisch: sind die Regeln aus firestore.rules veröffentlicht?)';
   }
   if (code.includes('unavailable') || code.includes('network')) {
     return 'Keine Verbindung. Deine Eingaben werden gespeichert und später übertragen.';
@@ -78,6 +90,7 @@ export class FirestoreBackend {
     this.onChange = null;
     this.onStatus = null;
     this._unsubs = [];
+    this._touched = false;
     this._status = { mode: 'cloud', connected: false, ready: false, fromCache: true, pending: 0, error: null };
   }
 
@@ -201,8 +214,12 @@ export class FirestoreBackend {
         tripRef,
         opts,
         (snap) => {
-          this.data.trip = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+          // `estimate`: ein gerade abgeschickter Löschauftrag hat serverseitig
+          // noch keine Zeit. Ohne die Schätzung stünde er hier als `null` da —
+          // und die Warnung erschiene erst, wenn wieder Netz da ist.
+          this.data.trip = snap.exists() ? normalizeTrip({ id: snap.id, ...snap.data({ serverTimestamps: 'estimate' }) }) : null;
           if (this.data.trip?.inviteCode) this.inviteCode = this.data.trip.inviteCode;
+          this._touchPresence();
           this._setStatus({
             ready: true,
             connected: !snap.metadata.fromCache,
@@ -338,6 +355,62 @@ export class FirestoreBackend {
     this.inviteCode = code;
   }
 
+  /**
+   * „Zuletzt gesehen“ am eigenen Eintrag nachziehen — einmal pro Sitzung.
+   *
+   * Daran erkennt die Gruppe, welches Gerät noch mitläuft und welches seit
+   * Wochen nicht mehr da war. Ohne diese Zeile stünde in der Geräteliste nur
+   * eine Kennung und ein Beitrittsdatum, und niemand könnte sagen, welches
+   * davon das verlorene Handy ist.
+   */
+  _touchPresence() {
+    if (this._touched || !this.uid || !this.db) return;
+    if (!(this.data.trip?.memberUids || []).includes(this.uid)) return;
+    this._touched = true;
+    fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
+      [`members.${this.uid}.lastSeenAt`]: Date.now(),
+    }).catch(() => {
+      // Kein Netz, oder gerade ausgesperrt worden: beides kein Grund, hier
+      // etwas anzuzeigen.
+    });
+  }
+
+  /**
+   * Ein Gerät aussperren.
+   *
+   * Allein reicht das nicht: den Beitrittsnachweis hat das Gerät noch, damit
+   * stünde es sofort wieder drin. Deshalb wechselt `store.removeDevice`
+   * gleichzeitig das Passwort — erst beides zusammen ist ein Aussperren.
+   */
+  async removeMember(uid) {
+    await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
+      memberUids: fb.arrayRemove(uid),
+      [`members.${uid}`]: fb.deleteField(),
+    });
+  }
+
+  /**
+   * Löschauftrag stellen. Die Zeit setzt der Server (`serverTimestamp`), nicht
+   * dieses Gerät — die Regeln bestehen darauf, sonst ließe sich die Bedenkzeit
+   * mit einer verstellten Uhr überspringen.
+   */
+  async requestDelete({ personId = null } = {}) {
+    await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
+      deleteRequestedAt: fb.serverTimestamp(),
+      deleteRequestedBy: this.uid,
+      deleteRequestedByPerson: personId,
+    });
+  }
+
+  /** Löschauftrag zurücknehmen — das darf jedes Gerät der Gruppe. */
+  async cancelDelete() {
+    await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
+      deleteRequestedAt: fb.deleteField(),
+      deleteRequestedBy: fb.deleteField(),
+      deleteRequestedByPerson: fb.deleteField(),
+    });
+  }
+
   async putExpense(row) { await fb.setDoc(this._ref('expenses', row.id), stripId(row)); }
   async removeExpense(id) { await fb.deleteDoc(this._ref('expenses', id)); }
   async putContribution(row) { await fb.setDoc(this._ref('contributions', row.id), stripId(row)); }
@@ -373,10 +446,12 @@ export class FirestoreBackend {
     await batch.commit();
   }
 
+  /** Dieses Gerät trägt sich selbst aus — beim Beenden der Synchronisierung. */
   async leave() {
-    if (!this.uid) return;
+    if (!this.uid || !this.db) return;
     await fb.updateDoc(fb.doc(this.db, 'trips', this.tripId), {
       memberUids: fb.arrayRemove(this.uid),
+      [`members.${this.uid}`]: fb.deleteField(),
     });
   }
 

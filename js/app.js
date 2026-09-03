@@ -5,7 +5,9 @@ import { computeBudget, todayISO } from './calc.js';
 import { applyTheme } from './prefs.js';
 import { onInstallabilityChange } from './install.js';
 import { money, days, compactDate } from './format.js';
-import { toast, confirmSheet, promptSheet } from './ui/sheet.js';
+import { toast, confirmSheet, promptSheet, closeAllSheets, hideToast } from './ui/sheet.js';
+import * as lock from './lock.js';
+import { lockScreen } from './ui/lock-screen.js';
 import { expenseSheet, contributionSheet, cashOutSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
 import { renderExpenses } from './views/expenses.js';
@@ -48,6 +50,9 @@ function consumeQuickAdd() {
   if (!/^#\/neu(?:$|[/?&])/.test(location.hash)) return;
   // Beim Kaltstart ist der Trip noch nicht da — dann gleich noch einmal.
   if (state.phase === 'loading') return;
+  // Und hinter der Gerätesperre wird gar nichts eingetragen: die Maske läge
+  // sonst unsichtbar hinter dem Sperrbildschirm.
+  if (lock.isLocked()) return;
   history.replaceState(null, '', `${location.pathname}${location.search}#/heute`);
   if (state.phase === 'ready' && state.trip) actions.addExpense();
 }
@@ -231,7 +236,27 @@ const actions = {
 
 // ------------------------------------------------------------------- Aufbau
 
+// Der Sperrbildschirm wird gehalten, nicht bei jedem Aufbau neu gebaut: sonst
+// wischt eine Änderung aus der Cloud die halb eingetippten Ziffern weg —
+// dahinter ändert sich ja ständig etwas, während jemand davor tippt.
+let lockScreenEl = null;
+
 function render() {
+  // Zugesperrt heißt: nichts von der Kasse steht auf dem Schirm. Kein Kopf,
+  // keine Liste, keine Zahl — nur der Code.
+  if (lock.isLocked()) {
+    document.body.classList.remove('is-onboarding');
+    // Auch der Fenstertitel: er steht im App-Umschalter des Systems, und dort
+    // hätte der Name der Kasse hinter der Sperre nichts verloren.
+    document.title = 'Urlaubstracker';
+    if (!lockScreenEl?.isConnected) {
+      lockScreenEl = lockScreen({ onUnlocked: () => render() });
+      replace(app, lockScreenEl);
+    }
+    return;
+  }
+  lockScreenEl = null;
+
   if (state.phase === 'loading') {
     replace(app, h('div.view.view--center', h('div.spinner', { 'aria-label': 'Lädt' })));
     return;
@@ -248,6 +273,7 @@ function render() {
 
   replace(app,
     header(),
+    deletionBar(),
     h('main.main', { id: 'main' }, tab.render(state, actions)),
     fab(tab.id),
     nav(tab.id),
@@ -287,6 +313,45 @@ function header() {
   );
 }
 
+/**
+ * Der Balken, der über einem offenen Löschauftrag steht.
+ *
+ * Er gehört unter den Kopf und nicht in die Einstellungen: eine Kasse, die in
+ * 24 Stunden verschwindet, ist keine Nachricht für die, die zufällig
+ * nachsehen. Stoppen darf ihn jedes Gerät der Gruppe — dafür ist die
+ * Bedenkzeit da.
+ */
+function deletionBar() {
+  const request = store.deletionRequest();
+  if (!request) return null;
+
+  const when = new Date(request.dueAt);
+  const stop = h('button.notice__action', {
+    type: 'button',
+    onclick: async () => {
+      stop.disabled = true;
+      try {
+        await store.cancelTripDeletion();
+        toast('Löschen gestoppt.', { type: 'success' });
+      } catch (err) {
+        stop.disabled = false;
+        toast(err?.message || 'Ging nicht.', { type: 'error' });
+      }
+    },
+  }, 'Stoppen');
+
+  return h('div.notice.notice--danger', { role: 'status' },
+    icon('trash', 18),
+    h('div.notice__main',
+      h('p.notice__title', request.due ? 'Diese Kasse ist zum Löschen freigegeben' : 'Diese Kasse soll gelöscht werden'),
+      h('p.notice__text', request.due
+        ? `${request.person ? `${request.person.name} hat` : 'Ein Gerät hat'} das Löschen beantragt, die Bedenkzeit ist um. Bis es jemand ausführt, könnt ihr es hier noch stoppen.`
+        : `${request.person ? `${request.person.name} hat` : 'Ein Gerät hat'} das Löschen beantragt. Ausgeführt werden kann es ab ${when.toLocaleDateString('de-DE', { day: 'numeric', month: 'long' })}, ${when.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr — bis dahin gilt: ein Tipp auf „Stoppen“, und alles bleibt.`),
+    ),
+    stop,
+  );
+}
+
 function fab(tabId) {
   // Budget und Einstellungen haben ihre Knöpfe im Inhalt — dort würde der
   // schwebende Knopf nur die Liste verdecken.
@@ -321,6 +386,17 @@ applyTheme();
 // muss die Installations-Zeile (Einstellungen, Einladungsbildschirm)
 // nachträglich auftauchen, ohne dass jemand die Ansicht wechseln muss.
 onInstallabilityChange(() => render());
+
+// Die Gerätesperre hängt nicht am Trip-Zustand, muss aber dasselbe Bild
+// austauschen. Beim Zusperren fliegen offene Sheets mit zu — in ihnen stehen
+// Beträge, Namen und im schlimmsten Fall die Beitrittsdaten.
+lock.subscribe((s) => {
+  if (s.locked) {
+    closeAllSheets();
+    hideToast();
+  }
+  render();
+});
 
 store.subscribe((next) => {
   // Nur nach dem Anlegen bzw. Beitreten auf „Heute“ springen. Beim Kaltstart
