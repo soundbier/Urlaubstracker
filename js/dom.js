@@ -125,6 +125,9 @@ const ICONS = {
   calendar: ['M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z', 'M8 3v4M16 3v4M4 11h16'],
   info: ['M12 21a9 9 0 100-18 9 9 0 000 18z', 'M12 11v5M12 8h.01'],
   repeat: ['M5 10V9a4 4 0 014-4h10', 'M16 2l3 3-3 3', 'M19 14v1a4 4 0 01-4 4H5', 'M8 22l-3-3 3-3'],
+  // Auge neben Passwortfeldern: verdeckt aufdecken, nicht dauerhaft anzeigen.
+  eye: ['M2 12a11 11 0 0 1 20 0 11 11 0 0 1 -20 0z', 'M12 8.7a3.3 3.3 0 100 6.6 3.3 3.3 0 000-6.6z'],
+  eyeOff: ['M3 3l18 18', 'M2 12a11 11 0 0 1 20 0 11 11 0 0 1 -20 0z', 'M12 8.7a3.3 3.3 0 100 6.6 3.3 3.3 0 000-6.6z'],
 
   // Kategorien. Bewusst dieselbe Strichstärke wie der Rest — Emoji sähen auf
   // jedem Gerät anders aus und passen farblich zu nichts.

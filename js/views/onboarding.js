@@ -2,8 +2,8 @@
 import { h, icon } from '../dom.js';
 import { toast } from '../ui/sheet.js';
 import { installInstructionsSheet } from '../ui/parts.js';
-import { joinSheet, plainInput } from '../ui/join-sheet.js';
-import { checkJoinName, checkPassword, suggestPassword } from '../join.js';
+import { joinSheet, plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
+import { checkJoinName, checkNewPassword, suggestPassword } from '../join.js';
 import { todayISO, addDays, daysInclusive, isValidDate, MAX_PEOPLE, PERSON_COLORS } from '../calc.js';
 import { days, fullDate } from '../format.js';
 import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
@@ -155,8 +155,9 @@ function createScreen() {
     value: values.name, maxlength: 60, placeholder: 'z. B. Roadtrip Süd 2026', enterkeyhint: 'next',
     oninput: (e) => { values.name = e.target.value; },
   });
-  const passwordInput = plainInput({
+  const passwordInput = maskedInput({
     value: values.password, maxlength: 60, placeholder: 'Passwort ausdenken', enterkeyhint: 'next',
+    autocomplete: 'new-password',
     oninput: (e) => { values.password = e.target.value; },
   });
   // Ein Vorschlag statt eines leeren Felds: zwei Wörter und eine Zahl lassen
@@ -168,7 +169,7 @@ function createScreen() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    const keyProblem = checkJoinName(values.name) || checkPassword(values.password);
+    const keyProblem = checkJoinName(values.name) || checkNewPassword(values.password);
     if (keyProblem) {
       error.textContent = keyProblem;
       (checkJoinName(values.name) ? nameInput : passwordInput).focus();
@@ -226,7 +227,7 @@ function createScreen() {
       h('label.field', h('span.field__label', 'Name der Kasse'), nameInput),
       h('div.field',
         h('span.field__label', 'Passwort'),
-        passwordInput,
+        maskedField(passwordInput),
         suggest,
         h('p.field__note', shared
           ? 'Mit diesem Namen und diesem Passwort kommen die anderen in dieselbe Kasse — mehr müsst ihr euch nicht schicken. Beides steht später in den Einstellungen.'

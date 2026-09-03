@@ -25,6 +25,18 @@
 export const MIN_PASSWORD = 6;
 export const MIN_NAME = 3;
 
+/**
+ * Strengere Grenze fürs *Festlegen* eines neuen Passworts (Anlegen, Ändern,
+ * erstmals Teilen) — nicht fürs Beitreten mit einem bestehenden. Sechs
+ * Zeichen und ein deterministischer Name als Salt sind zu wenig gegen jemanden,
+ * der den Namen der Kasse kennt oder errät: die PBKDF2-Nachweise lassen sich
+ * dann offline gegen Wortlisten vorrechnen, und Firestore bremst Versuche
+ * dagegen nicht von selbst (siehe README, Abschnitt „App Check“). `MIN_PASSWORD`
+ * bleibt trotzdem stehen, wie es ist — sonst käme jemand mit einem alten,
+ * kürzeren, aber gültigen Passwort nicht mehr in seine eigene Kasse hinein.
+ */
+export const MIN_NEW_PASSWORD = 10;
+
 const subtle = () => {
   const s = globalThis.crypto?.subtle;
   if (!s) {
@@ -71,6 +83,65 @@ export function checkPassword(password) {
   const value = String(password || '');
   if (!value.trim()) return 'Bitte ein Passwort eintragen.';
   if (value.length < MIN_PASSWORD) return `Das Passwort braucht mindestens ${MIN_PASSWORD} Zeichen.`;
+  return null;
+}
+
+/**
+ * Naheliegende Passwörter, die trotz ausreichender Länge nichts taugen — das,
+ * was jede Liste zuerst durchprobiert, bevor überhaupt geraten wird. Keine
+ * Vollständigkeit angestrebt, nur was mit zehn oder mehr Zeichen naheliegt;
+ * echte Stärke kommt aus der Länge, nicht aus dieser Liste.
+ */
+const WEAK_NEW_PASSWORDS = new Set([
+  'passwort123', 'passwort1234', 'passwort12345', 'password123', 'password1234',
+  '1234567890', '0123456789', 'qwertzuiop', 'qwertyuiop', 'asdfghjklo',
+  'iloveyou123', 'sonnenschein', 'sommerurlaub', 'willkommen1', 'ferienhaus1',
+  'urlaub2024', 'urlaub2025', 'urlaub2026', 'urlaub2027',
+]);
+
+// Codepunkte 0x0300–0x036f (kombinierende Akzentzeichen) als Zahlen statt als
+// Escape-Sequenz im Quelltext, damit hier keine unsichtbaren Zeichen stehen.
+const COMBINING_MARKS = new RegExp(`[${String.fromCharCode(0x0300)}-${String.fromCharCode(0x036f)}]`, 'g');
+
+function foldCase(value) {
+  return value
+    .replace(/ß/g, 'ss')
+    // NFKD zerlegt „ü“ in u + Zeichen (wie in normalizeJoinName); das Zeichen fällt danach weg.
+    .normalize('NFKD')
+    .replace(COMBINING_MARKS, '')
+    .toLowerCase();
+}
+
+const isRepeatedChar = (value) => /^(.)\1+$/.test(value);
+
+/** „abcdefghij“, „0123456789“ — auch rückwärts: rein fortlaufende Zeichen. */
+function isSequential(value) {
+  if (value.length < 4) return false;
+  let ascending = true;
+  let descending = true;
+  for (let i = 1; i < value.length; i++) {
+    const step = value.charCodeAt(i) - value.charCodeAt(i - 1);
+    if (step !== 1) ascending = false;
+    if (step !== -1) descending = false;
+  }
+  return ascending || descending;
+}
+
+/**
+ * Strengere Prüfung fürs *Festlegen* eines Passworts — beim Anlegen, beim
+ * Ändern und beim erstmaligen Teilen einer bisher lokalen Kasse. `checkPassword`
+ * bleibt für das *Beitreten* zuständig und unverändert: eine Kasse, deren
+ * Passwort vor dieser Änderung mit sechs Zeichen angelegt wurde, muss damit
+ * weiter erreichbar bleiben.
+ */
+export function checkNewPassword(password) {
+  const value = String(password || '');
+  if (!value.trim()) return 'Bitte ein Passwort eintragen.';
+  if (value.length < MIN_NEW_PASSWORD) return `Ein neues Passwort braucht mindestens ${MIN_NEW_PASSWORD} Zeichen.`;
+  const folded = foldCase(value.trim());
+  if (WEAK_NEW_PASSWORDS.has(folded) || isRepeatedChar(folded) || isSequential(folded)) {
+    return 'Dieses Passwort lässt sich zu leicht erraten. Der Vorschlag daneben taugt mehr.';
+  }
   return null;
 }
 

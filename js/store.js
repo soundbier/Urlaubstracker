@@ -9,7 +9,7 @@
 import { LocalBackend } from './backend-local.js';
 import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.js';
 import { newId } from './ids.js';
-import { joinKeysFor, joinProofFor, checkJoinName, checkPassword } from './join.js';
+import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
 import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare } from './calc.js';
 
 let backend = null;
@@ -259,7 +259,7 @@ export async function createTrip({ name, startDate, endDate, currency, budgetMod
 
   const nameProblem = checkJoinName(joinName);
   if (nameProblem) throw new Error(nameProblem);
-  const passwordProblem = checkPassword(password);
+  const passwordProblem = checkNewPassword(password);
   if (passwordProblem) throw new Error(passwordProblem);
 
   const config = firebaseConfig || cloudConfig();
@@ -569,7 +569,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
   const secret = String(password || prefs.tripRef?.joinPassword || '');
   const nameProblem = checkJoinName(name);
   if (nameProblem) throw new Error(nameProblem);
-  const passwordProblem = checkPassword(secret);
+  const passwordProblem = checkNewPassword(secret);
   if (passwordProblem) throw new Error(passwordProblem);
 
   const cloud = await openCloudTrip(firebaseConfig, name, secret);
@@ -613,7 +613,7 @@ export async function disconnectCloud() {
 export async function changeJoinPassword(password) {
   const prefs = getPrefs();
   if (prefs.tripRef?.mode !== 'cloud') throw new Error('Die Kasse liegt gar nicht in der Cloud.');
-  const problem = checkPassword(password);
+  const problem = checkNewPassword(password);
   if (problem) throw new Error(problem);
 
   const name = joinName();
@@ -621,6 +621,21 @@ export async function changeJoinPassword(password) {
   await withTimeout(Promise.resolve(backend.setInviteCode?.(proof)), 20000, NO_CONNECTION);
   setPrefs({ tripRef: { ...prefs.tripRef, inviteCode: proof, joinName: name, joinPassword: password } });
   return password;
+}
+
+/**
+ * Das Passwort auf diesem Gerät vergessen — für alle, denen der Klartext im
+ * `localStorage` zu weit geht (siehe `prefs.js`).
+ *
+ * Verbunden bleibt die Kasse trotzdem: dafür reicht der Nachweis `inviteCode`,
+ * der unverändert stehen bleibt. Nur zeigen oder weitergeben kann dieses
+ * Gerät die Beitrittsdaten danach nicht mehr — dafür braucht es dann ein
+ * neues Passwort (`changeJoinPassword`).
+ */
+export function forgetJoinPassword() {
+  const prefs = getPrefs();
+  if (!prefs.tripRef?.joinPassword) return;
+  setPrefs({ tripRef: { ...prefs.tripRef, joinPassword: '' } });
 }
 
 /** Der Name, mit dem man dieser Kasse beitritt — nicht zwingend die Überschrift. */

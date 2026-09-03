@@ -44,9 +44,12 @@ service cloud.firestore {
 
       allow update: if
         // Mitglieder pflegen den Trip. Sich selbst austragen ist erlaubt,
-        // andere hinauswerfen nicht.
+        // andere hinauswerfen nicht — und `hasOnly` sorgt dafür, dass auch
+        // niemand *hinzugefügt* werden kann: sonst könnte ein Mitglied ein
+        // fremdes Gerät ganz ohne Einladungscode in die Kasse holen.
         (isMember()
-         && request.resource.data.memberUids.hasAll(members().removeAll([request.auth.uid])))
+         && request.resource.data.memberUids.hasAll(members().removeAll([request.auth.uid]))
+         && request.resource.data.memberUids.hasOnly(members()))
         ||
         // Beitreten: nur mit dem richtigen Code, nur sich selbst hinzufügen,
         // und ohne den Code dabei auszutauschen.

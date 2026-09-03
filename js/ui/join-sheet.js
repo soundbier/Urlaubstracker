@@ -9,7 +9,7 @@
  * einzige Weg: aufgeklappt am Ende steht er weiterhin — und für Geräte, denen
  * die Firebase-Konfiguration der Gruppe noch fehlt, ist er der bequemste.
  */
-import { h, icon } from '../dom.js';
+import { h, icon, replace } from '../dom.js';
 import { openSheet, toast } from './sheet.js';
 import { disclosure } from './parts.js';
 import { checkJoinName, checkPassword } from '../join.js';
@@ -30,6 +30,40 @@ export function plainInput(props = {}) {
 }
 
 /**
+ * Ein Passwortfeld: verdeckt wie jedes Passwortfeld im Web.
+ *
+ * Stand hier früher als `plainInput` mit `type="text"`, mit der Begründung,
+ * das Passwort werde ohnehin laut vorgelesen und abgetippt, nie geheim
+ * gehalten. Nur macht das aus jedem Mitlesenden am Tisch, jedem
+ * Bildschirmfoto und jeder Bildschirmaufnahme einen Mitwisser. `revealButton`
+ * daneben deckt es bei Bedarf trotzdem auf — für den einen Blick, der eine
+ * Vertipper-Korrektur erspart.
+ */
+export function maskedInput(props = {}) {
+  return plainInput({ autocomplete: 'current-password', ...props, type: 'password' });
+}
+
+/** Das Auge neben einem `maskedInput`: deckt es auf oder wieder zu. */
+export function revealButton(input) {
+  const button = h('button.icon-btn.field__reveal-btn', {
+    type: 'button',
+    'aria-label': 'Passwort anzeigen',
+    onclick: () => {
+      const reveal = input.type === 'password';
+      input.type = reveal ? 'text' : 'password';
+      button.setAttribute('aria-label', reveal ? 'Passwort verbergen' : 'Passwort anzeigen');
+      replace(button, icon(reveal ? 'eyeOff' : 'eye', 20));
+    },
+  }, icon('eye', 20));
+  return button;
+}
+
+/** Ein Passwort- oder Passwort-Anzeigefeld mitsamt Auge, fürs Layout in einem Zug. */
+export function maskedField(input) {
+  return h('div.field__reveal', input, revealButton(input));
+}
+
+/**
  * Löst mit `true` auf, wenn der Beitritt geklappt hat.
  *
  * `defaults.name` füllt das Namensfeld vor — praktisch, wenn der Beitritt aus
@@ -44,9 +78,7 @@ export function joinSheet({ name = '' } = {}) {
     fullHeight: needsConfig,
     build: (close) => {
       const nameInput = plainInput({ value: name, maxlength: 60, placeholder: 'z. B. Roadtrip Süd 2026', enterkeyhint: 'next' });
-      // Sichtbar statt mit Punkten: dieses Passwort wird vorgelesen und
-      // abgetippt, nicht geheim gehalten. Verdeckt tippt man es zweimal falsch.
-      const passwordInput = plainInput({ maxlength: 60, placeholder: 'Passwort der Kasse', enterkeyhint: 'go' });
+      const passwordInput = maskedInput({ maxlength: 60, placeholder: 'Passwort der Kasse', enterkeyhint: 'go' });
       const configInput = h('textarea.field__input.field__input--code', {
         rows: 6, spellcheck: false, autocapitalize: 'off',
         placeholder: 'const firebaseConfig = {\n  apiKey: "…",\n  projectId: "…"\n};',
@@ -107,7 +139,7 @@ export function joinSheet({ name = '' } = {}) {
 
       return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
         h('label.field', h('span.field__label', 'Name der Kasse'), nameInput),
-        h('label.field', h('span.field__label', 'Passwort'), passwordInput),
+        h('label.field', h('span.field__label', 'Passwort'), maskedField(passwordInput)),
         h('p.field__note', 'Beim Namen ist egal, wie er geschrieben steht — beim Passwort zählt jeder Buchstabe.'),
         needsConfig
           ? h('div.field',

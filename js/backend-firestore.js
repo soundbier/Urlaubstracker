@@ -8,6 +8,15 @@
  *
  * Zugriff regelt `firestore.rules`: lesen und schreiben darf, wer in
  * `memberUids` steht. Beitreten darf, wer den Einladungscode kennt.
+ *
+ * Den Einladungscode kennt ein fremdes Gerät nicht — raten oder offline
+ * gegen eine Wortliste vorrechnen kann es trotzdem, wenn es den Namen der
+ * Kasse kennt (siehe join.js). Dagegen bremst Firestore von sich aus nichts;
+ * steht `appCheckSiteKey` in der Konfiguration, meldet sich dieses Gerät
+ * zusätzlich mit einem Nachweis von Firebase App Check (reCAPTCHA v3) an —
+ * ausgeschlossen wird darüber nicht das falsche Passwort, sondern das
+ * automatisierte Durchprobieren vieler davon. Siehe README, Abschnitt
+ * „Automatisiertes Ausprobieren erschweren (App Check)“.
  */
 import * as fb from '../vendor/firebase.js';
 
@@ -77,6 +86,7 @@ export class FirestoreBackend {
     if (existing) await fb.deleteApp(existing);
 
     this.app = fb.initializeApp(this.config, APP_NAME);
+    this._startAppCheck();
     this.db = fb.initializeFirestore(this.app, {
       localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }),
     });
@@ -104,6 +114,30 @@ export class FirestoreBackend {
     });
     this._setStatus({ uid: this.uid });
     return this.uid;
+  }
+
+  /**
+   * App Check anmelden, falls die Gruppe es eingerichtet hat.
+   *
+   * Ohne `appCheckSiteKey` in der Konfiguration passiert hier nichts — die
+   * Kasse läuft dann wie bisher, nur eben ohne diese zusätzliche Bremse.
+   * Scheitert die Anmeldung (kein Empfang, falscher Schlüssel), darf das den
+   * Verbindungsaufbau nicht verhindern: ohne „Erzwingen“ in der
+   * Firebase-Konsole ändert ein fehlender Nachweis an den Zugriffsrechten
+   * nichts, und mit „Erzwingen“ meldet sich Firestore gleich selbst mit
+   * „Kein Zugriff“ — beides fängt `describeError` schon ab.
+   */
+  _startAppCheck() {
+    const siteKey = this.config?.appCheckSiteKey;
+    if (!siteKey) return;
+    try {
+      fb.initializeAppCheck(this.app, {
+        provider: new fb.ReCaptchaV3Provider(siteKey),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch {
+      // Kein Grund, die Kasse deswegen offline zu lassen — siehe oben.
+    }
   }
 
   _setStatus(patch) {
