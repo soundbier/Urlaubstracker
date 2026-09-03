@@ -16,6 +16,8 @@
  *   FIREBASE_STORAGE_BUCKET       (optional)
  *   FIREBASE_MESSAGING_SENDER_ID  (optional)
  *   FIREBASE_APPCHECK_SITE_KEY    (optional, siehe README „App Check“)
+ *   FIREBASE_PRIVACY_CONTACT      (optional: verantwortliche Stelle, Art. 13 DSGVO)
+ *   FIREBASE_DATA_REGION          (optional: Region der Firestore-Datenbank, z. B. eur3)
  *
  * Ist keine einzige davon gesetzt, tut das Skript nichts — dann liefert
  * Cloudflare wie bisher ohne firebase-config.json aus, und die Konfiguration
@@ -40,6 +42,10 @@ const optional = {
   storageBucket: 'FIREBASE_STORAGE_BUCKET',
   messagingSenderId: 'FIREBASE_MESSAGING_SENDER_ID',
   appCheckSiteKey: 'FIREBASE_APPCHECK_SITE_KEY',
+  // Wer die Seite für andere bereitstellt, ist Verantwortlicher im Sinne der
+  // DSGVO — die App kann das nur zeigen, wenn es irgendwo steht (js/privacy.js).
+  privacyContact: 'FIREBASE_PRIVACY_CONTACT',
+  dataRegion: 'FIREBASE_DATA_REGION',
 };
 
 const requiredKeys = Object.keys(required);

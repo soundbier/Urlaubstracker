@@ -10,7 +10,7 @@
  */
 import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
-import { installInstructionsSheet } from '../ui/parts.js';
+import { installInstructionsSheet, privacySheet } from '../ui/parts.js';
 import { joinSheet, plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
 import { getPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
 import { checkJoinName, checkNewPassword, suggestPassword } from '../join.js';
@@ -18,6 +18,7 @@ import { buildInviteLink, buildExport, buildCsv, parseImport } from '../link.js'
 import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
 import { days, fullDate, compactDate, plural } from '../format.js';
 import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
+import { REGIONS, RECOMMENDED_REGION, regionLabel, regionAdvice, retentionOverdue, RETENTION_DAYS } from '../privacy.js';
 import * as store from '../store.js';
 
 const CURRENCIES = [
@@ -118,6 +119,7 @@ export function renderSettings(state, actions) {
     deviceGroup(actions),
     syncGroup(state),
     dataGroup(state),
+    privacyGroup(state),
     aboutGroup(state),
     // Ganz unten und für sich: was hier steht, ist nicht zurückzuholen.
     h('div.danger',
@@ -476,6 +478,18 @@ function syncGroup(state) {
       icon(status.icon, 22),
       h('div', h('p.status__title', status.title), h('p.status__text', status.text)),
     ),
+    // Sobald geteilt wird, liegen die Daten auf fremden Servern — dann zählt,
+    // in welchem Land. Die Konfiguration verrät die Region nicht, also fragen
+    // wir danach, statt sie in der README nur zu empfehlen.
+    cloud && regionAdvice(currentRegion(state)).tone !== 'good'
+      ? (() => {
+          const advice = regionAdvice(currentRegion(state));
+          return h('button.status.status--button', { type: 'button', class: `status--${advice.tone}`, onclick: () => regionSheet(state) },
+            icon('cloud', 22),
+            h('div', h('p.status__title', advice.title), h('p.status__text', advice.text)),
+          );
+        })()
+      : null,
     cloud
       ? h('div.rows',
           sharing?.byName
@@ -713,6 +727,7 @@ function shareTrip(state) {
       state,
       confirmLabel: 'Teilen und hochladen',
       onSubmit: (joinName, password) => store.connectCloud(store.cloudConfig(), { joinName, password }),
+      askRegion: true,
       close,
     }),
   });
@@ -734,6 +749,7 @@ function setupCloud(state) {
         state,
         confirmLabel: 'Verbinden und hochladen',
         confirmIcon: 'cloud',
+        askRegion: true,
         onSubmit: (joinName, password) => {
           const cfg = parseFirebaseConfig(input.value);
           const problem = validateFirebaseConfig(cfg);
@@ -760,7 +776,7 @@ function setupCloud(state) {
 }
 
 /** Name und Passwort abfragen und damit hochladen — für beide Wege oben. */
-function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, close }) {
+function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, askRegion = false, close }) {
   const prefs = getPrefs();
   const nameInput = plainInput({
     value: state.trip?.joinName || prefs.tripRef?.joinName || state.trip?.name || '',
@@ -774,6 +790,23 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, clo
   const error = h('p.field__error');
   const button = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon(confirmIcon, 19), confirmLabel);
 
+  // Wo die Daten liegen, entscheidet sich beim Anlegen der Datenbank und lässt
+  // sich danach nicht mehr ändern — gefragt wird deshalb hier, vor dem ersten
+  // Hochladen, und nicht irgendwann später in einem Hinweis.
+  const regionSelect = askRegion
+    ? h('select.field__input', {},
+        ...REGIONS.map(([id, label]) =>
+          h('option', { value: id, selected: id === (currentRegion(state) || RECOMMENDED_REGION) }, label)),
+      )
+    : null;
+  const regionNote = askRegion ? h('p.field__note') : null;
+  const showRegionNote = () => {
+    const advice = regionAdvice(regionSelect.value);
+    regionNote.textContent = advice.text;
+    regionNote.className = advice.tone === 'over' ? 'field__note field__note--warn' : 'field__note';
+  };
+  if (askRegion) { regionSelect.onchange = showRegionNote; showRegionNote(); }
+
   const go = async () => {
     const problem = checkJoinName(nameInput.value) || checkNewPassword(passwordInput.value);
     if (problem) { error.textContent = problem; return; }
@@ -781,6 +814,9 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, clo
     button.disabled = true;
     try {
       await onSubmit(nameInput.value.trim(), passwordInput.value);
+      // Erst nach dem Hochladen: vorher gibt es in der Cloud nichts, woran der
+      // Speicherort haften könnte.
+      if (askRegion) await saveTrip({ dataRegion: regionSelect.value });
       close(true);
       toast('Geteilt. Jetzt die Beitrittsdaten weitersagen.', { type: 'success' });
     } catch (err) {
@@ -794,6 +830,7 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, clo
     h('label.field', h('span.field__label', 'Passwort'), maskedField(passwordInput)),
     h('button.btn.btn--ghost.btn--small.field__inline', { type: 'button', onclick: () => { passwordInput.value = suggestPassword(); passwordInput.focus(); } },
       icon('repeat', 16), 'Vorschlag'),
+    regionSelect ? h('label.field', h('span.field__label', 'Speicherort der Daten'), regionSelect, regionNote) : null,
     h('p.field__note', 'Der Name muss im Firebase-Projekt einmalig sein — an ihm findet die App die Kasse wieder. Ändern lässt er sich danach nicht mehr.'),
     error,
     button,
@@ -844,6 +881,89 @@ function dataGroup(state) {
     actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
     importFile,
   );
+}
+
+// --------------------------------------------------------- Datenschutz
+
+/**
+ * Wo die Daten liegen. Der Trip hat das letzte Wort — er wird beim Teilen
+ * gesetzt und gilt für alle Geräte; steht dort nichts, greift die Angabe aus
+ * einer mitgelieferten `firebase-config.json`.
+ */
+function currentRegion(state) {
+  return state.trip?.dataRegion || store.cloudConfig()?.dataRegion || null;
+}
+
+/**
+ * Was die App verarbeitet, wo es liegt und wie lange.
+ *
+ * Im Kreis der eigenen Leute ist das Kür (Haushaltsausnahme, Art. 2 Abs. 2
+ * lit. c DSGVO) — sobald die Seite aber für wechselnde Gruppen bereitsteht,
+ * sind es Pflichtangaben nach Art. 13 DSGVO. Sie gehören dahin, wo die Leute
+ * sind: in die App, nicht nur in die README.
+ */
+function privacyGroup(state) {
+  const cloud = state.sync.mode === 'cloud';
+  const region = currentRegion(state);
+  const advice = cloud ? regionAdvice(region) : null;
+  const overdue = retentionOverdue(state.trip?.endDate);
+
+  return group('Datenschutz', {},
+    navRow('Datenschutzerklärung', {
+      sub: 'Was gespeichert wird, wer es sieht, welche Rechte ihr habt.',
+      onClick: () => privacySheet({ region: currentRegion(state), mode: state.sync.mode }),
+    }),
+    cloud
+      ? navRow('Speicherort der Daten', {
+          value: region ? regionLabel(region).replace(/\s*\(.*\)$/, '') : 'Unbekannt',
+          sub: advice.title,
+          onClick: () => regionSheet(state),
+        })
+      : null,
+    navRow('Aufbewahrung', {
+      value: overdue ? 'Fällig' : `${RETENTION_DAYS} Tage`,
+      sub: overdue
+        ? `Der Urlaub ist seit ${plural(overdue, 'Tag', 'Tagen')} vorbei — Zeit zum Sichern und Löschen.`
+        : `Empfohlen: spätestens ${RETENTION_DAYS} Tage nach dem letzten Urlaubstag löschen.`,
+      onClick: () => retentionSheet(state, overdue),
+    }),
+  );
+}
+
+/**
+ * Der Speicherort ist die eine Angabe, die die App nicht selbst herausfinden
+ * kann: die Firebase-Konfiguration verrät die Region der Firestore-Datenbank
+ * nicht. Also fragen wir danach — und sagen deutlich, was die Antwort bedeutet.
+ */
+async function regionSheet(state) {
+  const current = currentRegion(state);
+  const pick = await chooseSheet({
+    title: 'Speicherort der Daten',
+    subtitle: 'In welcher Region liegt eure Firestore-Datenbank? Steht in der Firebase-Konsole unter Firestore Database.',
+    options: REGIONS.map(([id, label, eu]) => [id, label, eu ? 'In der EU/im EWR.' : 'Außerhalb der EU.']),
+    current,
+  });
+  if (!pick || pick === current) return;
+  await saveTrip({ dataRegion: pick });
+  const advice = regionAdvice(pick);
+  toast(advice.title, { type: advice.tone === 'over' ? 'error' : 'success' });
+}
+
+/** Wie lange die Kasse stehen bleiben sollte — und der kurze Weg, sie zu räumen. */
+function retentionSheet(state, overdue) {
+  return openSheet({
+    title: 'Aufbewahrung',
+    subtitle: overdue
+      ? `Der Urlaub ist seit ${plural(overdue, 'Tag', 'Tagen')} vorbei.`
+      : 'Speicherbegrenzung, Art. 5 Abs. 1 lit. e DSGVO.',
+    build: (close) =>
+      h('div.stack',
+        h('p.field__note', `Automatisch gelöscht wird nichts — das entscheidet ihr. Empfohlen ist, die Kasse spätestens ${RETENTION_DAYS} Tage nach dem letzten Urlaubstag zu löschen: Bis dahin ist abgerechnet, danach trägt niemand mehr die Ausgaben der anderen mit sich herum.`),
+        h('p.field__note', 'Mitnehmen lässt sich vorher alles: „Sicherungskopie speichern“ legt die Daten als Datei auf euer Gerät, „Als CSV für Excel“ als Tabelle.'),
+        h('button.btn.btn--ghost.btn--wide.btn--danger', { type: 'button', onclick: () => { close(true); removeTrip(state); } },
+          icon('trash', 18), 'Urlaubskasse löschen'),
+      ),
+  });
 }
 
 async function removeTrip(state) {

@@ -792,6 +792,9 @@ select.field__input { background-image: none; }
 .field__pair > * { min-width: 0; }
 .field__pair .field__input { min-width: 0; }
 .field__note { font-size: var(--fs-xs); color: var(--text-muted); }
+/* Ein Hinweis, der nicht nur erklärt, sondern warnt — etwa ein Speicherort
+   außerhalb der EU. Dieselbe Größe, andere Farbe: es bleibt ein Hinweis. */
+.field__note--warn { color: var(--over); }
 /* Ein kleiner Knopf, der zum Feld darüber gehört (etwa „Vorschlag“): er soll
    so breit sein wie sein Text, nicht so breit wie das Eingabefeld. */
 .field__inline { align-self: flex-start; }
@@ -960,6 +963,9 @@ select.field__input { background-image: none; }
 .status--warn { color: var(--warn); }
 .status--over { color: var(--over); }
 .status--muted { color: var(--text-faint); }
+/* Ein Statusblock, der zugleich irgendwohin führt (Speicherort einstellen):
+   sieht aus wie die anderen, verhält sich wie ein Knopf. */
+.status--button { width: 100%; text-align: left; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
 .status__title { font-weight: 600; font-size: var(--fs-md); color: var(--text); }
 .status__text { font-size: var(--fs-xs); color: var(--text-muted); }
 

@@ -180,7 +180,11 @@ nachreicht.
 1. Auf [console.firebase.google.com](https://console.firebase.google.com) ein
    Projekt anlegen (Google Analytics kann aus bleiben).
 2. **Build → Firestore Database → Datenbank erstellen.**
-   Als Modus *Produktion* wählen, Region z. B. `eur3 (europe-west)`.
+   Als Modus *Produktion* wählen und eine **EU-Region** setzen, etwa
+   `eur3 (europe-west)`. Die Region lässt sich später nicht mehr ändern, und
+   außerhalb der EU ist jede Eingabe eine Drittlandübermittlung — die App
+   fragt beim Teilen danach und warnt dann sichtbar (siehe
+   [Wo liegen die Daten?](#wo-liegen-die-daten-datenschutz)).
 3. **Build → Authentication → Sign-in method → Anonym** aktivieren.
    Die App meldet die Geräte anonym an; niemand muss ein Konto anlegen.
 
@@ -432,6 +436,7 @@ js/
   backend-local.js    Speicherung im Gerät
   backend-firestore.js  Synchronisierung über mehrere Geräte
   prefs.js            geräteeigene Einstellungen (auch hell/dunkel)
+  privacy.js          Datenschutz: Speicherorte, Aufbewahrungsfrist, Art.-13-Text
   join.js             Name + Passwort → Kennung und Nachweis der Kasse
   link.js             Einladungslinks, CSV- und JSON-Export
   dom.js  format.js   kleine Helfer
@@ -504,14 +509,75 @@ npm run build:firebase        # oder: node tools/build-firebase.mjs 12.18.0
 
 ---
 
-## Wo liegen die Daten?
+## Wo liegen die Daten? (Datenschutz)
 
-Ohne Firebase: ausschließlich im Browser des Geräts (`localStorage`). Nichts
-verlässt das Handy.
+Ohne Firebase: ausschließlich im Browser des Geräts (`localStorage` und
+IndexedDB). Nichts verlässt das Handy.
 
 Mit Firebase: in eurem eigenen Firestore-Projekt. Es gibt keinen Server von
-uns dazwischen, keine Konten, keine Auswertung. Über **Mehr → Sicherungskopie
-speichern** kommt jederzeit alles als JSON-Datei heraus.
+uns dazwischen, keine Konten, keine Auswertung, keine Werbung, kein Tracking.
+Über **Mehr → Sicherungskopie speichern** kommt jederzeit alles als
+JSON-Datei heraus.
 
 Cloudflare liefert nur die Dateien der App aus und bekommt von den Einträgen
 nichts mit: die Geräte sprechen direkt mit Firestore, an Cloudflare vorbei.
+
+In der App steht dasselbe noch einmal für die Reisegruppe: **Mehr →
+Datenschutz** zeigt die Angaben nach Art. 13 DSGVO, den Speicherort und die
+Aufbewahrungsfrist; erreichbar ist der Text auch vom ersten Bildschirm aus,
+also bevor überhaupt ein Name eingetippt ist.
+
+### Wann die DSGVO überhaupt greift
+
+Führt ihr die Kasse im Kreis der eigenen Familie oder Freunde, greift die
+**Haushaltsausnahme** (Art. 2 Abs. 2 lit. c DSGVO): Dann sind die Pflichten
+unten für euch gegenstandslos. Sobald jemand diese Seite aber für wechselnde
+oder größere Gruppen bereitstellt — Vereinsfahrt, Firmenausflug, öffentlich
+erreichbare Installation —, endet die Ausnahme, und die folgenden Punkte
+gelten.
+
+### Verantwortlicher und Auftragsverarbeiter
+
+**Verantwortlicher** (Art. 4 Nr. 7 DSGVO) ist, wer die Seite bereitstellt und
+das Firebase-Projekt betreibt — nicht dieses Repository und nicht die
+Reisegruppe. Wer das ist, weiß nur ihr selbst, deshalb kennt die App dafür ein
+Feld: `privacyContact` in `firebase-config.json` (bei Cloudflare Pages die
+Umgebungsvariable `FIREBASE_PRIVACY_CONTACT`). Was dort steht — Name,
+Anschrift, E-Mail —, zeigt die App unter *Mehr → Datenschutz*. Bleibt das Feld
+leer, sagt sie ehrlich, dass die Stelle noch auszufüllen ist.
+
+**Auftragsverarbeiter** (Art. 28 DSGVO) ist Google (Firebase/Firestore). Der
+Auftragsverarbeitungsvertrag steckt im *Cloud Data Processing Addendum* der
+Google-Cloud-Bedingungen; er muss im Firebase-Projekt aktiv akzeptiert und
+dokumentiert werden (Google-Cloud-Konsole → *Privacy & Security → Data
+processing terms*). Weitere Empfänger gibt es nicht.
+
+### Speicherort: EU-Region
+
+Die Region der Firestore-Datenbank wird **beim Anlegen** festgelegt und lässt
+sich danach nicht mehr ändern — empfohlen ist `eur3 (europe-west)` oder eine
+andere `europe-*`-Region. Aus der Firebase-Konfiguration geht die Region nicht
+hervor, die App kann sie also nicht selbst auslesen; stattdessen fragt sie beim
+Teilen danach und warnt sichtbar, wenn die Wahl außerhalb der EU liegt
+(Drittlandübermittlung, Art. 44 ff. DSGVO). Die Angabe steht danach am Trip und
+gilt für alle Geräte; unter *Mehr → Speicherort der Daten* lässt sie sich
+korrigieren. Voreinstellen könnt ihr sie über `dataRegion` in
+`firebase-config.json` bzw. `FIREBASE_DATA_REGION`.
+
+Liegt eine bestehende Datenbank in den USA, hilft nur ein neues Firestore mit
+EU-Region und ein Umzug über *Sicherungskopie speichern → einspielen*.
+
+### Aufbewahrung und Löschung
+
+Automatisch gelöscht wird nichts — das würde eine laufende Kasse mitten im
+Urlaub leerräumen. Stattdessen gilt die Regel: **spätestens 42 Tage nach dem
+letzten Urlaubstag löschen** (Speicherbegrenzung, Art. 5 Abs. 1 lit. e DSGVO).
+Bis dahin sind Abrechnung und Rückzahlungen durch. Die App erinnert nach Ablauf
+der Frist unter *Mehr → Aufbewahrung* daran und bietet dort den Weg zum
+Löschen; die Frist steht als `RETENTION_DAYS` in `js/privacy.js`.
+
+*Mehr → Urlaubskasse löschen* entfernt den Trip samt allen Einträgen — im
+geteilten Betrieb für alle Geräte. Betroffenenrechte (Art. 15–21 DSGVO) decken
+die vorhandenen Funktionen ab: Auskunft und Datenübertragbarkeit über *Als CSV*
+bzw. *Sicherungskopie speichern*, Berichtigung über das Bearbeiten jedes
+Eintrags, Löschung über die beiden Wege oben.

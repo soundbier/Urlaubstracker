@@ -9,7 +9,12 @@
     "Unterstriche-Felder wie dieses werden ignoriert.",
     "appCheckSiteKey ist optional und bremst automatisiertes Durchprobieren von",
     "Passwörtern — siehe README, Abschnitt „App Check“. Ohne den Schlüssel bleibt",
-    "diese Bremse einfach aus, alles andere läuft unverändert."
+    "diese Bremse einfach aus, alles andere läuft unverändert.",
+    "privacyContact nennt die verantwortliche Stelle (Name, Anschrift, E-Mail).",
+    "Sie steht dann in der Datenschutzerklärung der App unter Mehr → Datenschutz —",
+    "nötig, sobald die Seite nicht nur im eigenen Familien- und Freundeskreis läuft.",
+    "dataRegion sagt, wo die Firestore-Datenbank liegt (eur3, europe-west3, nam5 …);",
+    "die App weist darauf hin, wenn das außerhalb der EU ist."
   ],
   "apiKey": "AIza…",
   "authDomain": "euer-projekt.firebaseapp.com",
@@ -17,5 +22,7 @@
   "storageBucket": "euer-projekt.appspot.com",
   "messagingSenderId": "000000000000",
   "appId": "1:000000000000:web:0000000000000000000000",
-  "appCheckSiteKey": "6Lc…"
+  "appCheckSiteKey": "6Lc…",
+  "privacyContact": "Vorname Nachname, Straße 1, 12345 Ort, kasse@example.org",
+  "dataRegion": "eur3"
 }
