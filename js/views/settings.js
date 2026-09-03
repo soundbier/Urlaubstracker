@@ -19,6 +19,8 @@ import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOP
 import { days, fullDate, compactDate, plural } from '../format.js';
 import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
 import { REGIONS, RECOMMENDED_REGION, regionLabel, regionAdvice, retentionOverdue, RETENTION_DAYS } from '../privacy.js';
+import { TRASH_DAYS } from '../trash.js';
+import * as lock from '../lock.js';
 import * as store from '../store.js';
 
 const CURRENCIES = [
@@ -109,6 +111,30 @@ function chooseSheet({ title, subtitle, options, current }) {
 }
 
 const saveTrip = (patch) => store.updateTrip(patch).catch((e) => toast(e.message, { type: 'error' }));
+
+/**
+ * Eine Datei aufs Gerät legen. Steht hier oben und nicht in „Daten“, weil das
+ * Löschen dieselbe Sicherungskopie anbietet — dort ist sie am wichtigsten.
+ */
+function download(content, filename, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = h('a', { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const slugFor = (trip) =>
+  (trip?.name || 'urlaub').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'urlaub';
+
+const backupNow = (state) => {
+  download(
+    buildExport({ trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts }),
+    `${slugFor(state.trip)}-sicherung.json`,
+    'application/json',
+  );
+};
 
 // ------------------------------------------------------------------ Seite
 
@@ -415,8 +441,17 @@ function shareSplit(trip, save) {
 function deviceGroup(actions) {
   const current = getPrefs().theme || 'auto';
   const label = (THEMES.find(([id]) => id === current) || THEMES[0])[1];
+  const status = lock.status();
+  const delay = (lock.DELAYS.find(([m]) => m === status.minutes) || lock.DELAYS[2])[1];
 
   return group('Dieses Gerät', {},
+    navRow('App-Sperre', {
+      value: status.enabled ? (status.biometrics ? 'Code + Biometrie' : 'Code') : 'Aus',
+      sub: status.enabled
+        ? `${delay.replace(/^Nach/, 'Sperrt nach')}${delay === 'Sofort' ? ' zu, sobald die App weg ist' : ' im Hintergrund'}.`
+        : 'Ein Code vor der Kasse — falls das Handy einmal wegkommt.',
+      onClick: () => lockSheet(actions),
+    }),
     navRow('Aussehen', {
       value: label,
       onClick: async () => {
@@ -437,6 +472,177 @@ function deviceGroup(actions) {
       },
     }),
   );
+}
+
+/**
+ * Die Gerätesperre — einrichten, ändern, abschalten.
+ *
+ * Warum es sie gibt: die Anmeldung an der geteilten Kasse gilt dauerhaft und
+ * überlebt jeden Neustart. Das ist gewollt (niemand will im Urlaub Passwörter
+ * tippen), heißt aber auch: ein gefundenes Handy zeigt die Finanzen der ganzen
+ * Gruppe. Der Code hier ist die zweite Tür davor.
+ *
+ * Was er nicht ist, steht auch da — verschlüsselt wird nichts, und wer sich mit
+ * dem Browser auskennt, kommt an die Daten im Speicher trotzdem heran. Ein
+ * Versprechen, das die App nicht halten kann, wäre schlimmer als keins.
+ */
+function lockSheet(actions) {
+  const status = lock.status();
+  return openSheet({
+    title: 'App-Sperre',
+    subtitle: status.enabled ? 'Gilt nur für dieses Gerät.' : 'Ein Zifferncode, bevor die Kasse aufgeht.',
+    build: (close) =>
+      status.enabled ? lockSettings(close, actions) : lockSetup(close, actions),
+  });
+}
+
+function lockSetup(close, actions) {
+  const code = maskedInput({ inputmode: 'numeric', maxlength: lock.MAX_CODE, placeholder: 'Code', autocomplete: 'new-password', enterkeyhint: 'next' });
+  const again = maskedInput({ inputmode: 'numeric', maxlength: lock.MAX_CODE, placeholder: 'Noch einmal', autocomplete: 'new-password', enterkeyhint: 'go' });
+  const error = h('p.field__error');
+  const save = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Sperre einschalten');
+
+  const go = async () => {
+    const problem = lock.checkCode(code.value) || (code.value !== again.value ? 'Die beiden Eingaben sind nicht gleich.' : null);
+    if (problem) { error.textContent = problem; return; }
+    save.disabled = true;
+    try {
+      await lock.setCode(code.value);
+      close(true);
+      toast('Sperre eingeschaltet.', { type: 'success' });
+      actions.rerender();
+    } catch (err) {
+      error.textContent = err?.message || String(err);
+      save.disabled = false;
+    }
+  };
+
+  return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
+    h('label.field', h('span.field__label', `Code (${lock.MIN_CODE}–${lock.MAX_CODE} Ziffern)`), maskedField(code)),
+    h('label.field', h('span.field__label', 'Wiederholen'), maskedField(again)),
+    error,
+    save,
+    h('p.field__note', 'Der Code steht nirgends — auch nicht auf diesem Gerät. Vergessen heißt: neu beitreten mit Name und Passwort der Kasse.'),
+    h('p.field__note', 'Er hält jemanden ab, der das entsperrte Handy in die Hand nimmt. Verschlüsselt sind die Daten damit nicht — dafür sorgt die Sperre des Geräts selbst.'),
+  );
+}
+
+function lockSettings(close, actions) {
+  const status = lock.status();
+  const delay = (lock.DELAYS.find(([m]) => m === status.minutes) || lock.DELAYS[2])[1];
+
+  const rows = h('div.rows',
+    navRow('Code ändern', {
+      onClick: () => { close(true); changeLockCodeSheet(actions); },
+    }),
+    navRow('Zusperren', {
+      value: delay,
+      onClick: async () => {
+        const pick = await chooseSheet({
+          title: 'Wann zusperren?',
+          subtitle: 'Gerechnet ab dem Moment, in dem die App in den Hintergrund geht.',
+          options: lock.DELAYS.map(([m, label, note]) => [String(m), label, note]),
+          current: String(status.minutes),
+        });
+        if (pick == null) return;
+        lock.setDelay(Number(pick));
+        close(true);
+        actions.rerender();
+      },
+    }),
+    navRow('Fingerabdruck oder Gesicht', {
+      value: status.biometrics ? 'An' : 'Aus',
+      sub: status.biometrics ? 'Der Code bleibt daneben gültig.' : 'Statt den Code zu tippen — sofern das Gerät das anbietet.',
+      onClick: async () => {
+        if (status.biometrics) {
+          lock.disableBiometrics();
+          close(true);
+          toast('Nur noch mit Code.');
+          actions.rerender();
+          return;
+        }
+        if (!(await lock.biometricsAvailable())) {
+          toast('Dieses Gerät bietet dafür nichts an.', { type: 'error' });
+          return;
+        }
+        try {
+          await lock.enrollBiometrics();
+          close(true);
+          toast('Eingerichtet.', { type: 'success' });
+          actions.rerender();
+        } catch (err) {
+          if (err?.name !== 'NotAllowedError' && err?.name !== 'AbortError') {
+            toast(err?.message || 'Das hat nicht geklappt.', { type: 'error' });
+          }
+        }
+      },
+    }),
+    actionRow('close', 'Jetzt sperren', () => { close(true); lock.lock(); }),
+    actionRow('trash', 'Sperre ausschalten', () => { close(true); disableLockSheet(actions); }, { danger: true }),
+  );
+
+  return h('div.stack', rows);
+}
+
+function changeLockCodeSheet(actions) {
+  return openSheet({
+    title: 'Code ändern',
+    build: (close) => {
+      const old = maskedInput({ inputmode: 'numeric', maxlength: lock.MAX_CODE, placeholder: 'Bisheriger Code', autocomplete: 'current-password' });
+      const next = maskedInput({ inputmode: 'numeric', maxlength: lock.MAX_CODE, placeholder: 'Neuer Code', autocomplete: 'new-password' });
+      const error = h('p.field__error');
+      const save = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Ändern');
+
+      const go = async () => {
+        const problem = lock.checkCode(next.value);
+        if (problem) { error.textContent = problem; return; }
+        save.disabled = true;
+        try {
+          if (!(await lock.verify(old.value))) throw new Error('Der bisherige Code stimmt nicht.');
+          await lock.setCode(next.value);
+          close(true);
+          toast('Neuer Code gesetzt.', { type: 'success' });
+          actions.rerender();
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+          save.disabled = false;
+        }
+      };
+
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
+        h('label.field', h('span.field__label', 'Bisheriger Code'), maskedField(old)),
+        h('label.field', h('span.field__label', 'Neuer Code'), maskedField(next)),
+        error,
+        save,
+      );
+    },
+  });
+}
+
+function disableLockSheet(actions) {
+  return openSheet({
+    title: 'Sperre ausschalten?',
+    subtitle: 'Danach geht die Kasse ohne Code auf.',
+    build: (close) => {
+      const code = maskedInput({ inputmode: 'numeric', maxlength: lock.MAX_CODE, placeholder: 'Code', autocomplete: 'current-password' });
+      const error = h('p.field__error');
+      const go = async () => {
+        try {
+          await lock.disable(code.value);
+          close(true);
+          toast('Sperre aus.');
+          actions.rerender();
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+        }
+      };
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); go(); } },
+        h('label.field', h('span.field__label', 'Code zur Bestätigung'), maskedField(code)),
+        error,
+        h('button.btn.btn--ghost.btn--danger.btn--wide', { type: 'submit' }, 'Ausschalten'),
+      );
+    },
+  });
 }
 
 // --------------------------------------------------------------------- Sync
@@ -492,10 +698,23 @@ function syncGroup(state) {
       : null,
     cloud
       ? h('div.rows',
+          (() => {
+            const devices = store.getDevices();
+            if (!devices.length) return null;
+            return navRow('Verbundene Geräte', {
+              value: String(devices.length),
+              sub: 'Wer die Kasse offen hat — und wie ein verlorenes Gerät wieder herausfliegt.',
+              onClick: () => devicesSheet(state),
+            });
+          })(),
           sharing?.byName
             ? navRow('Beitrittsdaten', {
                 value: sharing.joinName,
-                sub: sharing.joinPassword ? 'Name und Passwort zum Weitersagen' : 'Passwort ist auf diesem Gerät nicht bekannt',
+                sub: sharing.joinPassword
+                  ? 'Name und Passwort zum Weitersagen'
+                  : sharing.passwordOutdated
+                    ? 'Ein anderes Gerät hat das Passwort gewechselt'
+                    : 'Passwort ist auf diesem Gerät nicht bekannt',
                 onClick: () => joinDataSheet(state, sharing),
               })
             : null,
@@ -520,6 +739,79 @@ function syncGroup(state) {
 }
 
 /**
+ * Die Geräteliste — und der einzige Weg, ein verlorenes wieder loszuwerden.
+ *
+ * Bisher gab es den nicht: die anonyme Anmeldung gilt dauerhaft, und
+ * ausgetragen hat sich höchstens ein Gerät selbst. Wer sein Handy im Taxi
+ * liegen ließ, konnte der Gruppe nur sagen: „Legt eine neue Kasse an.“
+ */
+function devicesSheet(state) {
+  const devices = store.getDevices();
+  const when = (ms) => (ms ? compactDate(new Date(ms).toISOString().slice(0, 10)) : 'unbekannt');
+
+  return openSheet({
+    title: 'Verbundene Geräte',
+    subtitle: `${plural(devices.length, 'Gerät hat', 'Geräte haben')} Zugriff auf diese Kasse.`,
+    build: (close) =>
+      h('div.stack',
+        h('div.rows', ...devices.map((d) => {
+          const name = d.person?.name || 'Noch niemandem zugeordnet';
+          const seen = d.isMe ? 'dieses Gerät' : d.lastSeenAt ? `zuletzt ${when(d.lastSeenAt)}` : `dabei seit ${when(d.joinedAt)}`;
+          return h('div.srow.srow--static',
+            h('span.srow__main',
+              h('span.srow__label', name),
+              h('span.srow__sub', `${seen} · ${d.uid.slice(0, 6)}…`),
+            ),
+            d.isMe
+              ? null
+              : h('button.btn.btn--ghost.btn--small.btn--danger', { type: 'button', onclick: () => { close(true); kickDeviceSheet(state, d); } }, 'Aussperren'),
+          );
+        })),
+        h('p.field__note', 'Ein Gerät auszusperren wechselt zugleich das Passwort der Kasse — sonst käme es mit dem Nachweis, den es noch hat, sofort wieder herein. Die anderen bleiben verbunden; nur wer neu beitritt, braucht danach das neue Passwort.'),
+        h('p.field__note', 'Mehr als die Kennung, wer daran sitzt und wann es zuletzt da war, weiß die Kasse über ein Gerät nicht.'),
+      ),
+  });
+}
+
+/** Aussperren heißt: austragen und Passwort wechseln — beides oder gar nichts. */
+function kickDeviceSheet(state, device) {
+  const who = device.person?.name ? `das Gerät von ${device.person.name}` : 'dieses Gerät';
+  return openSheet({
+    title: 'Gerät aussperren',
+    subtitle: `Danach kommt ${who} an nichts mehr heran.`,
+    build: (close) => {
+      const input = maskedInput({ maxlength: 60, placeholder: 'Neues Passwort', autocomplete: 'new-password', enterkeyhint: 'go' });
+      input.value = suggestPassword();
+      const error = h('p.field__error');
+      const go = h('button.btn.btn--primary.btn--wide.btn--danger', { type: 'submit' }, 'Aussperren');
+
+      const submit = async () => {
+        const problem = checkNewPassword(input.value);
+        if (problem) { error.textContent = problem; return; }
+        go.disabled = true;
+        try {
+          await store.removeDevice(device.uid, input.value);
+          close(true);
+          toast('Ausgesperrt. Das neue Passwort steht unter „Beitrittsdaten“.', { type: 'success' });
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+          go.disabled = false;
+        }
+      };
+
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); submit(); } },
+        h('p.field__note', 'Weil das Gerät den bisherigen Beitrittsnachweis kennt, muss das Passwort mit gewechselt werden. Wer schon verbunden ist, bleibt es; für neue Geräte gilt ab sofort das hier.'),
+        h('label.field', h('span.field__label', 'Neues Passwort der Kasse'), maskedField(input)),
+        h('button.btn.btn--ghost.btn--small.field__inline', { type: 'button', onclick: () => { input.value = suggestPassword(); input.focus(); } },
+          icon('repeat', 16), 'Vorschlag'),
+        error,
+        go,
+      );
+    },
+  });
+}
+
+/**
  * Was man weitersagt, damit jemand dazukommt.
  *
  * Beides steht hier zum Ablesen: der Name ist ohnehin sichtbar, das Passwort
@@ -536,7 +828,9 @@ function joinDataSheet(state, sharing) {
         readonlyField('Name der Kasse', sharing.joinName),
         sharing.joinPassword
           ? readonlyPasswordField('Passwort', sharing.joinPassword)
-          : h('p.field__note', 'Das Passwort steht nur auf den Geräten, die es gesetzt oder eingetippt haben — dieses hier gehört nicht dazu. Wer es kennt, findet es in seinen Einstellungen; sonst setzt ihr unten ein neues.'),
+          : h('p.field__note', sharing.passwordOutdated
+              ? 'Ein anderes Gerät hat das Passwort inzwischen gewechselt — das hier gespeicherte gilt nicht mehr und wird deshalb nicht angezeigt. Frag in der Gruppe nach dem neuen, oder setz unten selbst eines.'
+              : 'Das Passwort steht nur auf den Geräten, die es gesetzt oder eingetippt haben — dieses hier gehört nicht dazu. Wer es kennt, findet es in seinen Einstellungen; sonst setzt ihr unten ein neues.'),
         h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => { close(true); shareJoinData(sharing); } },
           icon('share', 19), 'Beitrittsdaten teilen'),
         h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => { close(true); shareInvite(sharing); } },
@@ -841,17 +1135,7 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, ask
 
 function dataGroup(state) {
   const { trip, contributions, expenses, cashOuts } = state;
-
-  const download = (content, filename, type) => {
-    const url = URL.createObjectURL(new Blob([content], { type }));
-    const a = h('a', { href: url, download: filename });
-    document.body.append(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  };
-
-  const slug = (trip.name || 'urlaub').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'urlaub';
+  const slug = slugFor(trip);
 
   const importFile = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: async (e) => {
     const file = e.target.files?.[0];
@@ -966,19 +1250,84 @@ function retentionSheet(state, overdue) {
   });
 }
 
+/**
+ * Löschen — mit Anlauf.
+ *
+ * Vorher reichten zwei Tipps, und der ganze Urlaub war für alle weg: kein
+ * zweiter Nachweis, keine Bedenkzeit, keine Kopie. Jetzt sind es drei Hürden,
+ * jede gegen einen anderen Fehler:
+ *
+ *   Namen abtippen   gegen den Fehlgriff in der Liste,
+ *   Bedenkzeit       gegen den Alleingang, sobald mehrere Geräte dranhängen
+ *                    (erzwungen von firestore.rules, nicht nur hier),
+ *   Kopie            gegen den Fall, dass es doch der falsche Knopf war.
+ */
 async function removeTrip(state) {
   const cloud = state.sync.mode === 'cloud';
-  const ok = await confirmSheet({
-    title: 'Urlaubskasse löschen?',
-    text: cloud
-      ? 'Die Kasse wird für alle Geräte gelöscht — alle Einzahlungen und Ausgaben sind dann weg. Vorher am besten eine Sicherungskopie speichern.'
-      : 'Alle Einzahlungen und Ausgaben auf diesem Gerät werden gelöscht. Vorher am besten eine Sicherungskopie speichern.',
-    confirmLabel: 'Endgültig löschen',
-    danger: true,
+  const request = store.deletionRequest();
+  const needsGrace = store.deleteNeedsGrace();
+  const devices = store.getDevices().length;
+  const expected = (state.trip?.name || '').trim().toLowerCase();
+
+  return openSheet({
+    title: request?.due ? 'Kasse endgültig löschen' : 'Urlaubskasse löschen',
+    subtitle: needsGrace && !request?.due
+      ? `An dieser Kasse hängen ${plural(devices, 'Gerät', 'Geräte')}.`
+      : cloud ? 'Für alle Geräte.' : 'Auf diesem Gerät.',
+    build: (close) => {
+      const confirm = plainInput({ placeholder: state.trip?.name || '', maxlength: 60, enterkeyhint: 'go' });
+      const error = h('p.field__error');
+      const go = h('button.btn.btn--primary.btn--wide.btn--danger', { type: 'submit' },
+        needsGrace && !request?.due ? 'Löschen beantragen' : 'Endgültig löschen');
+
+      const submit = async () => {
+        if (confirm.value.trim().toLowerCase() !== expected) {
+          error.textContent = 'Der Name stimmt nicht. Gelöscht wird nur, was man auch benennen kann.';
+          return;
+        }
+        error.textContent = '';
+        go.disabled = true;
+        try {
+          if (needsGrace && !request?.due) {
+            await store.requestTripDeletion();
+            close(true);
+            toast(`Löschen beantragt. In ${store.DELETE_GRACE_HOURS} Stunden kann es jedes Gerät ausführen — bis dahin auch stoppen.`, { duration: 6000 });
+            return;
+          }
+          const { backupKept } = await store.deleteTrip();
+          close(true);
+          toast(
+            backupKept
+              ? `Gelöscht. ${TRASH_DAYS} Tage lang lässt sie sich auf diesem Gerät noch zurückholen.`
+              : 'Gelöscht.',
+            { duration: 6000 },
+          );
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+          go.disabled = false;
+        }
+      };
+
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); submit(); } },
+        h('p.confirm__text', cloud
+          ? 'Alle Einzahlungen, Ausgaben und Auszahlungen verschwinden — auf allen Geräten der Gruppe, nicht nur auf diesem.'
+          : 'Alle Einzahlungen, Ausgaben und Auszahlungen auf diesem Gerät verschwinden.'),
+        needsGrace && !request?.due
+          ? h('p.field__note', `Weil mehr als ein Gerät dranhängt, wird das Löschen erst beantragt: ${store.DELETE_GRACE_HOURS} Stunden lang steht der Auftrag sichtbar in der Kasse, und jedes Gerät kann ihn stoppen. Danach führt ihn aus, wer will.`)
+          : null,
+        request?.due
+          ? h('p.field__note', 'Die Bedenkzeit ist abgelaufen — jetzt geht es wirklich weg.')
+          : null,
+        h('button.btn.btn--ghost.btn--wide', { type: 'button', onclick: () => backupNow(state) },
+          icon('download', 18), 'Vorher Sicherungskopie speichern'),
+        h('p.field__note', 'Zum Bestätigen den Namen der Kasse abtippen — was man löscht, soll man auch benennen können.'),
+        h('label.field', h('span.field__label', 'Name der Kasse'), confirm),
+        error,
+        go,
+        h('p.field__note', `Die App legt beim Löschen zusätzlich eine Kopie auf diesem Gerät ab und räumt sie nach ${TRASH_DAYS} Tagen von selbst weg. Bis dahin steht sie auf dem Anfangsbildschirm zum Zurückholen — oder lässt sich dort sofort endgültig entfernen.`),
+      );
+    },
   });
-  if (!ok) return;
-  await store.deleteTrip();
-  toast('Gelöscht.');
 }
 
 // --------------------------------------------------------------------- Über

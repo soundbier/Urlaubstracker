@@ -3,6 +3,22 @@ import { h, icon, replace, $, $$ } from '../dom.js';
 
 let openCount = 0;
 
+/**
+ * Alle offenen Sheets, damit die Gerätesperre sie zumachen kann: in einem Sheet
+ * stehen Beträge, Namen und im schlimmsten Fall die Beitrittsdaten — die dürfen
+ * nicht hinter dem Sperrbildschirm liegen bleiben.
+ */
+const openSheets = new Set();
+
+export function closeAllSheets() {
+  for (const close of [...openSheets]) close(undefined);
+}
+
+/** Auch die kurze Meldung unten kann einen Betrag tragen — sie geht mit zu. */
+export function hideToast() {
+  $('#toast')?.classList.remove('is-visible');
+}
+
 const FOCUSABLE = 'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /** Sichtbar heißt hier: nimmt Platz ein. `offsetParent` taugt nicht — das Sheet liegt fixiert. */
@@ -22,6 +38,7 @@ export function openSheet({ title, subtitle, build, fullHeight = false, bodyClas
     const close = (value) => {
       if (done) return;
       done = true;
+      openSheets.delete(close);
       overlay.classList.remove('is-open');
       openCount = Math.max(0, openCount - 1);
       if (!openCount) document.body.classList.remove('has-sheet');
@@ -84,6 +101,7 @@ export function openSheet({ title, subtitle, build, fullHeight = false, bodyClas
     document.body.append(overlay);
     document.body.classList.add('has-sheet');
     openCount++;
+    openSheets.add(close);
     // In der Erfassungsphase, damit die Falle auch dann greift, wenn der Fokus
     // gerade in einem Feld sitzt, das Tab selbst behandelt.
     addEventListener('keydown', onKey, true);

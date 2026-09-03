@@ -8,6 +8,24 @@ rules_version = '2';
 // `joinProof` mit, und der Vergleich passiert hier auf dem Server. Mehr als
 // acht Geräte kommen nicht an einen Trip; ebenso viele Personen führt die App.
 //
+// Zwei Dinge regeln die Regeln, die die App allein nicht könnte:
+//
+//   Aussperren — ein verlorenes Handy bleibt sonst für immer drin. Mitglieder
+//   dürfen deshalb fremde Kennungen entfernen (aber weiterhin keine
+//   hinzufügen). Der Preis: wer in der Gruppe ist, kann auch andere
+//   hinauswerfen. Bei acht Leuten, die zusammen in den Urlaub fahren, ist das
+//   die kleinere Sorge als ein Gerät, das man nicht mehr loswird. Die App
+//   wechselt beim Aussperren zusätzlich das Passwort — sonst käme das Gerät
+//   mit dem Nachweis, den es noch hat, sofort wieder herein.
+//
+//   Löschen mit Bedenkzeit — bisher konnte jedes Mitglied die ganze Kasse mit
+//   einem Tipp und ohne Rückfrage zweiter Art wegräumen. Jetzt braucht es
+//   dafür einen Löschauftrag, der 24 Stunden im Dokument steht: alle Geräte
+//   sehen ihn, jedes kann ihn abbrechen. Der Zeitstempel muss die Serverzeit
+//   sein (`request.time`), sonst ließe er sich vordatieren. Allein am Gerät
+//   (ein einziges Mitglied) bleibt Löschen sofort möglich — dort gibt es
+//   niemanden, den die Bedenkzeit schützen würde.
+//
 // Veröffentlichen:  firebase deploy --only firestore:rules
 // (oder in der Firebase-Konsole unter Firestore Database → Regeln einfügen)
 
@@ -23,6 +41,10 @@ service cloud.firestore {
         return resource.data.memberUids;
       }
 
+      function afterMembers() {
+        return request.resource.data.memberUids;
+      }
+
       function isMember() {
         return signedIn() && request.auth.uid in members();
       }
@@ -30,6 +52,22 @@ service cloud.firestore {
       // Für die Unterordner: das Trip-Dokument nachschlagen.
       function tripMembers() {
         return get(/databases/$(database)/documents/trips/$(tripId)).data.memberUids;
+      }
+
+      // Ein Löschauftrag zählt nur mit Serverzeit. Unverändert stehen lassen
+      // darf ihn jede andere Änderung — sonst käme keine Ausgabe mehr durch,
+      // solange einer offen ist.
+      function honestDeleteRequest() {
+        return !('deleteRequestedAt' in request.resource.data)
+               || request.resource.data.deleteRequestedAt == request.time
+               || ('deleteRequestedAt' in resource.data
+                   && request.resource.data.deleteRequestedAt == resource.data.deleteRequestedAt);
+      }
+
+      function graceOver() {
+        return 'deleteRequestedAt' in resource.data
+               && resource.data.deleteRequestedAt is timestamp
+               && request.time > resource.data.deleteRequestedAt + duration.value(24, 'h');
       }
 
       // Anlegen darf jedes angemeldete Gerät — aber nur mit sich selbst als
@@ -43,13 +81,16 @@ service cloud.firestore {
       allow list: if false; // Trips lassen sich nicht durchsuchen, nur gezielt öffnen.
 
       allow update: if
-        // Mitglieder pflegen den Trip. Sich selbst austragen ist erlaubt,
-        // andere hinauswerfen nicht — und `hasOnly` sorgt dafür, dass auch
-        // niemand *hinzugefügt* werden kann: sonst könnte ein Mitglied ein
-        // fremdes Gerät ganz ohne Einladungscode in die Kasse holen.
+        // Mitglieder pflegen den Trip. `hasOnly` sorgt dafür, dass niemand
+        // *hinzugefügt* werden kann: sonst holte ein Mitglied ein fremdes
+        // Gerät ganz ohne Einladungscode in die Kasse. Entfernen ist erlaubt —
+        // sich selbst (verlassen) und, solange man selbst drinbleibt, ein
+        // verlorenes Gerät. Wer geht, nimmt niemanden mit.
         (isMember()
-         && request.resource.data.memberUids.hasAll(members().removeAll([request.auth.uid]))
-         && request.resource.data.memberUids.hasOnly(members()))
+         && afterMembers().hasOnly(members())
+         && (request.auth.uid in afterMembers()
+             || afterMembers().hasAll(members().removeAll([request.auth.uid])))
+         && honestDeleteRequest())
         ||
         // Beitreten: nur mit dem richtigen Code, nur sich selbst hinzufügen,
         // und ohne den Code dabei auszutauschen.
@@ -57,11 +98,14 @@ service cloud.firestore {
          && !(request.auth.uid in members())
          && request.resource.data.joinProof == resource.data.inviteCode
          && request.resource.data.inviteCode == resource.data.inviteCode
-         && request.resource.data.memberUids.hasAll(members())
-         && request.resource.data.memberUids.hasOnly(members().concat([request.auth.uid]))
-         && request.resource.data.memberUids.size() <= 8);
+         && afterMembers().hasAll(members())
+         && afterMembers().hasOnly(members().concat([request.auth.uid]))
+         && afterMembers().size() <= 8
+         && honestDeleteRequest());
 
-      allow delete: if isMember();
+      // Endgültig weg ist die Kasse erst nach der Bedenkzeit — oder sofort,
+      // wenn nur noch ein Gerät daran hängt.
+      allow delete: if isMember() && (members().size() == 1 || graceOver());
 
       // Einzahlungen und Ausgaben: für Mitglieder offen, für alle anderen zu.
       match /{document=**} {

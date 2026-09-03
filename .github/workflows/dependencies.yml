@@ -1,0 +1,60 @@
+# Einmal pro Woche nachsehen, ob in dem, was wir ausliefern, inzwischen eine
+# bekannte Lücke steckt — und ob es etwas Neueres gibt.
+#
+# Getrennt von den Tests, weil dieser Lauf ins Netz greift: die Registry kann
+# langsam sein oder gerade nicht antworten, und daran soll kein Pull Request
+# hängen bleiben. Was hier rot wird, ist eine Nachricht an die Wartung, kein
+# Deployment-Stopp (veröffentlicht wird ohnehin über Cloudflare Pages).
+name: Abhängigkeiten
+
+on:
+  schedule:
+    - cron: '17 5 * * 1' # montags früh
+  workflow_dispatch:
+  # Ändert sich, was festgenagelt ist, wird sofort geprüft statt erst montags.
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - vendor/firebase.lock.json
+      - tools/check-deps.mjs
+      - tools/firebase-bundle.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Bekannte Lücken und neue Fassungen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check:deps
+
+  reproducible:
+    name: Bündel neu bauen und vergleichen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      # Aus denselben Fassungen muss dieselbe Datei fallen. Kommt hier etwas
+      # anderes heraus als im Repository liegt, ist vendor/firebase.js nicht
+      # das, was package-lock.json beschreibt — und niemand weiß, was drin ist.
+      - run: npm run build:firebase
+      - name: vendor/firebase.js unverändert?
+        run: |
+          if ! git diff --quiet -- vendor/; then
+            echo "::error::Neu gebaut ergibt ein anderes vendor/firebase.js als im Repository liegt."
+            git diff --stat -- vendor/
+            exit 1
+          fi
+          echo "Gleiche Fassungen, gleiches Bündel."

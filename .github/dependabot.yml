@@ -1,0 +1,41 @@
+# Wer sagt Bescheid, wenn im Firebase-SDK eine Lücke gestopft wurde?
+#
+# Vorher: niemand. vendor/firebase.js war von Hand gebaut, die Fassung stand
+# nur als Zahl im Bau-Skript, und ein Sicherheitsupdate fiel genau dann auf,
+# wenn jemand zufällig daran dachte.
+#
+# Jetzt stehen die Fassungen in package.json und package-lock.json — damit
+# sieht Dependabot sie und schlägt jede neue als Pull Request vor. Wichtig
+# dabei: der Pull Request ändert nur die Zahl. Damit die App das Update
+# wirklich bekommt, muss danach das Bündel neu gebaut werden:
+#
+#   npm ci && npm run build:firebase   (und APP_VERSION in sw.js hochzählen)
+#
+# Genau darauf besteht `npm test` — tests/deps.test.js vergleicht den
+# Fingerabdruck von vendor/firebase.js mit der festgelegten Fassung und wird
+# rot, solange nur die Zahl aktualisiert wurde.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: Europe/Berlin
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'Abhängigkeiten'
+    labels:
+      - abhängigkeiten
+
+  # Auch die Actions in den Workflows altern — und laufen mit Zugriff auf das
+  # Repository.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'Actions'
+    labels:
+      - abhängigkeiten

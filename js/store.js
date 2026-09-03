@@ -10,6 +10,7 @@ import { LocalBackend } from './backend-local.js';
 import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.js';
 import { newId } from './ids.js';
 import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
+import { keepCopy, lastCopy, discardCopy } from './trash.js';
 import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare } from './calc.js';
 
 let backend = null;
@@ -595,6 +596,12 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
 export async function disconnectCloud() {
   const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts };
   const prefs = getPrefs();
+  // Sich auch wirklich austragen. Vorher hörte dieses Gerät nur auf zuzuhören
+  // und stand serverseitig weiter als Mitglied da — mit vollem Zugriff, bloß
+  // ohne dass jemand es noch auf dem Schirm hatte. Ohne Netz geht das nicht;
+  // dann bleibt es in der Liste und lässt sich von einem anderen Gerät
+  // aussperren.
+  await backend?.leave?.().catch(() => {});
   // Name und Passwort bleiben stehen: wer die Kasse später wieder teilt, soll
   // sich nichts Neues ausdenken müssen.
   setPrefs({ tripRef: { mode: 'local', joinName: joinName(), joinPassword: prefs.tripRef?.joinPassword || '' } });
@@ -654,18 +661,171 @@ function joinName() {
 export function getSharingInfo() {
   const prefs = getPrefs();
   if (prefs.tripRef?.mode !== 'cloud') return null;
+  // Hat ein anderes Gerät inzwischen das Passwort gewechselt, steht hier ein
+  // Nachweis, den die Kasse nicht mehr kennt. Dann ist auch das Passwort
+  // daneben veraltet — und weiterzusagen wäre schlimmer als nichts zu sagen.
+  const liveProof = state.trip?.inviteCode || prefs.tripRef.inviteCode;
+  const outdated = !!(prefs.tripRef.inviteCode && liveProof && prefs.tripRef.inviteCode !== liveProof);
   return {
     tripId: prefs.tripRef.tripId,
-    inviteCode: state.trip?.inviteCode || prefs.tripRef.inviteCode,
+    inviteCode: liveProof,
     config: prefs.firebaseConfig,
     tripName: state.trip?.name || '',
     joinName: joinName(),
-    joinPassword: prefs.tripRef.joinPassword || '',
+    joinPassword: outdated ? '' : prefs.tripRef.joinPassword || '',
+    passwordOutdated: outdated,
     // Kassen aus früheren Fassungen liegen unter einer zufälligen Kennung: zu
     // ihnen führt kein Name, nur der Einladungslink. Woran man sie erkennt: im
     // Dokument steht kein Beitrittsname.
     byName: !!state.trip?.joinName,
   };
+}
+
+// ------------------------------------------------------------------ Geräte
+
+/**
+ * Welche Geräte an dieser Kasse hängen.
+ *
+ * Ein verlorenes Handy war bisher nicht loszuwerden: die anonyme Anmeldung
+ * gilt dauerhaft, und ausgetragen hat sich ein Gerät höchstens selbst. Damit
+ * jemand ein fremdes Gerät aussperren kann, muss er es erst einmal sehen —
+ * darum diese Liste. Mehr als die Kennung, wer daran sitzt und wann es zuletzt
+ * da war, steht nicht drin; kein Gerätemodell, kein Browser, kein Standort.
+ */
+export function getDevices() {
+  if (state.sync.mode !== 'cloud' || !state.trip) return [];
+  const rows = state.trip.members || {};
+  return (state.trip.memberUids || []).map((uid) => {
+    const row = rows[uid] || {};
+    return {
+      uid,
+      personId: row.personId || null,
+      person: (state.trip.people || []).find((p) => p.id === row.personId) || null,
+      joinedAt: row.joinedAt || null,
+      lastSeenAt: row.lastSeenAt || null,
+      isMe: !!state.sync.uid && uid === state.sync.uid,
+    };
+  });
+}
+
+/**
+ * Ein Gerät aussperren — mit neuem Passwort im selben Zug.
+ *
+ * Ohne den Wechsel wäre es kein Aussperren: das Gerät kennt den Nachweis noch
+ * und stünde nach dem nächsten Start wieder in der Liste. Erst kommt deshalb
+ * das neue Passwort (dann kann es nicht mehr beitreten), dann das Austragen
+ * (dann kommt es an die laufende Kasse nicht mehr heran).
+ */
+export async function removeDevice(uid, newPassword) {
+  if (state.sync.mode !== 'cloud') throw new Error('Die Kasse liegt gar nicht in der Cloud.');
+  if (!uid) throw new Error('Welches Gerät denn?');
+  if (uid === state.sync.uid) {
+    throw new Error('Dieses Gerät sperrt sich nicht selbst aus — dafür gibt es „Synchronisierung beenden“.');
+  }
+  await changeJoinPassword(newPassword);
+  await withTimeout(Promise.resolve(backend.removeMember?.(uid)), 20000, NO_CONNECTION);
+}
+
+// ------------------------------------------------------------------ Löschen
+
+/** So lange steht ein Löschauftrag im Dokument, bevor er ausgeführt werden darf. */
+export const DELETE_GRACE_HOURS = 24;
+const DELETE_GRACE_MS = DELETE_GRACE_HOURS * 3600000;
+
+/** Hängt mehr als ein Gerät dran? Dann löscht niemand mehr im Alleingang. */
+export function deleteNeedsGrace() {
+  return state.sync.mode === 'cloud' && (state.trip?.memberUids || []).length > 1;
+}
+
+/** Der offene Löschauftrag — oder `null`, wenn keiner läuft. */
+export function deletionRequest() {
+  const at = Number(state.trip?.deleteRequestedAt) || 0;
+  if (!at) return null;
+  const dueAt = at + DELETE_GRACE_MS;
+  return {
+    at,
+    dueAt,
+    due: Date.now() >= dueAt,
+    person: (state.trip.people || []).find((p) => p.id === state.trip.deleteRequestedByPerson) || null,
+  };
+}
+
+/** Löschauftrag stellen: ab jetzt sehen ihn alle Geräte, und jedes kann ihn stoppen. */
+export async function requestTripDeletion() {
+  if (!deleteNeedsGrace()) throw new Error('Diese Kasse lässt sich sofort löschen.');
+  await withTimeout(Promise.resolve(backend.requestDelete?.({ personId: state.myPersonId })), 20000, NO_CONNECTION);
+}
+
+/** Löschauftrag zurücknehmen. */
+export async function cancelTripDeletion() {
+  await withTimeout(Promise.resolve(backend.cancelDelete?.()), 20000, NO_CONNECTION);
+}
+
+/**
+ * Trip löschen und zurück auf Anfang.
+ *
+ * Vorher legt die App eine Kopie auf diesem Gerät ab (siehe `trash.js`) — ein
+ * Fehlgriff kostete bisher den ganzen Urlaub. Bei mehreren Geräten geht es
+ * außerdem nur nach der Bedenkzeit: die Regeln in `firestore.rules` bestehen
+ * darauf, und hier steht dieselbe Bedingung noch einmal, damit die App gar
+ * nicht erst anfängt, Einträge zu löschen, die der Server danach behält.
+ */
+export async function deleteTrip() {
+  const request = deletionRequest();
+  if (deleteNeedsGrace() && !request?.due) {
+    throw new Error(
+      request
+        ? 'Die Bedenkzeit läuft noch. Bis dahin kann jedes Gerät das Löschen stoppen.'
+        : 'An dieser Kasse hängen mehrere Geräte — dafür braucht es erst einen Löschauftrag.',
+    );
+  }
+
+  const backupKept = keepCopy({
+    trip: state.trip,
+    contributions: state.contributions,
+    expenses: state.expenses,
+    cashOuts: state.cashOuts,
+  });
+
+  await backend.deleteTrip?.();
+  clearPrefs();
+  const local = new LocalBackend();
+  // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
+  await local.deleteTrip();
+  set({ trip: null, contributions: [], expenses: [], cashOuts: [], myPersonId: null, invite: null, phase: 'onboarding' });
+  await useBackend(local);
+  return { backupKept };
+}
+
+/** Die zuletzt gelöschte Kasse, solange sie noch zurückzuholen ist. */
+export function lastDeleted() {
+  return lastCopy();
+}
+
+/** Sie doch behalten: zurück auf dieses Gerät, ohne Cloud. */
+export async function restoreLastDeleted() {
+  const copy = lastCopy();
+  if (!copy) throw new Error('Es gibt nichts mehr zurückzuholen.');
+  const { parseImport } = await import('./link.js');
+  const payload = parseImport(copy.json);
+
+  const local = new LocalBackend();
+  await local.replaceAll({
+    trip: { ...payload.trip, updatedAt: Date.now() },
+    contributions: payload.contributions,
+    expenses: payload.expenses,
+    cashOuts: payload.cashOuts || [],
+  });
+  setPrefs({
+    tripRef: { mode: 'local', joinName: payload.trip.joinName || payload.trip.name || '', joinPassword: '' },
+  });
+  discardCopy();
+  await useBackend(local);
+}
+
+/** Die Kopie endgültig wegwerfen. */
+export function discardLastDeleted() {
+  discardCopy();
 }
 
 // ------------------------------------------------------------------- Daten
@@ -677,17 +837,6 @@ export async function importData(payload) {
     expenses: payload.expenses,
     cashOuts: payload.cashOuts || [],
   });
-}
-
-/** Trip löschen und zurück auf Anfang. */
-export async function deleteTrip() {
-  await backend.deleteTrip?.();
-  clearPrefs();
-  const local = new LocalBackend();
-  // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
-  await local.deleteTrip();
-  set({ trip: null, contributions: [], expenses: [], cashOuts: [], myPersonId: null, invite: null, phase: 'onboarding' });
-  await useBackend(local);
 }
 
 export function me() {

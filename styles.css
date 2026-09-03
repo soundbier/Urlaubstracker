@@ -874,6 +874,11 @@ select.field__input { background-image: none; }
 .srow__chevron { display: grid; place-items: center; color: var(--text-faint); transform: rotate(-90deg); }
 .srow__check { display: grid; place-items: center; color: var(--accent); }
 
+/* Eine Zeile, die nur berichtet und ihren Knopf rechts trägt — die Geräteliste. */
+.srow--static { cursor: default; }
+.srow--static:active { background: none; }
+.srow--static .srow__label { font-size: var(--fs-md); color: var(--text); }
+
 .srow--danger { color: var(--over); }
 .srow--danger .srow__lead { color: currentColor; }
 
@@ -968,6 +973,87 @@ select.field__input { background-image: none; }
 .status--button { width: 100%; text-align: left; border: 0; background: none; padding: 0; font: inherit; cursor: pointer; }
 .status__title { font-weight: 600; font-size: var(--fs-md); color: var(--text); }
 .status__text { font-size: var(--fs-xs); color: var(--text-muted); }
+
+/* -------------------------------------------------- Hinweisbalken (notice) */
+
+/*
+ * Ein Balken, der etwas will: ein offener Löschauftrag, eine Kopie, die noch
+ * zurückzuholen ist. Anders als `.status` steht er nicht in einem Abschnitt,
+ * sondern quer über der Ansicht — deshalb hat er eine Fläche und eine Kante in
+ * seiner Farbe, damit man ihn nicht für eine Überschrift hält.
+ */
+.notice {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  margin: var(--sp-3) 0;
+  padding: var(--sp-3);
+  border: 1px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 8%, var(--surface));
+}
+.notice .icon { margin-top: 2px; flex: none; }
+/* Auf schmalen Schirmen rutscht der Knopf unter den Text, statt ihn auf vier
+   Wörter pro Zeile einzuquetschen. */
+.notice { flex-wrap: wrap; }
+.notice__main { flex: 1 1 220px; }
+.notice--danger { color: var(--over); }
+.notice--warn { color: var(--warn); }
+.notice__main { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-1); align-items: flex-start; }
+.notice__title { font-weight: 600; font-size: var(--fs-sm); color: var(--text); }
+.notice__text { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.45; }
+.notice__action {
+  flex: none;
+  margin-left: auto;
+  align-self: center;
+  min-height: 36px;
+  padding: 0 var(--sp-3);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+.notice__action:disabled { opacity: 0.5; }
+
+/* -------------------------------------------------------- Sperrbildschirm */
+
+/*
+ * Der Sperrbildschirm ersetzt die App, statt sich darüberzulegen: was hinter
+ * einer halbdurchsichtigen Fläche noch zu lesen wäre, ist genau das, was hier
+ * nicht zu sehen sein soll.
+ */
+/* Ohne Navigationsleiste darunter braucht die Ansicht auch deren Platz nicht —
+   sonst steht die Tastatur oben und darunter klafft ein Loch. */
+.lockscreen {
+  min-height: 100dvh;
+  justify-content: center;
+  padding-bottom: calc(var(--safe-b) + var(--sp-7));
+}
+.lockscreen__inner {
+  width: 100%;
+  max-width: 340px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+}
+.lockscreen__title { font-size: var(--fs-lg); font-weight: 600; }
+.lockscreen__text { font-size: var(--fs-xs); color: var(--text-muted); text-align: center; }
+.lockscreen__dots { display: flex; gap: var(--sp-2); min-height: 14px; align-items: center; }
+.lockscreen__dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid var(--rule);
+}
+.lockscreen__dot.is-on { background: var(--text); border-color: var(--text); }
+.lockscreen__msg { min-height: 1.3em; font-size: var(--fs-xs); color: var(--over); text-align: center; }
+.lockscreen .keypad { width: 100%; }
+/* Der Haken bestätigt — er darf sich von den Ziffern abheben. */
+.key--go { color: var(--accent); }
 
 /* --------------------------------------------------------------- Knöpfe */
 

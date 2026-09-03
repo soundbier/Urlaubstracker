@@ -1,11 +1,11 @@
 /** Erster Start: Urlaubskasse anlegen — oder einer Einladung folgen. */
 import { h, icon } from '../dom.js';
-import { toast } from '../ui/sheet.js';
+import { toast, confirmSheet } from '../ui/sheet.js';
 import { installInstructionsSheet, privacySheet } from '../ui/parts.js';
 import { joinSheet, plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
 import { checkJoinName, checkNewPassword, suggestPassword } from '../join.js';
 import { todayISO, addDays, daysInclusive, isValidDate, MAX_PEOPLE, PERSON_COLORS } from '../calc.js';
-import { days, fullDate } from '../format.js';
+import { days, fullDate, plural } from '../format.js';
 import { isInstalled, canPromptInstall, promptInstall } from '../install.js';
 import * as store from '../store.js';
 
@@ -70,6 +70,63 @@ function inviteScreen(state) {
  * sie zu verstehen. Jetzt beantwortet die Reihenfolge sie: das Feld mit „Du“
  * daneben bist du, alles darunter sind die anderen.
  */
+/**
+ * Der Rückweg nach einem Fehlgriff.
+ *
+ * „Urlaubskasse löschen“ war endgültig; die einzige Rettung war eine
+ * Sicherungskopie, an die vorher jemand gedacht hatte. Jetzt legt die App beim
+ * Löschen selbst eine ab — und zeigt sie genau dort, wo man nach dem
+ * Fehlgriff landet: auf dem leeren Anfangsbildschirm.
+ *
+ * Sie steht nicht ewig da. Nach `TRASH_DAYS` Tagen räumt die App sie weg, und
+ * „Endgültig entfernen“ tut es sofort: gelöscht soll gelöscht heißen.
+ */
+function restoreCard() {
+  const copy = store.lastDeleted();
+  if (!copy) return null;
+
+  const restore = h('button.notice__action', {
+    type: 'button',
+    onclick: async () => {
+      restore.disabled = true;
+      try {
+        await store.restoreLastDeleted();
+        toast('Zurückgeholt — vorerst nur auf diesem Gerät.', { type: 'success', duration: 6000 });
+      } catch (err) {
+        restore.disabled = false;
+        toast(err?.message || 'Ging nicht.', { type: 'error' });
+      }
+    },
+  }, 'Zurückholen');
+
+  const card = h('div.notice.notice--warn', { role: 'status' },
+    icon('upload', 18),
+    h('div.notice__main',
+      h('p.notice__title', `„${copy.name}“ ist gelöscht`),
+      h('p.notice__text', `Eine Kopie mit ${plural(copy.entries, 'Eintrag', 'Einträgen')} liegt noch ${plural(copy.daysLeft, 'Tag', 'Tage')} auf diesem Gerät. Zurückgeholt läuft sie erst mal wieder allein auf diesem Gerät; teilen geht danach wie beim ersten Mal.`),
+      h('button.btn.btn--ghost.btn--small', {
+        type: 'button',
+        onclick: async () => {
+          const ok = await confirmSheet({
+            title: 'Kopie endgültig entfernen?',
+            text: 'Danach ist die Kasse wirklich weg — auch von diesem Gerät.',
+            confirmLabel: 'Entfernen',
+            danger: true,
+          });
+          if (!ok) return;
+          store.discardLastDeleted();
+          toast('Kopie entfernt.');
+          // Der Anfangsbildschirm wird nicht neu gezeichnet, solange sich am
+          // Trip nichts ändert — die Karte räumt sich deshalb selbst weg.
+          card.remove();
+        },
+      }, 'Endgültig entfernen'),
+    ),
+    restore,
+  );
+  return card;
+}
+
 function createScreen() {
   const today = todayISO();
   const values = {
@@ -219,6 +276,7 @@ function createScreen() {
   const shared = store.cloudReady();
 
   return h('div.view',
+    restoreCard(),
     h('div.welcome.welcome--compact',
       h('div.welcome__mark', '€'),
       h('h1.welcome__title', 'Urlaubskasse anlegen'),

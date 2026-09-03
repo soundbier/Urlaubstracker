@@ -13,6 +13,11 @@
  * wird das in `views/settings.js`.
  */
 
+// Wie lange eine gelöschte Kasse als Kopie auf dem löschenden Gerät liegen
+// bleibt. Die Zahl gehört zu `trash.js` und steht dort; eine Löschung, die
+// sieben Tage lang keine ist, gehört aber in die Erklärung.
+import { TRASH_DAYS } from './trash.js';
+
 // ------------------------------------------------------------ Speicherort
 
 /**
@@ -138,7 +143,11 @@ export function privacySections({ contact = '', region = null, mode = 'local' } 
     },
     {
       title: 'Was verarbeitet wird',
-      text: 'Namen der Teilnehmenden (frei wählbar, ein Spitzname reicht), Einzahlungen, Ausgaben mit Datum, Kategorie und Notiz, Auszahlungen sowie Zeitraum und Währung der Kasse. Dazu geräteeigene Einstellungen (Aussehen, wer an diesem Gerät sitzt) im Speicher des Browsers.',
+      text: `Namen der Teilnehmenden (frei wählbar, ein Spitzname reicht), Einzahlungen, Ausgaben mit Datum, Kategorie und Notiz, Auszahlungen sowie Zeitraum und Währung der Kasse. Dazu geräteeigene Einstellungen (Aussehen, wer an diesem Gerät sitzt) im Speicher des Browsers.${
+        cloud
+          ? ' Für jedes verbundene Gerät kommt hinzu: eine zufällige Kennung der anonymen Anmeldung, wem das Gerät gehört, wann es beigetreten ist und wann es zuletzt verbunden war. Das braucht die Gruppe, um ein verlorenes Gerät wieder aussperren zu können; Gerätemodell, Browser oder Standort werden nicht erhoben.'
+          : ''
+      }`,
     },
     {
       title: 'Wozu und auf welcher Grundlage',
@@ -149,20 +158,22 @@ export function privacySections({ contact = '', region = null, mode = 'local' } 
     {
       title: 'Wer die Daten sieht',
       text: cloud
-        ? 'Alle Geräte, die Name und Passwort der Kasse kennen. Als Auftragsverarbeiter (Art. 28 DSGVO) kommt Google Ireland Ltd. mit Firebase/Firestore hinzu; die Auftragsverarbeitung ist im Google-Cloud-Datenverarbeitungszusatz geregelt, den der Betreiber des Projekts akzeptieren muss. Eine Weitergabe darüber hinaus findet nicht statt — die App enthält keine Werbung, kein Tracking und keine Analyse.'
+        ? 'Alle Geräte, die der Kasse beigetreten sind — sie stehen unter „Gemeinsam nutzen → Verbundene Geräte“ und lassen sich dort einzeln aussperren. Als Auftragsverarbeiter (Art. 28 DSGVO) kommt Google Ireland Ltd. mit Firebase/Firestore hinzu; die Auftragsverarbeitung ist im Google-Cloud-Datenverarbeitungszusatz geregelt, den der Betreiber des Projekts akzeptieren muss. Eine Weitergabe darüber hinaus findet nicht statt — die App enthält keine Werbung, kein Tracking und keine Analyse.'
         : 'Niemand. Ohne Synchronisierung verlässt kein Eintrag dieses Gerät. Die App enthält keine Werbung, kein Tracking und keine Analyse.',
     },
     {
       title: 'Wo die Daten liegen',
       text: cloud
-        ? `${advice.title}: ${advice.text}`
-        : 'Im Speicher dieses Browsers (IndexedDB und localStorage). Auf keinem Server.',
+        ? `${advice.title}: ${advice.text} Auf jedem verbundenen Gerät liegt zusätzlich eine vollständige Kopie im Speicher des Browsers, damit die App offline weiterläuft. Wer sie dort vor fremden Blicken schützen will, schaltet unter „Dieses Gerät → App-Sperre“ einen Code davor.`
+        : 'Im Speicher dieses Browsers (IndexedDB und localStorage). Auf keinem Server. Vor fremden Blicken auf demselben Gerät schützt die App-Sperre unter „Dieses Gerät“.',
     },
     {
       title: 'Wie lange',
       text: `So lange die Kasse besteht — automatisch gelöscht wird nichts. Empfohlen ist, sie spätestens ${RETENTION_DAYS} Tage nach dem letzten Urlaubstag zu löschen; die App erinnert daran. „Urlaubskasse löschen“ entfernt ${
         cloud ? 'den Trip mit allen Einträgen für alle Geräte' : 'alle Einträge auf diesem Gerät'
-      }. Vorher lässt sich alles als Sicherungskopie oder CSV mitnehmen.`,
+      }.${
+        cloud ? ' Hängen mehrere Geräte an der Kasse, steht der Löschauftrag erst 24 Stunden sichtbar darin, damit ihn jedes Gerät stoppen kann.' : ''
+      } Danach bleibt auf dem löschenden Gerät ${TRASH_DAYS} Tage lang eine Kopie zum Zurückholen liegen; sie räumt sich danach selbst weg und lässt sich jederzeit sofort entfernen. Mitnehmen lässt sich vorher alles als Sicherungskopie oder CSV.`,
     },
     {
       title: 'Eure Rechte',
