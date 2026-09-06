@@ -45,7 +45,7 @@ export function clearInviteFromLocation() {
 }
 
 /** Vollständige Sicherungskopie als JSON-Datei. */
-export function buildExport({ trip, contributions, expenses, cashOuts = [] }) {
+export function buildExport({ trip, contributions, expenses, cashOuts = [], planItems = [] }) {
   return JSON.stringify(
     {
       format: 'urlaubstracker',
@@ -55,6 +55,7 @@ export function buildExport({ trip, contributions, expenses, cashOuts = [] }) {
       contributions,
       expenses,
       cashOuts,
+      planItems,
     },
     null,
     2,
@@ -93,6 +94,35 @@ export function parseImport(text) {
   const rows = (list, extra) =>
     (Array.isArray(list) ? list : []).filter((r) => r && typeof r.id === 'string' && usableAmount(r.amount) && isValidDate(r.date) && extra(r));
 
+  const expenses = rows(data.expenses, () => true).map((e) => ({
+    ...e,
+    category: CATEGORY_BY_ID[e.category] ? e.category : 'other',
+    payer: validPayer(e.payer) ? e.payer : POT,
+    // Nur eine echte Marke zählt; alles andere ist eine bezahlte Ausgabe.
+    planned: e.planned === true,
+    fromPlan: e.fromPlan === true && e.planned !== true,
+  }));
+  const expenseIds = new Set(expenses.map((e) => e.id));
+
+  // Programmpunkte brauchen keinen Betrag (der steht, wenn überhaupt, an der
+  // verknüpften Ausgabe) — deshalb eine eigene, schlankere Prüfung statt der
+  // generischen `rows()`, die einen gültigen Betrag voraussetzt.
+  const planItems = (Array.isArray(data.planItems) ? data.planItems : [])
+    .filter((p) => p && typeof p.id === 'string' && p.id && isValidDate(p.date))
+    .map((p) => ({
+      ...p,
+      title: String(p.title || '').trim() || 'Programmpunkt',
+      category: CATEGORY_BY_ID[p.category] ? p.category : 'other',
+      time: /^\d{2}:\d{2}$/.test(p.time) ? p.time : '',
+      note: String(p.note || '').trim(),
+      payer: validPayer(p.payer) ? p.payer : POT,
+      done: p.done === true,
+      // Zeigt die Verknüpfung ins Leere (Ausgabe fehlt oder kam nicht durch
+      // die Prüfung), ist der Programmpunkt eben ohne Kostenpunkt da — besser
+      // als eine Kennung, die nirgendwohin führt.
+      linkedExpenseId: typeof p.linkedExpenseId === 'string' && expenseIds.has(p.linkedExpenseId) ? p.linkedExpenseId : null,
+    }));
+
   return {
     trip: {
       ...t,
@@ -105,19 +135,13 @@ export function parseImport(text) {
     // Abrechnung Geld erfinden bzw. verschwinden lassen.
     contributions: rows(data.contributions, (c) => knownPerson.has(c.personId)),
     cashOuts: rows(data.cashOuts, (c) => knownPerson.has(c.personId)),
-    expenses: rows(data.expenses, () => true).map((e) => ({
-      ...e,
-      category: CATEGORY_BY_ID[e.category] ? e.category : 'other',
-      payer: validPayer(e.payer) ? e.payer : POT,
-      // Nur eine echte Marke zählt; alles andere ist eine bezahlte Ausgabe.
-      planned: e.planned === true,
-      fromPlan: e.fromPlan === true && e.planned !== true,
-    })),
+    expenses,
+    planItems,
   };
 }
 
 /** Ausgaben als CSV, für Tabellenkalkulationen. */
-export function buildCsv({ trip, expenses, contributions, cashOuts = [] }) {
+export function buildCsv({ trip, expenses, contributions, cashOuts = [], planItems = [] }) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const money = (cents) => (cents / 100).toFixed(2).replace('.', ',');
   const personName = (id) => trip.people.find((p) => p.id === id)?.name || 'Unbekannt';
@@ -129,18 +153,28 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [] }) {
     if (isCashPayer(payer)) return `Bargeld (${personName(cashPayerPerson(payer))})`;
     return personName(payer);
   };
-  const lines = [['Art', 'Datum', 'Betrag', 'Kategorie', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
+  const lines = [['Art', 'Datum', 'Zeit', 'Betrag', 'Kategorie', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
 
   for (const c of [...contributions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(['Einzahlung', c.date, money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
+    lines.push(['Einzahlung', c.date, '', money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const c of [...cashOuts].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(['Bargeld ausgezahlt', c.date, money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
+    lines.push(['Bargeld ausgezahlt', c.date, '', money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const e of [...expenses].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     // Vorgemerktes steht mit eigener Art da — sonst zählte eine Tabelle Geld
     // mit, das noch gar nicht ausgegeben ist.
-    lines.push([e.planned === true ? 'Verplant' : 'Ausgabe', e.date, money(e.amount), categoryLabel(e.category), payerLabel(e.payer), e.note].map(esc).join(';'));
+    lines.push([e.planned === true ? 'Verplant' : 'Ausgabe', e.date, '', money(e.amount), categoryLabel(e.category), payerLabel(e.payer), e.note].map(esc).join(';'));
+  }
+  // Der Reiseplan steht als eigene Art dabei: ein Programmpunkt ohne
+  // Kostenpunkt hat kein Geld, das in dieser Tabelle sonst fehlen würde.
+  for (const p of [...planItems].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+    const linked = p.linkedExpenseId ? expenses.find((e) => e.id === p.linkedExpenseId) : null;
+    const notiz = [p.title, p.note].filter(Boolean).join(' · ');
+    lines.push([
+      'Programm', p.date, p.time || '', linked ? money(linked.amount) : '',
+      categoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,
+    ].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';

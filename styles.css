@@ -259,13 +259,17 @@ strong { font-weight: 600; }
   text-overflow: ellipsis;
 }
 
+/* Kalender-Symbol (Reiseplan) und Sync-Punkt zusammen am rechten Rand — die
+   negative Randbreite gehört auf den Wrapper, sonst rückt nur der äußere der
+   beiden Knöpfe an den Rand, während der innere zu viel Luft lässt. */
+.topbar__icons { display: flex; align-items: center; margin-right: -10px; }
+
 /* Der Zustand der Synchronisierung. Ohne Kreis und ohne Rahmen: solange alles
    läuft, muss hier nichts leuchten — Farbe bekommt nur ein echtes Problem. */
 .syncdot {
   display: grid;
   place-items: center;
   width: var(--tap); height: var(--tap);
-  margin-right: -10px;
   border: 0;
   border-radius: var(--radius-pill);
   background: none;
@@ -600,6 +604,11 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 }
 .prow__done:active { background: var(--accent-soft); border-radius: var(--radius-sm); }
 .prow.is-overdue .row__icon--planned { color: var(--warn); }
+/* Ein Programmpunkt bleibt nach dem Abhaken an seinem Platz im Tag (anders
+   als eine Vormerkung, die in eine andere Liste wandert) — erledigt heißt
+   hier also: blasser, mit gefülltem statt umrissenem Haken, nicht: weg. */
+.prow.is-done .row__title { color: var(--text-faint); }
+.prow__done.is-done { color: var(--on-accent); background: var(--accent); border-radius: var(--radius-pill); }
 
 /* Ein Beiwort an der Zeile — Zahler, Fälligkeit, Herkunft. Ohne Fläche und
    ohne Rahmen: zwanzig umrandete Pillen in einer Liste sind zwanzig kleine
@@ -1105,6 +1114,7 @@ select.field__input { background-image: none; }
   color: var(--text-muted);
 }
 .icon-btn:active { background: var(--surface-2); }
+.icon-btn.is-active { color: var(--accent); }
 
 /*
  * Auswahl in Sheets (Zahler, Person): Haarlinie statt gefüllter Pille. Gewählt

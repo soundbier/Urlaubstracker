@@ -100,3 +100,41 @@ test('Was exportiert wurde, lässt sich wieder einlesen', () => {
   assert.equal(back.trip.id, TRIP.id);
   assert.deepEqual(back.trip.people, TRIP.people);
 });
+
+test('Der Reiseplan reist mit der Sicherung — auch ohne eigenen Betrag', () => {
+  const expenses = [{ id: 'e1', date: '2026-07-05', amount: 4500, category: 'activity', payer: POT, note: 'Trollstigen', planned: true, fromPlan: false }];
+  const planItems = [
+    { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', note: '', payer: POT, linkedExpenseId: 'e1', done: false },
+    { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang am Hafen', category: 'activity', note: '', payer: POT, linkedExpenseId: null, done: false },
+  ];
+  const back = parseImport(buildExport({ trip: TRIP, contributions: [], expenses, planItems }));
+
+  assert.deepEqual(back.planItems, planItems);
+});
+
+test('Eine Kennung ins Leere verliert nur die Verknüpfung, nicht den Programmpunkt', () => {
+  const back = parseImport(buildExport({
+    trip: TRIP,
+    contributions: [],
+    expenses: [],
+    planItems: [{ id: 'pl1', date: '2026-07-05', time: '', title: 'Museum', category: 'quatsch', note: '', payer: 'weg', linkedExpenseId: 'nie-da-gewesen', done: false }],
+  }));
+  assert.equal(back.planItems.length, 1);
+  assert.equal(back.planItems[0].category, 'other', 'unbekannte Kategorie wird Sonstiges');
+  assert.equal(back.planItems[0].payer, POT, 'unbekannter Zahler fällt auf die Kasse zurück');
+  assert.equal(back.planItems[0].linkedExpenseId, null);
+});
+
+test('CSV: der Reiseplan steht als eigene Art dabei', () => {
+  const csv = buildCsv({
+    trip: TRIP,
+    contributions: [],
+    expenses: [{ id: 'e1', date: '2026-07-05', amount: 4500, category: 'activity', payer: POT, note: '' }],
+    planItems: [
+      { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', note: '', payer: POT, linkedExpenseId: 'e1' },
+      { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang', category: 'activity', note: 'am Hafen', payer: POT, linkedExpenseId: null },
+    ],
+  });
+  assert.ok(csv.includes('"Programm";"2026-07-05";"15:00";"45,00"'), 'verknüpfter Kostenpunkt steht dabei');
+  assert.ok(csv.includes('"Spaziergang · am Hafen"'), 'Titel und Notiz zusammen, ohne Betrag');
+});

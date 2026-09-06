@@ -7,7 +7,7 @@
 
 const KEY = 'urlaubstracker.data.v1';
 
-const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [] };
+const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [] };
 
 function load() {
   try {
@@ -18,6 +18,7 @@ function load() {
       contributions: Array.isArray(raw.contributions) ? raw.contributions : [],
       expenses: Array.isArray(raw.expenses) ? raw.expenses : [],
       cashOuts: Array.isArray(raw.cashOuts) ? raw.cashOuts : [],
+      planItems: Array.isArray(raw.planItems) ? raw.planItems : [],
     };
   } catch {
     return { ...EMPTY };
@@ -59,6 +60,7 @@ export class LocalBackend {
       contributions: [...this.data.contributions],
       expenses: [...this.data.expenses],
       cashOuts: [...this.data.cashOuts],
+      planItems: [...this.data.planItems],
     });
   }
 
@@ -88,7 +90,7 @@ export class LocalBackend {
   }
 
   async createTrip(trip) {
-    this.data = { trip, contributions: [], expenses: [], cashOuts: [] };
+    this.data = { trip, contributions: [], expenses: [], cashOuts: [], planItems: [] };
     this._persist();
   }
 
@@ -98,7 +100,7 @@ export class LocalBackend {
   }
 
   async deleteTrip() {
-    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [] };
+    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [], planItems: [] };
     try {
       localStorage.removeItem(KEY);
     } catch {
@@ -113,9 +115,11 @@ export class LocalBackend {
   async removeContribution(id) { this._remove('contributions', id); }
   async putCashOut(row) { this._put('cashOuts', row); }
   async removeCashOut(id) { this._remove('cashOuts', id); }
+  async putPlanItem(row) { this._put('planItems', row); }
+  async removePlanItem(id) { this._remove('planItems', id); }
 
-  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [] }) {
-    this.data = { trip, contributions, expenses, cashOuts };
+  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [] }) {
+    this.data = { trip, contributions, expenses, cashOuts, planItems };
     this._persist();
   }
 }

@@ -1,4 +1,4 @@
-/** Die beiden Eingabemasken: Ausgabe erfassen und Einzahlung eintragen. */
+/** Die Eingabemasken: Ausgabe, Einzahlung, Bargeld, Programmpunkt. */
 import { h, icon } from '../dom.js';
 import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
@@ -413,6 +413,91 @@ export function cashOutSheet({ trip, cashOut = null, defaults = {} }) {
         amount.el,
         field('An wen?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
         field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
+        field('Notiz', note),
+        h('div.entry__actions',
+          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
+        ),
+      );
+    },
+  });
+}
+
+/**
+ * Programmpunkt anlegen oder bearbeiten: was, wann — und optional, wofür
+ * dabei Geld draufgeht. Anders als bei einer Ausgabe ist der Betrag hier nicht
+ * die Hauptsache, sondern ein optionaler Teil: der Titel steht zuerst.
+ *
+ * Ein Kostenpunkt wird sofort zur Vormerkung in der Kasse (siehe
+ * `store.addPlanItem`/`updatePlanItem`) — dieselbe Vormerkung, die auch beim
+ * Eintragen einer Ausgabe mit Zukunftsdatum entsteht, nur von der anderen
+ * Seite her gedacht. Ist sie inzwischen bezahlt (`linkedExpense` nicht mehr
+ * `planned`), ist sie echte Ausgabengeschichte: der Kostenbereich zeigt dann
+ * nur noch den Betrag, ändern geht ab da nur noch unter „Ausgaben“.
+ */
+export function planItemSheet({ trip, planItem = null, linkedExpense = null, defaults = {} }) {
+  const editing = Boolean(planItem);
+  const realized = Boolean(linkedExpense && !linkedExpense.planned);
+  let category = planItem?.category || defaults.category || 'activity';
+  let date = planItem?.date || defaults.date || todayISO();
+  let payer = planItem?.payer || linkedExpense?.payer || defaults.payer || POT;
+  const title = h('input.field__input', { type: 'text', value: planItem?.title || '', placeholder: 'z. B. Trollstigen', maxlength: 120, enterkeyhint: 'next' });
+  const time = h('input.field__input', { type: 'time', value: planItem?.time || '' });
+  const note = h('input.field__input', { type: 'text', value: planItem?.note || '', placeholder: 'Notiz, Adresse, Reservierung', maxlength: 120, enterkeyhint: 'done' });
+  const amount = amountField(linkedExpense?.amount || 0, trip.currency);
+
+  const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
+
+  return openSheet({
+    title: editing ? 'Programmpunkt bearbeiten' : 'Was steht an?',
+    fullHeight: true,
+    bodyClass: 'sheet__body--entry',
+    build: (close) => {
+      const titleError = h('p.field__error');
+
+      const save = () => {
+        const t = title.value.trim();
+        if (!t) {
+          titleError.textContent = 'Bitte einen Titel eingeben';
+          title.focus();
+          return;
+        }
+        titleError.textContent = '';
+        close({
+          action: 'save',
+          values: {
+            title: t, date, time: time.value, category, note: note.value, payer,
+            // Realisiert wird nichts mehr angetastet — dafür ist der Wert hier
+            // gar nicht erst dabei (siehe `store.updatePlanItem`).
+            amount: realized ? undefined : Math.max(0, amount.getCents() || 0),
+          },
+        });
+      };
+
+      const costNote = h(
+        'p.field__note',
+        realized
+          ? `Bezahlt: ${money(linkedExpense.amount, trip.currency)} — ändern geht unter „Ausgaben“.`
+          : 'Optional. Wird sofort als Vormerkung in die Kasse übernommen.',
+      );
+
+      const costBody = realized
+        ? h('p.amount__hint', money(linkedExpense.amount, trip.currency))
+        : h('div.stack',
+            amount.el,
+            h('label.field', h('span.field__label', 'Bezahlt von'), chipRow(payers, payer, (id) => { payer = id; })),
+          );
+
+      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        h('label.field', h('span.field__label', 'Titel'), title, titleError),
+        field('Wofür?', categoryGrid(category, (id) => { category = id; })),
+        field('Wann?', dateRow(date, (iso) => { date = iso; }, { withTomorrow: true }).el),
+        field('Uhrzeit (optional)', time),
+        h('div.field',
+          h('span.field__label', 'Kosten (optional)'),
+          costBody,
+          costNote,
+        ),
         field('Notiz', note),
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,

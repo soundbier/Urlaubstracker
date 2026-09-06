@@ -22,6 +22,7 @@ let state = {
   contributions: [],
   expenses: [],
   cashOuts: [],
+  planItems: [],
   myPersonId: null,
   invite: null, // offene Einladung aus dem Link
   sync: {
@@ -110,6 +111,10 @@ function handleChange(data) {
     contributions: sortByDate(data.contributions),
     expenses: sortByDate(data.expenses),
     cashOuts: sortByDate(data.cashOuts || []),
+    // Nicht mit `sortByDate`: der Reiseplan sortiert Tage aufsteigend und
+    // innerhalb eines Tages nach Uhrzeit (siehe `planItemsByDay`), nicht nach
+    // „neueste zuerst“ wie die übrigen Listen.
+    planItems: data.planItems || [],
     // Eine offene Einladung hat Vorrang, sonst würde sie beim nächsten
     // Datenereignis unter dem Finger verschwinden.
     phase: state.invite ? 'onboarding' : trip ? 'ready' : 'onboarding',
@@ -425,7 +430,7 @@ export async function removePerson(personId) {
   const person = people.find((p) => p.id === personId);
   if (!person) return;
   if (people.length <= 1) throw new Error('Eine Person muss bleiben.');
-  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts });
+  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems });
   if (used) {
     throw new Error(
       used === 1
@@ -488,6 +493,113 @@ export async function markExpensePaid(id, today = todayISO()) {
 
 export async function deleteExpense(id) {
   await backend.removeExpense(id);
+}
+
+// ---------------------------------------------------------------- Reiseplan
+
+/**
+ * Ein Programmpunkt ist kein Geld-Objekt — er beantwortet „was, wann“, nicht
+ * „wie viel“. Bekommt er einen Kostenpunkt, entsteht daraus sofort eine
+ * vorgemerkte Ausgabe: das Budget auf „Heute“ und „Budget“ stimmt damit von
+ * Anfang an, auch für einen noch nicht besuchten, aber schon teuren
+ * Programmpunkt — genau wie bei jeder anderen Vormerkung.
+ */
+export async function addPlanItem({ date, time, title, category, note, payer, amount }) {
+  const now = Date.now();
+  const row = {
+    id: newId(),
+    date: date || todayISO(),
+    time: time || '',
+    title: String(title || '').trim(),
+    category: category || 'other',
+    note: (note || '').trim(),
+    payer: payer || POT,
+    linkedExpenseId: null,
+    done: false,
+    createdAt: now,
+    updatedAt: now,
+    createdBy: state.myPersonId || null,
+  };
+  if (amount > 0) {
+    const expense = await addExpense({ amount, date: row.date, category: row.category, note: row.title, payer: row.payer, planned: true });
+    row.linkedExpenseId = expense.id;
+  }
+  await backend.putPlanItem(row);
+  return row;
+}
+
+/**
+ * Ändert einen Programmpunkt — und zieht eine noch offene, verknüpfte
+ * Vormerkung nach: neuer Betrag, neues Datum, neue Kategorie, neuer Zahler,
+ * das ist ja derselbe Programmpunkt, nur mit anderen Angaben. Ist die
+ * Vormerkung schon bezahlt, ist sie echte Ausgabengeschichte — dann rührt
+ * dieser Aufruf sie nicht mehr an, ändern geht dann nur noch unter „Ausgaben“.
+ *
+ * Auf null gesetzt, geht eine noch offene Vormerkung mit weg: ohne
+ * Kostenpunkt gibt es nichts mehr zu verplanen. Ein erster Kostenpunkt an
+ * einem bislang kostenlosen Programmpunkt legt sie neu an.
+ */
+export async function updatePlanItem(id, patch) {
+  const row = state.planItems.find((p) => p.id === id);
+  if (!row) return;
+  const next = { ...row, ...patch, updatedAt: Date.now() };
+  const linked = row.linkedExpenseId ? state.expenses.find((e) => e.id === row.linkedExpenseId) : null;
+  const stillOpen = !linked || linked.planned;
+
+  if (stillOpen && patch.amount !== undefined) {
+    if (patch.amount > 0 && !linked) {
+      const expense = await addExpense({ amount: patch.amount, date: next.date, category: next.category, note: next.title, payer: next.payer, planned: true });
+      next.linkedExpenseId = expense.id;
+    } else if (patch.amount > 0 && linked) {
+      await updateExpense(linked.id, { amount: patch.amount, date: next.date, category: next.category, note: next.title, payer: next.payer });
+    } else if (!(patch.amount > 0) && linked) {
+      await deleteExpense(linked.id);
+      next.linkedExpenseId = null;
+    }
+  } else if (stillOpen && linked) {
+    // Kein neuer Betrag im Patch — aber Datum, Kategorie, Titel oder Zahler
+    // können sich geändert haben, und die noch offene Vormerkung soll dieselbe
+    // Auskunft tragen wie der Programmpunkt selbst.
+    await updateExpense(linked.id, { date: next.date, category: next.category, note: next.title, payer: next.payer });
+  }
+
+  await backend.putPlanItem(next);
+}
+
+/**
+ * Programmpunkt löschen. Eine noch offene Vormerkung gehört nur zu ihm und
+ * geht mit — niemand sonst weiß von ihr. Eine schon bezahlte ist echte
+ * Ausgabengeschichte und bleibt stehen.
+ */
+export async function deletePlanItem(id) {
+  const row = state.planItems.find((p) => p.id === id);
+  const linked = row?.linkedExpenseId ? state.expenses.find((e) => e.id === row.linkedExpenseId) : null;
+  if (linked?.planned) await deleteExpense(linked.id);
+  await backend.removePlanItem(id);
+}
+
+/** Erledigt — eine noch offene Vormerkung wird dabei zur echten Ausgabe. */
+export async function markPlanItemDone(id, today = todayISO()) {
+  const row = state.planItems.find((p) => p.id === id);
+  if (!row) return;
+  const linked = row.linkedExpenseId ? state.expenses.find((e) => e.id === row.linkedExpenseId) : null;
+  if (linked?.planned) await markExpensePaid(linked.id, today);
+  await backend.putPlanItem({ ...row, done: true, updatedAt: Date.now() });
+}
+
+/**
+ * Zurück auf offen — auch wenn die verknüpfte Ausgabe unterdessen unter
+ * „Ausgaben“ direkt bezahlt wurde (dort lässt sich jede Vormerkung abhaken,
+ * nicht nur über den Reiseplan). Dann macht das Zurücknehmen beides rückgängig,
+ * sonst stünde das Geld doppelt da: einmal als „schon ausgegeben“, einmal
+ * wieder als Vorhaben.
+ */
+export async function markPlanItemOpen(id) {
+  const row = state.planItems.find((p) => p.id === id);
+  if (!row) return;
+  const linked = row.linkedExpenseId ? state.expenses.find((e) => e.id === row.linkedExpenseId) : null;
+  if (linked?.fromPlan) await updateExpense(linked.id, { planned: true, fromPlan: false });
+  await backend.putPlanItem({ ...row, done: false, updatedAt: Date.now() });
 }
 
 // ------------------------------------------------------------- Einzahlungen
@@ -579,7 +691,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
       throw new Error('Unter diesem Namen liegt in diesem Projekt schon eine Kasse. Wähle einen anderen Namen.');
     }
     await cloud.createTrip({ ...state.trip, joinName: name }, { personId: state.myPersonId });
-    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts });
+    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems });
   } catch (err) {
     await afterFailedAttempt(cloud);
     throw err;
@@ -594,7 +706,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
 
 /** Zurück in den lokalen Modus — mit einer Kopie des aktuellen Standes. */
 export async function disconnectCloud() {
-  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts };
+  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems };
   const prefs = getPrefs();
   // Sich auch wirklich austragen. Vorher hörte dieses Gerät nur auf zuzuhören
   // und stand serverseitig weiter als Mitglied da — mit vollem Zugriff, bloß
@@ -785,6 +897,7 @@ export async function deleteTrip() {
     contributions: state.contributions,
     expenses: state.expenses,
     cashOuts: state.cashOuts,
+    planItems: state.planItems,
   });
 
   await backend.deleteTrip?.();
@@ -792,7 +905,7 @@ export async function deleteTrip() {
   const local = new LocalBackend();
   // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
   await local.deleteTrip();
-  set({ trip: null, contributions: [], expenses: [], cashOuts: [], myPersonId: null, invite: null, phase: 'onboarding' });
+  set({ trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], myPersonId: null, invite: null, phase: 'onboarding' });
   await useBackend(local);
   return { backupKept };
 }
@@ -815,6 +928,7 @@ export async function restoreLastDeleted() {
     contributions: payload.contributions,
     expenses: payload.expenses,
     cashOuts: payload.cashOuts || [],
+    planItems: payload.planItems || [],
   });
   setPrefs({
     tripRef: { mode: 'local', joinName: payload.trip.joinName || payload.trip.name || '', joinPassword: '' },
@@ -836,6 +950,7 @@ export async function importData(payload) {
     contributions: payload.contributions,
     expenses: payload.expenses,
     cashOuts: payload.cashOuts || [],
+    planItems: payload.planItems || [],
   });
 }
 

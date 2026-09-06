@@ -107,11 +107,12 @@ export function averageShare(people = []) {
  * eine Bargeld-Auszahlung ohne Empfänger würde die Abrechnung still
  * verfälschen.
  */
-export function personEntryCount(personId, { contributions = [], expenses = [], cashOuts = [] } = {}) {
+export function personEntryCount(personId, { contributions = [], expenses = [], cashOuts = [], planItems = [] } = {}) {
   return (
     contributions.filter((c) => c.personId === personId).length +
     expenses.filter((e) => e.payer === personId || cashPayerPerson(e.payer) === personId).length +
-    cashOuts.filter((c) => c.personId === personId).length
+    cashOuts.filter((c) => c.personId === personId).length +
+    planItems.filter((p) => p.payer === personId).length
   );
 }
 
@@ -291,6 +292,51 @@ export function groupByDay(expenses) {
       total: totalSpent(items),
       items: items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)),
     }));
+}
+
+// ------------------------------------------------------------------ Reiseplan
+
+/**
+ * Ob ein Programmpunkt „erledigt“ wirkt.
+ *
+ * Das ist nicht immer dasselbe wie sein eigenes `done`-Feld: Wird die
+ * verknüpfte Vormerkung direkt unter „Ausgaben“ bezahlt (statt über den Haken
+ * im Reiseplan), bleibt `done` dort unberührt stehen. Der Programmpunkt soll
+ * trotzdem sofort als erledigt gelten — sonst zeigte der Plan ein „noch
+ * offen“, das die Kasse längst nicht mehr kennt.
+ */
+export function planItemDone(item, expenseById) {
+  if (item.done) return true;
+  const linked = item.linkedExpenseId ? expenseById.get(item.linkedExpenseId) : null;
+  return !!(linked && !linked.planned);
+}
+
+/** Programmpunkte eines einzelnen Tages, sortiert für die Anzeige. */
+export function planItemsOnDay(planItems, date) {
+  return planItems
+    .filter((p) => p.date === date)
+    .sort((a, b) => {
+      const at = a.time || '';
+      const bt = b.time || '';
+      if (at === bt) return (a.createdAt || 0) - (b.createdAt || 0);
+      // Ohne Uhrzeit zuerst — wie ein „ganztägig“ am Kopf eines Kalendertages.
+      if (!at) return -1;
+      if (!bt) return 1;
+      return at < bt ? -1 : 1;
+    });
+}
+
+/**
+ * Programmpunkte je Reisetag, aufsteigend — auch für Tage, an denen noch
+ * nichts steht. Ein Planer, der nur die Tage mit Einträgen zeigt, verschweigt
+ * genau die Lücken, die er eigentlich sichtbar machen soll. Punkte außerhalb
+ * des Reisezeitraums (kommt kaum vor, etwa nach einer Verlängerung) gehen
+ * deshalb nicht verloren, sondern hängen als eigener Tag hinten dran.
+ */
+export function planItemsByDay(planItems, startDate, endDate) {
+  const days = new Set(dateRange(startDate, endDate));
+  for (const p of planItems) days.add(p.date);
+  return [...days].sort().map((date) => ({ date, items: planItemsOnDay(planItems, date) }));
 }
 
 // ------------------------------------------------------------- Budget-Kennzahlen
