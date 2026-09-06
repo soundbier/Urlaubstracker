@@ -164,10 +164,13 @@ export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null, ma
 }
 
 /**
- * Eine Zeile im Reiseplan: Uhrzeit und Notiz in der Unterzeile, ein Haken
- * rechts macht sie in beide Richtungen erledigt oder wieder offen — anders
- * als bei einer Vormerkung bleibt sie dabei an ihrem Platz im Tag, statt in
- * eine andere Liste zu wandern.
+ * Eine Zeile im Reiseplan: die Uhrzeit steht links in einer eigenen Spalte,
+ * abgetrennt durch eine Haarlinie — wie im Fahrplan, dem die App ihre eigene
+ * Kopfzeile schon entlehnt (`daymark`). Ohne Uhrzeit steht dort ein
+ * Gedankenstrich statt einer leeren Lücke. Ein Haken rechts macht die Zeile
+ * in beide Richtungen erledigt oder wieder offen — anders als bei einer
+ * Vormerkung bleibt sie dabei an ihrem Platz im Tag, statt in eine andere
+ * Liste zu wandern.
  *
  * Ein Kostenpunkt zeigt sich wie überall als Betrag rechts. Der Programmpunkt
  * selbst trägt nur die Kennung der Ausgabe, nicht den Betrag — der steht an
@@ -180,13 +183,14 @@ export function planItemRow(item, trip, { onEdit, onToggle, expenseById } = {}) 
   const done = planItemDone(item, expenseById);
   const privatelyPaid = linkedExpense && linkedExpense.payer !== POT;
   const sub = [
-    item.time ? h('span', item.time) : null,
+    item.location ? h('span.row__place', icon('pin', 13), item.location) : null,
     privatelyPaid ? h('span.tag', payerLabel(trip, linkedExpense.payer)) : null,
     item.note ? h('span', item.note) : null,
   ].filter(Boolean);
 
   return h('div.prow', { class: done ? 'is-done' : '' },
     h('button.prow__open', { type: 'button', onclick: () => onEdit(item) },
+      h('span.trow__time', item.time || '–'),
       h('span.row__icon', icon(cat.icon, 20)),
       h('span.row__main',
         h('span.row__title', item.title),

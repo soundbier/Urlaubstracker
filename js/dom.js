@@ -123,6 +123,9 @@ const ICONS = {
   people: ['M8 11a3 3 0 100-6 3 3 0 000 6z', 'M2 20a6 6 0 0112 0', 'M16 5.2a3 3 0 010 5.6M17 14.3A6 6 0 0122 20'],
   person: ['M12 11.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z', 'M5 20a7 7 0 0114 0'],
   calendar: ['M5 6h14a1 1 0 011 1v12a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1z', 'M8 3v4M16 3v4M4 11h16'],
+  // Ein Ort im Reiseplan: derselbe Tropfen wie auf jeder Karte, in derselben
+  // dünnen Linie wie die anderen Symbole hier.
+  pin: ['M12 21s6.5-6.4 6.5-11A6.5 6.5 0 105.5 10c0 4.6 6.5 11 6.5 11z', 'M12 12.6a2.4 2.4 0 100-4.8 2.4 2.4 0 000 4.8z'],
   info: ['M12 21a9 9 0 100-18 9 9 0 000 18z', 'M12 11v5M12 8h.01'],
   repeat: ['M5 10V9a4 4 0 014-4h10', 'M16 2l3 3-3 3', 'M19 14v1a4 4 0 01-4 4H5', 'M8 22l-3-3 3-3'],
   // Auge neben Passwortfeldern: verdeckt aufdecken, nicht dauerhaft anzeigen.

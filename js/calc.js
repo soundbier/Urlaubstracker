@@ -156,6 +156,20 @@ export function isValidDate(iso) {
   return typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso) && !Number.isNaN(dayValue(iso));
 }
 
+/**
+ * Zwingt ein Datum in den Reisezeitraum.
+ *
+ * Für den Tageswechsel im Tagesplan: außerhalb der Reise gibt es keinen Tag,
+ * den man dort ansehen könnte — vor der Abfahrt zeigt die Tagesansicht deshalb
+ * gleich den ersten Reisetag, nach der Rückkehr den letzten, statt an einem
+ * Datum zu landen, zu dem es nichts zu planen gibt.
+ */
+export function clampDateToTrip(date, trip) {
+  if (date < trip.startDate) return trip.startDate;
+  if (date > trip.endDate) return trip.endDate;
+  return date;
+}
+
 // ------------------------------------------------------------------ Geldhilfen
 
 /**
@@ -337,6 +351,16 @@ export function planItemsByDay(planItems, startDate, endDate) {
   const days = new Set(dateRange(startDate, endDate));
   for (const p of planItems) days.add(p.date);
   return [...days].sort().map((date) => ({ date, items: planItemsOnDay(planItems, date) }));
+}
+
+/**
+ * Wie viele Programmpunkte eines Tages schon erledigt sind — für den
+ * Tagesfortschritt im Reiseplan. Zählt über `planItemDone`, nicht über das
+ * eigene Feld: sonst bliebe ein anderswo bezahlter Programmpunkt ungezählt.
+ */
+export function planDayProgress(items, expenseById) {
+  const done = items.filter((p) => planItemDone(p, expenseById)).length;
+  return { done, total: items.length };
 }
 
 // ------------------------------------------------------------- Budget-Kennzahlen

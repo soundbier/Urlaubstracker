@@ -1,16 +1,24 @@
 # Urlaubstracker
 
-Eine gemeinsame Urlaubskasse für alle, die zusammen unterwegs sind — als
-installierbare Web-App (PWA). Ihr tragt ein, was jede:r eingezahlt hat,
-die App rechnet das Tagesbudget aus, ihr hakt Ausgaben ab, am Ende steht
-die Abrechnung: wer wem noch was überweist.
+Ein persönlicher Urlaubsplaner für alle, die zusammen unterwegs sind — als
+installierbare Web-App (PWA). Im Mittelpunkt steht die Tagesplanung: was
+steht heute an, wo geht's hin, wann. Die gemeinsame Kasse gehört weiter
+dazu, tritt aber eine Ebene zurück — sie rechnet im Hintergrund mit, wenn
+ein Programmpunkt Geld kostet, wer eingezahlt hat und wer wem am Ende noch
+was überweist.
 
 Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
 
 ## Funktionen
 
-- **Heute / Ausgaben / Budget / Mehr** — Tagesbudget auf einen Blick,
-  Ausgaben nach Tagen, Einzahlungen & Endabrechnung, Einstellungen.
+- **Heute** — der Tag als Timeline: Sehenswürdigkeiten, Essen, Aktivitäten
+  mit Uhrzeit, Ort, Notiz und optionalen Kosten. Tage vor- und
+  zurückblättern, Programmpunkte anlegen, bearbeiten, verschieben, abhaken.
+- **Reiseplan** — alle Reisetage auf einen Blick, mit Tagesfortschritt.
+- Ein Kostenpunkt am Programmpunkt wird sofort zur Vormerkung in der Kasse
+  übernommen — dieselbe Vormerkung wie bei einer Ausgabe mit Zukunftsdatum.
+- **Ausgaben / Budget / Mehr** — Ausgaben nach Tagen, Tagesbudget auf einen
+  Blick, Einzahlungen & Endabrechnung, Einstellungen.
 - Eigene Zahlentastatur, Rückgängig, Ausgabe „nochmal“ eintragen.
 - Reisegruppe mit 1–8 Personen, Kostenaufteilung frei einstellbar.
 - Bezahlt von Kasse, privat oder bar — zählt in der Abrechnung richtig.
