@@ -382,6 +382,7 @@ export const PACK_CATEGORIES = [
   { id: 'documents', label: 'Dokumente', icon: 'documents' },
   { id: 'tech', label: 'Technik', icon: 'tech' },
   { id: 'hygiene', label: 'Hygiene', icon: 'hygiene' },
+  { id: 'meds', label: 'Reiseapotheke', icon: 'meds' },
   { id: 'shoes', label: 'Schuhe', icon: 'shoes' },
   { id: 'trips', label: 'Ausflüge', icon: 'backpack' },
   { id: 'beach', label: 'Strand', icon: 'beach' },
