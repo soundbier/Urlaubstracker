@@ -14,8 +14,15 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
 - **Heute** — der Tag als Timeline: Sehenswürdigkeiten, Essen, Aktivitäten
   mit Uhrzeit, Ort, Notiz und optionalen Kosten. Tage vor- und
   zurückblättern, Programmpunkte anlegen, bearbeiten, verschieben, abhaken.
-- **Planung** — alle Reisetage auf einen Blick, mit Tagesfortschritt; ein
-  Tipp auf die Datumszeile schlägt den Tag auf „Heute“ auf.
+- **Planung** — zwei Reiter in einem Bereich: „Tagesplanung“ (alle Reisetage
+  auf einen Blick, mit Tagesfortschritt; ein Tipp auf die Datumszeile schlägt
+  den Tag auf „Heute“ auf) und „Packliste“.
+- **Packliste** — was mit muss, offline und ohne Datum: eintragen im
+  Schnellfeld, danach nach Kategorie (Dokumente, Technik, Hygiene, Schuhe,
+  Ausflüge, Strand, Kleidung, Sonstiges), Stand (noch offen, noch zu kaufen,
+  noch zu waschen, liegt bereit, eingepackt) und Gepäck (Hand- oder
+  Aufgabegepäck) sortieren. Eigene Reiter für Handgepäck, Aufgabegepäck und
+  „Zu tun“.
 - Ein Kostenpunkt am Programmpunkt wird sofort zur Vormerkung in der Kasse
   übernommen — dieselbe Vormerkung wie bei einer Ausgabe mit Zukunftsdatum.
 - **Finanzen** — zwei Reiter in einem Bereich: „Ausgaben“ (nach Tagen, mit

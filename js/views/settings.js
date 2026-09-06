@@ -130,7 +130,7 @@ const slugFor = (trip) =>
 
 const backupNow = (state) => {
   download(
-    buildExport({ trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems }),
+    buildExport({ trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems }),
     `${slugFor(state.trip)}-sicherung.json`,
     'application/json',
   );
@@ -1134,7 +1134,7 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, ask
 // -------------------------------------------------------------------- Daten
 
 function dataGroup(state) {
-  const { trip, contributions, expenses, cashOuts, planItems } = state;
+  const { trip, contributions, expenses, cashOuts, planItems, packItems } = state;
   const slug = slugFor(trip);
 
   const importFile = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: async (e) => {
@@ -1160,8 +1160,8 @@ function dataGroup(state) {
   } });
 
   return group('Daten', {},
-    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions, cashOuts, planItems }), `${slug}.csv`, 'text/csv;charset=utf-8')),
-    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses, cashOuts, planItems }), `${slug}-sicherung.json`, 'application/json')),
+    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions, cashOuts, planItems, packItems }), `${slug}.csv`, 'text/csv;charset=utf-8')),
+    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems }), `${slug}-sicherung.json`, 'application/json')),
     actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
     importFile,
   );

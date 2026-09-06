@@ -139,3 +139,48 @@ test('CSV: der Reiseplan steht als eigene Art dabei', () => {
   assert.ok(csv.includes('"Trollstigen · Andalsnes"'), 'Titel und Ort zusammen');
   assert.ok(csv.includes('"Spaziergang · am Hafen"'), 'ohne Ort bleiben Titel und Notiz zusammen, ohne Betrag');
 });
+
+test('Die Packliste reist mit der Sicherung — ohne Datum und ohne Betrag', () => {
+  const packItems = [
+    { id: 'pk1', title: 'Reisepass', category: 'documents', status: 'packed', bag: 'hand', note: '' },
+    { id: 'pk2', title: 'Handtücher', category: 'beach', status: 'wash', bag: 'hold', note: 'zwei große' },
+  ];
+  const back = parseImport(buildExport({ trip: TRIP, contributions: [], expenses: [], packItems }));
+
+  // Die generische Prüfung verlangt Betrag und Datum — daran wäre die ganze
+  // Packliste beim Zurückholen hängen geblieben.
+  assert.deepEqual(back.packItems, packItems);
+});
+
+test('Ein Eintrag der Packliste ohne Titel ist kein Eintrag', () => {
+  const back = parseImport(buildExport({
+    trip: TRIP,
+    contributions: [],
+    expenses: [],
+    packItems: [
+      { id: 'pk1', title: '   ', category: 'clothing', status: 'open', bag: 'none' },
+      { id: 'pk2', title: 'Ladekabel', category: 'quatsch', status: 'quatsch', bag: 'quatsch' },
+    ],
+  }));
+
+  assert.equal(back.packItems.length, 1, 'ohne Titel bliebe eine leere Zeile stehen');
+  assert.equal(back.packItems[0].category, 'other', 'unbekannte Kategorie wird Sonstiges');
+  assert.equal(back.packItems[0].status, 'open');
+  assert.equal(back.packItems[0].bag, 'none');
+});
+
+test('CSV: die Packliste steht als eigene Art dabei — dafür druckt man sie', () => {
+  const csv = buildCsv({
+    trip: TRIP,
+    contributions: [],
+    expenses: [],
+    packItems: [
+      { id: 'pk1', title: 'Reisepass', category: 'documents', status: 'packed', bag: 'hand', note: '' },
+      { id: 'pk2', title: 'Handtücher', category: 'beach', status: 'wash', bag: 'hold', note: 'zwei große' },
+    ],
+  });
+
+  assert.ok(csv.includes('"Packliste";"";"";"";"Dokumente"'), 'kein Datum, kein Betrag, aber die Kategorie');
+  assert.ok(csv.includes('"Reisepass · Eingepackt · Handgepäck"'));
+  assert.ok(csv.includes('"Handtücher · Noch zu waschen · Aufgabegepäck · zwei große"'));
+});

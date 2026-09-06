@@ -4,6 +4,9 @@
  * steht ausführlich auf „Heute“, ein Tipp auf die Datumszeile schlägt ihn
  * dort auf. Übersicht und Tagesblatt, wie im Kalender.
  *
+ * Einer der beiden Reiter unter „Planung“ (siehe `planning.js`); der andere
+ * ist die Packliste.
+ *
  * Anders als die Ausgabenliste zeigt dieser Screen jeden Reisetag, auch die,
  * an denen noch nichts steht — ein Planer, der nur die Tage mit Einträgen
  * zeigt, verschweigt genau die Lücken, die er eigentlich sichtbar machen soll.
@@ -25,15 +28,17 @@ export function renderPlan(state, actions) {
 
   return h('div.view',
     // Steht schon etwas im Plan, ist der Stand über die ganze Reise die
-    // nützlichere Kopfzeile als ein Satz, der nur den Bildschirm benennt.
+    // nützlichere Kopfzeile als ein Satz, der nur den Bildschirm benennt. Wie
+    // der Bildschirm heißt, sagt ohnehin der Reiter darüber — hier steht
+    // deshalb, was gezählt wird, nicht noch einmal „Tagesplanung“.
     total
       ? h('div.summary',
-          h('p.summary__label', 'Tagesplanung'),
+          h('p.summary__label', 'Erledigt'),
           h('p.summary__value', `${done} von ${total}`),
-          h('p.summary__meta', 'Programmpunkten erledigt'),
+          h('p.summary__meta', 'Programmpunkten'),
         )
       : h('div.hero.hero--muted',
-          h('p.hero__title', 'Tagesplanung'),
+          h('p.hero__title', 'Was steht an?'),
           h('p.hero__sub', 'Sehenswürdigkeiten, Essen, Aktivitäten — Tag für Tag.'),
         ),
     h('div.daygroups', ...groups.map((g) => dayGroup(g, trip, today, expenseById, actions, openDay))),

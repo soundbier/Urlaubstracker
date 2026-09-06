@@ -6,7 +6,7 @@
  * Sicherheitsregeln), die Trip-Kennung und den Einladungscode. Er steht im
  * Fragment der URL — das schickt der Browser nie an einen Server.
  */
-import { CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson } from './calc.js';
+import { CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson, PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID } from './calc.js';
 
 function toBase64Url(str) {
   const bytes = new TextEncoder().encode(str);
@@ -45,7 +45,7 @@ export function clearInviteFromLocation() {
 }
 
 /** Vollständige Sicherungskopie als JSON-Datei. */
-export function buildExport({ trip, contributions, expenses, cashOuts = [], planItems = [] }) {
+export function buildExport({ trip, contributions, expenses, cashOuts = [], planItems = [], packItems = [] }) {
   return JSON.stringify(
     {
       format: 'urlaubstracker',
@@ -56,6 +56,7 @@ export function buildExport({ trip, contributions, expenses, cashOuts = [], plan
       expenses,
       cashOuts,
       planItems,
+      packItems,
     },
     null,
     2,
@@ -124,6 +125,20 @@ export function parseImport(text) {
       linkedExpenseId: typeof p.linkedExpenseId === 'string' && expenseIds.has(p.linkedExpenseId) ? p.linkedExpenseId : null,
     }));
 
+  // Die Packliste hat weder Datum noch Betrag — von der generischen `rows()`
+  // bliebe da nichts übrig. Gebraucht wird nur ein Titel; die drei Merkmale
+  // fallen auf ihre Voreinstellung zurück, wenn dort etwas Unbekanntes steht.
+  const packItems = (Array.isArray(data.packItems) ? data.packItems : [])
+    .filter((p) => p && typeof p.id === 'string' && p.id && String(p.title || '').trim())
+    .map((p) => ({
+      ...p,
+      title: String(p.title).trim(),
+      category: PACK_CATEGORY_BY_ID[p.category] ? p.category : 'other',
+      status: PACK_STATUS_BY_ID[p.status] ? p.status : 'open',
+      bag: PACK_BAG_BY_ID[p.bag] ? p.bag : 'none',
+      note: String(p.note || '').trim(),
+    }));
+
   return {
     trip: {
       ...t,
@@ -138,11 +153,12 @@ export function parseImport(text) {
     cashOuts: rows(data.cashOuts, (c) => knownPerson.has(c.personId)),
     expenses,
     planItems,
+    packItems,
   };
 }
 
 /** Ausgaben als CSV, für Tabellenkalkulationen. */
-export function buildCsv({ trip, expenses, contributions, cashOuts = [], planItems = [] }) {
+export function buildCsv({ trip, expenses, contributions, cashOuts = [], planItems = [], packItems = [] }) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const money = (cents) => (cents / 100).toFixed(2).replace('.', ',');
   const personName = (id) => trip.people.find((p) => p.id === id)?.name || 'Unbekannt';
@@ -176,6 +192,14 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
       'Programm', p.date, p.time || '', linked ? money(linked.amount) : '',
       categoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,
     ].map(esc).join(';'));
+  }
+  // Die Packliste hat in dieser Tabelle keine Spalte für sich: kein Datum,
+  // kein Betrag. Sie steht trotzdem drin, weil genau dafür jemand exportiert —
+  // eine Liste zum Ausdrucken und Abhaken auf Papier. Stand und Gepäck stehen
+  // hinten bei der Notiz, wo sie niemandem eine Geldspalte verstellen.
+  for (const p of packItems) {
+    const merkmale = [PACK_STATUS_BY_ID[p.status]?.label, PACK_BAG_BY_ID[p.bag]?.short, p.note].filter(Boolean);
+    lines.push(['Packliste', '', '', '', PACK_CATEGORY_BY_ID[p.category]?.label || 'Sonstiges', '', [p.title, ...merkmale].join(' \u00b7 ')].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';

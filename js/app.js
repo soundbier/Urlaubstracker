@@ -1,19 +1,19 @@
 /** Die Hülle: Kopfzeile, Ansichten, Navigation, Schnelleingabe. */
 import { h, icon, replace, $ } from './dom.js';
 import * as store from './store.js';
-import { computeBudget, todayISO } from './calc.js';
+import { computeBudget, todayISO, packStatus } from './calc.js';
 import { applyTheme } from './prefs.js';
 import { onInstallabilityChange } from './install.js';
 import { money, days, compactDate } from './format.js';
 import { toast, confirmSheet, promptSheet, closeAllSheets, hideToast } from './ui/sheet.js';
 import * as lock from './lock.js';
 import { lockScreen } from './ui/lock-screen.js';
-import { expenseSheet, contributionSheet, cashOutSheet, planItemSheet } from './ui/entry-sheets.js';
+import { expenseSheet, contributionSheet, cashOutSheet, planItemSheet, packItemSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
 import { renderFinances, financePane, setFinancePane } from './views/finances.js';
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
-import { renderPlan } from './views/plan.js';
+import { renderPlanning, planningPane } from './views/planning.js';
 
 /**
  * Vier Ziele, in der Reihenfolge, in der man sie im Urlaub braucht: was steht
@@ -21,7 +21,7 @@ import { renderPlan } from './views/plan.js';
  */
 const TABS = [
   { id: 'heute', label: 'Heute', icon: 'sun', render: renderToday },
-  { id: 'plan', label: 'Planung', icon: 'calendar', render: renderPlan },
+  { id: 'plan', label: 'Planung', icon: 'calendar', render: renderPlanning },
   { id: 'finanzen', label: 'Finanzen', icon: 'wallet', render: renderFinances },
   { id: 'mehr', label: 'Mehr', icon: 'gear', render: renderSettings },
 ];
@@ -316,6 +316,65 @@ const actions = {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
   },
+
+  async addPackItem(defaults = {}) {
+    const result = await packItemSheet({ defaults });
+    if (result?.action !== 'save') return;
+    try {
+      const row = await store.addPackItem(result.values);
+      undoable(`„${row.title}“ steht auf der Liste`, () => store.deletePackItem(row.id));
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  /**
+   * Der Weg über das Schnellfeld: eintragen, ohne dass etwas aufgeht.
+   *
+   * Bewusst ohne Meldung — die neue Zeile erscheint unmittelbar unter dem Feld,
+   * und wer zehn Sachen hintereinander eintippt, will nicht zehnmal einen
+   * Balken über der Liste haben. Geht es schief, sagt das natürlich trotzdem
+   * jemand.
+   */
+  async addPackItemQuick(values) {
+    try {
+      await store.addPackItem(values);
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  async editPackItem(item) {
+    const result = await packItemSheet({ packItem: item });
+    if (!result) return;
+    try {
+      if (result.action === 'save') {
+        await store.updatePackItem(item.id, result.values);
+      } else if (result.action === 'delete') {
+        const ok = await confirmSheet({ title: `„${item.title}“ von der Liste nehmen?`, confirmLabel: 'Löschen', danger: true });
+        if (ok) await store.deletePackItem(item.id);
+      }
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  /**
+   * Der Haken an der Zeile: eingepackt und wieder zurück.
+   *
+   * Zurück heißt „noch offen“ — welcher Stand vorher dastand, weiß der Eintrag
+   * nicht mehr. Wer sich vertippt, holt ihn über „Rückgängig“ zurück; dort
+   * steht der alte Stand noch.
+   */
+  async togglePackItem(item) {
+    const before = packStatus(item);
+    try {
+      await store.updatePackItem(item.id, { status: before === 'packed' ? 'open' : 'packed' });
+      undoable(before === 'packed' ? 'Wieder ausgepackt.' : 'Eingepackt.', () => store.updatePackItem(item.id, { status: before }));
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
 };
 
 // ------------------------------------------------------------------- Aufbau
@@ -445,10 +504,13 @@ function fab(route) {
   if (route === 'mehr') return null;
   if (route === 'finanzen' && financePane() !== 'ausgaben') return null;
   if (route === 'plan') {
+    // Zwei Reiter, zwei Sorten Eintrag: unter „Tagesplanung“ ein Programmpunkt,
+    // unter „Packliste“ ein Ding, das mit muss.
+    const packing = planningPane() === 'packliste';
     return h('button.fab', {
       type: 'button',
-      onclick: () => actions.addPlanItem(),
-      'aria-label': 'Programmpunkt eintragen',
+      onclick: () => (packing ? actions.addPackItem() : actions.addPlanItem()),
+      'aria-label': packing ? 'Auf die Packliste setzen' : 'Programmpunkt eintragen',
     }, icon('plus', 24));
   }
   return h('button.fab', {

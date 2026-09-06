@@ -10,6 +10,7 @@ import {
   normalizeShares, averageShare,
   cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
   planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip,
+  packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -563,4 +564,59 @@ test('Tagesfortschritt im Reiseplan zählt über planItemDone, nicht über das e
   ];
   assert.deepEqual(planDayProgress(items, expenseById), { done: 2, total: 3 });
   assert.deepEqual(planDayProgress([], expenseById), { done: 0, total: 0 });
+});
+
+// ------------------------------------------------------------------ Packliste
+
+test('Unbekannte Werte auf der Packliste fallen auf ihre Voreinstellung zurück', () => {
+  // Aus einer Sicherungskopie, von einem älteren Gerät oder aus einer
+  // künftigen Fassung kann alles Mögliche kommen. Was hier durchrutschte,
+  // stünde in keiner Gruppe — der Eintrag wäre da und trotzdem unauffindbar.
+  assert.equal(packCategory({ category: 'hygiene' }), 'hygiene');
+  assert.equal(packCategory({ category: 'food' }), 'other', 'Ausgaben-Kategorien gelten hier nicht');
+  assert.equal(packCategory({}), 'other');
+  assert.equal(packStatus({ status: 'wash' }), 'wash');
+  assert.equal(packStatus({ status: 'quatsch' }), 'open');
+  assert.equal(packStatus({}), 'open');
+  assert.equal(packBag({ bag: 'hand' }), 'hand');
+  assert.equal(packBag({}), 'none');
+});
+
+test('Eingepackt ist ein Stand, kein eigenes Feld', () => {
+  assert.equal(packItemPacked({ status: 'packed' }), true);
+  assert.equal(packItemPacked({ status: 'ready' }), false, 'bereitgelegt ist noch nicht im Koffer');
+  assert.equal(packItemPacked({}), false);
+  assert.deepEqual(packProgress([{ status: 'packed' }, { status: 'open' }, { status: 'packed' }]), { done: 2, total: 3 });
+  assert.deepEqual(packProgress([]), { done: 0, total: 0 });
+});
+
+test('Die Packliste gruppiert nach Kategorie, in fester Reihenfolge und ohne Leerstellen', () => {
+  const items = [
+    { id: 'a', title: 'Zahnbürste', category: 'hygiene', createdAt: 3 },
+    { id: 'b', title: 'Reisepass', category: 'documents', createdAt: 1 },
+    { id: 'c', title: 'Duschgel', category: 'hygiene', createdAt: 2 },
+  ];
+  const groups = packItemsByCategory(items);
+
+  // Dokumente stehen in `PACK_CATEGORIES` vor Hygiene — nicht die Eingabe
+  // entscheidet die Reihenfolge der Gruppen, sondern die Liste.
+  assert.deepEqual(groups.map((g) => g.id), ['documents', 'hygiene']);
+  // Innerhalb einer Gruppe dagegen schon: wer die Hygiene in einem Rutsch
+  // einträgt, denkt dabei in einer Reihenfolge.
+  assert.deepEqual(groups[1].items.map((i) => i.title), ['Duschgel', 'Zahnbürste']);
+  // Leere Kategorien fallen weg — „Strand“ ohne Einträge sagt nichts.
+  assert.equal(groups.length, 2);
+  assert.deepEqual(packItemsByCategory([]), []);
+});
+
+test('Nach Stand gruppiert steht das Offene beieinander', () => {
+  const items = [
+    { id: 'a', title: 'Handtuch', status: 'wash', createdAt: 1 },
+    { id: 'b', title: 'Sonnencreme', status: 'buy', createdAt: 2 },
+    { id: 'c', title: 'Badehose', status: 'packed', createdAt: 3 },
+    { id: 'd', title: 'Kopfhörer', createdAt: 4 },
+  ];
+  const groups = packItemsByStatus(items);
+  assert.deepEqual(groups.map((g) => g.id), ['open', 'buy', 'wash', 'packed']);
+  assert.deepEqual(groups[0].items.map((i) => i.title), ['Kopfhörer'], 'ohne Stand heißt offen');
 });
