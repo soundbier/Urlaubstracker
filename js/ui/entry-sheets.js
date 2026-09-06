@@ -107,7 +107,7 @@ function categoryGrid(selectedId, onSelect, list = CATEGORIES) {
       selectedId = c.id;
       buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
       onSelect(c.id);
-    } }, c.icon ? icon(c.icon, 16) : null, c.short || c.label);
+    } }, c.icon ? icon(c.icon, 16) : null, h('span.catgrid__label', c.short || c.label));
     b.classList.toggle('is-active', c.id === selectedId);
     return b;
   });
@@ -619,8 +619,12 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
         field('Wie viele?', qtyStepper(qty, (n) => { qty = n; })),
         field('Wohin gehört es?', categoryGrid(category, (id) => { category = id; sub = ''; renderSubs(); }, PACK_CATEGORIES)),
         subField,
-        field('Wie weit ist es?', chipRow(PACK_STATUSES, status, (id) => { status = id; })),
-        field('In welches Gepäck?', chipRow(PACK_BAGS, bag, (id) => { bag = id; })),
+        // Status: `short` bleibt hier außen vor — das Kürzel ist als
+        // Beiwort für die Zeile lokalisiert (klein geschrieben), in den
+        // Reitern soll derselbe ganze Satz stehen wie bei Kategorie und
+        // Sorte darüber.
+        field('Wie weit ist es?', categoryGrid(status, (id) => { status = id; }, PACK_STATUSES.map(({ id, label }) => ({ id, label })))),
+        field('In welches Gepäck?', categoryGrid(bag, (id) => { bag = id; }, PACK_BAGS)),
         field('Notiz', note),
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
