@@ -6,6 +6,7 @@ import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, daymark } from '../ui/parts.js';
+import { setFinancePane } from './finances.js';
 
 // Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
 // Verdikt, kein Dauerzustand. Erst beim Kippen ins Knappe oder Über zeigt er
@@ -26,8 +27,20 @@ function resolveSelectedDate(trip) {
   return selectedDate;
 }
 
-function setSelectedDate(date, trip) {
-  selectedDate = clampDateToTrip(date, trip);
+function setSelectedDate(date) {
+  // Ohne Klemmen: `resolveSelectedDate` holt einen Tag außerhalb der Reise
+  // beim nächsten Aufbau ohnehin zurück, und zwar mit dem dann gültigen
+  // Zeitraum — hier wäre er womöglich schon veraltet.
+  selectedDate = date;
+}
+
+/**
+ * Einen bestimmten Tag aufschlagen — von der Tagesplanung aus, wo die
+ * Übersicht aller Tage steht. Übersicht und Tagesansicht, wie Monats- und
+ * Tagesblatt im Kalender.
+ */
+export function openPlanDay(date) {
+  setSelectedDate(date);
 }
 
 export function renderToday(state, actions) {
@@ -115,8 +128,10 @@ export function renderToday(state, actions) {
         : emptyState('Heute noch nichts eingetragen.'),
     ),
     b.phase === 'after' ? h('div.callout',
-      h('p', 'Der Urlaub ist vorbei. Wer wem noch was überweist, steht unter ', h('strong', 'Budget'), '.'),
-      h('button.btn.btn--ghost', { type: 'button', onclick: () => actions.goto('budget') }, 'Zur Abrechnung'),
+      h('p', 'Der Urlaub ist vorbei. Wer wem noch was überweist, steht unter ', h('strong', 'Finanzen'), '.'),
+      // Direkt auf den Kassen-Reiter, nicht nur auf den Bereich: die
+      // Abrechnung ist der Grund, aus dem man hier tippt.
+      h('button.btn.btn--ghost', { type: 'button', onclick: () => { setFinancePane('kasse'); actions.goto('finanzen'); } }, 'Zur Abrechnung'),
     ) : null,
   );
 }
@@ -136,8 +151,8 @@ function dayNav(trip, selected, today, actions) {
   const atEnd = selected >= trip.endDate;
   const canJumpToday = today !== selected && today >= trip.startDate && today <= trip.endDate;
 
-  const go = (delta) => { setSelectedDate(addDays(selected, delta), trip); actions.rerender(); };
-  const jumpToday = () => { setSelectedDate(today, trip); actions.rerender(); };
+  const go = (delta) => { setSelectedDate(addDays(selected, delta)); actions.rerender(); };
+  const jumpToday = () => { setSelectedDate(today); actions.rerender(); };
 
   return h('div.daynav',
     h('button.icon-btn.daynav__arrow.daynav__arrow--prev', {

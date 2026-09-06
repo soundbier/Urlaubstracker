@@ -19,6 +19,6 @@
   ],
   "shortcuts": [
     { "name": "Ausgabe eintragen", "short_name": "Ausgabe", "url": "./#/neu" },
-    { "name": "Budget ansehen", "short_name": "Budget", "url": "./#/budget" }
+    { "name": "Finanzen ansehen", "short_name": "Finanzen", "url": "./#/finanzen" }
   ]
 }
