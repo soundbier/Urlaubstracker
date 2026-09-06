@@ -10,18 +10,29 @@ import * as lock from './lock.js';
 import { lockScreen } from './ui/lock-screen.js';
 import { expenseSheet, contributionSheet, cashOutSheet, planItemSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
-import { renderExpenses } from './views/expenses.js';
-import { renderBudget } from './views/budget.js';
+import { renderFinances, financePane, setFinancePane } from './views/finances.js';
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
 import { renderPlan } from './views/plan.js';
 
+/**
+ * Vier Ziele, in der Reihenfolge, in der man sie im Urlaub braucht: was steht
+ * heute an, was steht diese Woche an, was kostet das — und der Rest.
+ */
 const TABS = [
   { id: 'heute', label: 'Heute', icon: 'sun', render: renderToday },
-  { id: 'ausgaben', label: 'Ausgaben', icon: 'list', render: renderExpenses },
-  { id: 'budget', label: 'Budget', icon: 'chart', render: renderBudget },
+  { id: 'plan', label: 'Planung', icon: 'calendar', render: renderPlan },
+  { id: 'finanzen', label: 'Finanzen', icon: 'wallet', render: renderFinances },
   { id: 'mehr', label: 'Mehr', icon: 'gear', render: renderSettings },
 ];
+
+/**
+ * „Ausgaben“ und „Budget“ waren einmal zwei Reiter und sind jetzt zwei
+ * Unter-Reiter von „Finanzen“. Alte Lesezeichen, die App-Verknüpfung aus dem
+ * Manifest und der Zurück-Knopf sollen trotzdem dort landen, wo der Inhalt
+ * heute steht.
+ */
+const LEGACY_ROUTES = { ausgaben: 'finanzen', budget: 'finanzen' };
 
 const app = $('#app');
 let state = store.getState();
@@ -30,11 +41,21 @@ let state = store.getState();
 
 function currentTab() {
   const id = (location.hash.match(/^#\/([a-z]+)/) || [])[1];
-  // Der Reiseplan ist kein Tab (die Bottom-Navigation bleibt bei vier
-  // ruhigen Zielen), aber eine eigene Adresse — erreichbar über das
-  // Kalender-Symbol in der Kopfzeile, nicht über die Leiste unten.
-  if (id === 'plan') return 'plan';
+  if (LEGACY_ROUTES[id]) return LEGACY_ROUTES[id];
   return TABS.find((t) => t.id === id) ? id : 'heute';
+}
+
+/**
+ * Eine alte Adresse wird zur neuen — samt passendem Unter-Reiter: `#/budget`
+ * führt auf die Kasse, `#/ausgaben` auf die Liste. Die Adresse wird dabei
+ * ersetzt, nicht angehängt, damit der Zurück-Knopf nicht zwischen alter und
+ * neuer Schreibweise hin und her springt.
+ */
+function consumeLegacyRoute() {
+  const id = (location.hash.match(/^#\/([a-z]+)/) || [])[1];
+  if (!LEGACY_ROUTES[id]) return;
+  setFinancePane(id === 'budget' ? 'kasse' : 'ausgaben');
+  history.replaceState(null, '', `${location.pathname}${location.search}#/${LEGACY_ROUTES[id]}`);
 }
 
 function goto(tab) {
@@ -62,7 +83,7 @@ function consumeQuickAdd() {
   if (state.phase === 'ready' && state.trip) actions.addExpense();
 }
 
-addEventListener('hashchange', () => { render(); consumeQuickAdd(); });
+addEventListener('hashchange', () => { consumeLegacyRoute(); render(); consumeQuickAdd(); });
 
 // ------------------------------------------------------------------ Aktionen
 
@@ -336,16 +357,16 @@ function render() {
   const tab = TABS.find((t) => t.id === route);
 
   replace(app,
-    header(route),
+    header(),
     deletionBar(),
-    h('main.main', { id: 'main' }, route === 'plan' ? renderPlan(state, actions) : tab.render(state, actions)),
+    h('main.main', { id: 'main' }, tab.render(state, actions)),
     fab(route),
     nav(route),
   );
   document.title = `${state.trip.name} — Urlaubstracker`;
 }
 
-function header(route) {
+function header() {
   const { trip, sync } = state;
   const today = todayISO();
   const b = computeBudget({ trip, contributions: state.contributions, expenses: state.expenses, today });
@@ -372,13 +393,6 @@ function header(route) {
       h('p.topbar__sub', subtitle),
     ),
     h('div.topbar__icons',
-      // Der Reiseplan ist kein Tab, sondern eine eigene Adresse — dieser
-      // Knopf ist der einzige Weg dahin, deshalb steht er in der Kopfzeile,
-      // nicht in der Bottom-Navigation.
-      h('button.icon-btn', {
-        type: 'button', class: route === 'plan' ? 'is-active' : '',
-        title: 'Reiseplan', 'aria-label': 'Reiseplan', onclick: () => goto('plan'),
-      }, icon('calendar', 20)),
       h('button.syncdot', { type: 'button', class: `syncdot--${syncTone}`, title: syncTitle, 'aria-label': syncTitle, onclick: () => goto('mehr') },
         icon(syncTone === 'on' ? 'cloud' : syncTone === 'off' ? 'cloudOff' : syncTone === 'error' ? 'cloudOff' : 'cloud', 18),
       ),
@@ -426,9 +440,10 @@ function deletionBar() {
 }
 
 function fab(route) {
-  // Budget und Einstellungen haben ihre Knöpfe im Inhalt — dort würde der
-  // schwebende Knopf nur die Liste verdecken.
-  if (route === 'budget' || route === 'mehr') return null;
+  // Die Kasse und die Einstellungen haben ihre Knöpfe im Inhalt — dort würde
+  // der schwebende Knopf nur die Liste verdecken.
+  if (route === 'mehr') return null;
+  if (route === 'finanzen' && financePane() !== 'ausgaben') return null;
   if (route === 'plan') {
     return h('button.fab', {
       type: 'button',
@@ -461,6 +476,10 @@ function nav(activeId) {
 // Die Farbwahl steht schon als `data-theme` am <html> (siehe index.html) —
 // hier zieht nur noch die Adressleiste nach.
 applyTheme();
+
+// Eine alte Adresse (`#/ausgaben`, `#/budget`) noch vor dem ersten Aufbau auf
+// die neue umschreiben — sonst blitzt beim Kaltstart der falsche Reiter auf.
+consumeLegacyRoute();
 
 // `beforeinstallprompt` trifft oft erst nach dem ersten Aufbau ein — dann
 // muss die Installations-Zeile (Einstellungen, Einladungsbildschirm)

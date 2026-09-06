@@ -1,7 +1,8 @@
 /**
- * Der Reiseplan: was wann ansteht, Tag für Tag — Sehenswürdigkeiten, Essen,
- * Aktivitäten. Kein eigener Tab (die Bottom-Navigation bleibt bei vier
- * ruhigen Zielen), erreichbar über das Kalender-Symbol in der Kopfzeile.
+ * Die Tagesplanung: was wann ansteht, Tag für Tag — Sehenswürdigkeiten,
+ * Essen, Aktivitäten. Die Übersicht über die ganze Reise; der einzelne Tag
+ * steht ausführlich auf „Heute“, ein Tipp auf die Datumszeile schlägt ihn
+ * dort auf. Übersicht und Tagesblatt, wie im Kalender.
  *
  * Anders als die Ausgabenliste zeigt dieser Screen jeden Reisetag, auch die,
  * an denen noch nichts steht — ein Planer, der nur die Tage mit Einträgen
@@ -11,28 +12,46 @@ import { h, icon } from '../dom.js';
 import { planItemsByDay, planDayProgress, todayISO } from '../calc.js';
 import { dayLabel } from '../format.js';
 import { planItemRow, bar } from '../ui/parts.js';
+import { openPlanDay } from './today.js';
 
 export function renderPlan(state, actions) {
   const { trip, planItems, expenses } = state;
   const today = todayISO();
   const expenseById = new Map(expenses.map((e) => [e.id, e]));
   const groups = planItemsByDay(planItems, trip.startDate, trip.endDate);
+  const { done, total } = planDayProgress(planItems, expenseById);
+
+  const openDay = (date) => { openPlanDay(date); actions.goto('heute'); };
 
   return h('div.view',
-    h('div.hero.hero--muted',
-      h('p.hero__title', 'Reiseplan'),
-      h('p.hero__sub', 'Sehenswürdigkeiten, Essen, Aktivitäten — Tag für Tag.'),
-    ),
-    h('div.daygroups', ...groups.map((g) => dayGroup(g, trip, today, expenseById, actions))),
+    // Steht schon etwas im Plan, ist der Stand über die ganze Reise die
+    // nützlichere Kopfzeile als ein Satz, der nur den Bildschirm benennt.
+    total
+      ? h('div.summary',
+          h('p.summary__label', 'Tagesplanung'),
+          h('p.summary__value', `${done} von ${total}`),
+          h('p.summary__meta', 'Programmpunkten erledigt'),
+        )
+      : h('div.hero.hero--muted',
+          h('p.hero__title', 'Tagesplanung'),
+          h('p.hero__sub', 'Sehenswürdigkeiten, Essen, Aktivitäten — Tag für Tag.'),
+        ),
+    h('div.daygroups', ...groups.map((g) => dayGroup(g, trip, today, expenseById, actions, openDay))),
   );
 }
 
-function dayGroup(group, trip, today, expenseById, actions) {
+function dayGroup(group, trip, today, expenseById, actions, openDay) {
   const { done, total } = planDayProgress(group.items, expenseById);
   return h('section.daygroup',
     h('header.daygroup__head',
       h('div.daygroup__line',
-        h('h3.daygroup__title', dayLabel(group.date, today)),
+        // Die Datumszeile ist der Weg in den Tag: sie führt auf „Heute“, wo
+        // derselbe Tag mit Uhrzeiten-Spalte und Tageswahl steht.
+        h('button.daygroup__open', {
+          type: 'button',
+          'aria-label': `${dayLabel(group.date, today)} öffnen`,
+          onclick: () => openDay(group.date),
+        }, h('h3.daygroup__title', dayLabel(group.date, today)), icon('chevron', 16)),
         h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: group.date }) }, icon('plus', 16), 'Eintragen'),
       ),
       // Der Fortschritt eines Tages, nicht nur die Liste selbst: auf einen

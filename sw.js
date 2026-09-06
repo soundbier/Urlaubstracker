@@ -14,7 +14,7 @@
  * Beim Veröffentlichen: APP_VERSION hochzählen (und `data-version` in
  * index.html mitziehen, `npm test` prüft das).
  */
-const APP_VERSION = '1.21.0';
+const APP_VERSION = '1.22.0';
 const CACHE = `urlaubstracker-${APP_VERSION}`;
 
 const SHELL = [
@@ -43,6 +43,7 @@ const SHELL = [
   './js/ui/entry-sheets.js',
   './js/views/today.js',
   './js/views/expenses.js',
+  './js/views/finances.js',
   './js/views/budget.js',
   './js/views/settings.js',
   './js/views/onboarding.js',
@@ -158,7 +159,7 @@ self.addEventListener('fetch', (event) => {
     (async () => {
       const cache = await caches.open(CACHE);
 
-      // Seitenaufrufe landen immer auf der App-Hülle, damit auch #/budget geht.
+      // Seitenaufrufe landen immer auf der App-Hülle, damit auch #/finanzen geht.
       const navigating = request.mode === 'navigate';
       const cached = await cache.match(navigating ? './' : request);
       // Beim Befüllen ist das Flag schon weg; hier steht die Garantie noch

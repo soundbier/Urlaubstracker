@@ -14,11 +14,14 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
 - **Heute** — der Tag als Timeline: Sehenswürdigkeiten, Essen, Aktivitäten
   mit Uhrzeit, Ort, Notiz und optionalen Kosten. Tage vor- und
   zurückblättern, Programmpunkte anlegen, bearbeiten, verschieben, abhaken.
-- **Reiseplan** — alle Reisetage auf einen Blick, mit Tagesfortschritt.
+- **Planung** — alle Reisetage auf einen Blick, mit Tagesfortschritt; ein
+  Tipp auf die Datumszeile schlägt den Tag auf „Heute“ auf.
 - Ein Kostenpunkt am Programmpunkt wird sofort zur Vormerkung in der Kasse
   übernommen — dieselbe Vormerkung wie bei einer Ausgabe mit Zukunftsdatum.
-- **Ausgaben / Budget / Mehr** — Ausgaben nach Tagen, Tagesbudget auf einen
-  Blick, Einzahlungen & Endabrechnung, Einstellungen.
+- **Finanzen** — zwei Reiter in einem Bereich: „Ausgaben“ (nach Tagen, mit
+  Kategorie-Filter) und „Kasse“ (Tagesbudget, Einzahlungen, Bargeld,
+  Endabrechnung, Verlauf).
+- **Mehr** — Reisegruppe, Sync, Sperre, Sicherung, Einstellungen.
 - Eigene Zahlentastatur, Rückgängig, Ausgabe „nochmal“ eintragen.
 - Reisegruppe mit 1–8 Personen, Kostenaufteilung frei einstellbar.
 - Bezahlt von Kasse, privat oder bar — zählt in der Abrechnung richtig.

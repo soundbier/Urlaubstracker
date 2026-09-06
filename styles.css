@@ -710,6 +710,28 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
  * Was drüber liegt, steht in Tinte, der Rest bleibt blass — das Verdikt trägt
  * die große Zahl auf „Heute“.
  */
+/* Die Datumszeile der Tagesplanung ist zugleich der Weg in den Tag: sie führt
+   auf „Heute“, wo derselbe Tag ausführlich steht. Ein Knopf, der nicht wie
+   einer aussieht — das Datum bleibt die Überschrift, der Pfeil sagt nur, dass
+   es weitergeht. */
+.daygroup__open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+/* Der Pfeil gehört ans Datum, nicht an den Rand: sonst steht er direkt neben
+   „Eintragen“ und sieht aus, als gehörte er zu diesem Knopf. */
+.daygroup__open .daygroup__title { flex: 0 1 auto; }
+.daygroup__open .icon { flex: none; color: var(--text-faint); transform: rotate(-90deg); }
+.daygroup__open:active .daygroup__title { color: var(--accent); }
+
 .daygroup__sub { font-size: var(--fs-xs); color: var(--text-faint); }
 .daygroup__sub.is-over { color: var(--text-muted); font-weight: 500; }
 .daygroup__total { font-weight: 600; }
