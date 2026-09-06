@@ -3,6 +3,7 @@ import { h, icon } from '../dom.js';
 import {
   CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packCategory, packStatus, packBag, packItemPacked,
+  packSubLabel, packQty,
 } from '../calc.js';
 import { money, dayLabel } from '../format.js';
 import { openSheet } from './sheet.js';
@@ -210,7 +211,14 @@ export function packItemRow(item, { onEdit, onToggle } = {}) {
   const status = PACK_STATUS_BY_ID[packStatus(item)];
   const bag = PACK_BAG_BY_ID[packBag(item)];
   const packed = packItemPacked(item);
+  const qty = packQty(item);
+  const subLabel = packSubLabel(item);
+  // Die Sorte steht vorn in der Beiwortzeile und in nichts als dem blassen
+  // Grauton der anderen Beiworte: sie ordnet den Eintrag für die Übersicht
+  // ein, sie ist keine zweite Überschrift. Wo sie fehlt, fehlt nichts —
+  // deshalb auch kein Platzhalter, der die Lücke betont.
   const sub = [
+    subLabel ? h('span.tag', subLabel) : null,
     packed || status.id === 'open' ? null : h('span.tag.tag--todo', status.short),
     bag.short ? h('span.tag', bag.short) : null,
     item.note ? h('span', item.note) : null,
@@ -220,7 +228,10 @@ export function packItemRow(item, { onEdit, onToggle } = {}) {
     h('button.prow__open', { type: 'button', onclick: () => onEdit(item) },
       h('span.row__icon', icon(cat.icon, 20)),
       h('span.row__main',
-        h('span.row__title', item.title),
+        // Die Anzahl gehört vor den Namen, wie man sie auch sagt („vier
+        // Hemden“) — und nur, wenn sie mehr als eins ist: ein „1 ×“ vor
+        // jeder zweiten Zeile wäre Rauschen um der Einheitlichkeit willen.
+        h('span.row__title', qty > 1 ? h('span.row__qty', `${qty} \u00d7`) : null, item.title),
         sub.length ? h('span.row__sub', ...sub) : null,
       ),
     ),

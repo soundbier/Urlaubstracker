@@ -6,7 +6,10 @@
  * Sicherheitsregeln), die Trip-Kennung und den Einladungscode. Er steht im
  * Fragment der URL — das schickt der Browser nie an einen Server.
  */
-import { CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson, PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID } from './calc.js';
+import {
+  CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson,
+  PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packSub, packSubLabel, packQty,
+} from './calc.js';
 
 function toBase64Url(str) {
   const bytes = new TextEncoder().encode(str);
@@ -130,14 +133,22 @@ export function parseImport(text) {
   // fallen auf ihre Voreinstellung zurück, wenn dort etwas Unbekanntes steht.
   const packItems = (Array.isArray(data.packItems) ? data.packItems : [])
     .filter((p) => p && typeof p.id === 'string' && p.id && String(p.title || '').trim())
-    .map((p) => ({
-      ...p,
-      title: String(p.title).trim(),
-      category: PACK_CATEGORY_BY_ID[p.category] ? p.category : 'other',
-      status: PACK_STATUS_BY_ID[p.status] ? p.status : 'open',
-      bag: PACK_BAG_BY_ID[p.bag] ? p.bag : 'none',
-      note: String(p.note || '').trim(),
-    }));
+    .map((p) => {
+      const category = PACK_CATEGORY_BY_ID[p.category] ? p.category : 'other';
+      return {
+        ...p,
+        title: String(p.title).trim(),
+        category,
+        // Die Sorte wird gegen die *geprüfte* Kategorie gehalten, nicht gegen
+        // die rohe: rutscht ein Eintrag beim Einlesen nach „Sonstiges“, darf
+        // seine alte Sorte nicht mitrutschen.
+        sub: packSub({ category, sub: p.sub }),
+        qty: packQty(p),
+        status: PACK_STATUS_BY_ID[p.status] ? p.status : 'open',
+        bag: PACK_BAG_BY_ID[p.bag] ? p.bag : 'none',
+        note: String(p.note || '').trim(),
+      };
+    });
 
   return {
     trip: {
@@ -198,8 +209,12 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   // eine Liste zum Ausdrucken und Abhaken auf Papier. Stand und Gepäck stehen
   // hinten bei der Notiz, wo sie niemandem eine Geldspalte verstellen.
   for (const p of packItems) {
-    const merkmale = [PACK_STATUS_BY_ID[p.status]?.label, PACK_BAG_BY_ID[p.bag]?.short, p.note].filter(Boolean);
-    lines.push(['Packliste', '', '', '', PACK_CATEGORY_BY_ID[p.category]?.label || 'Sonstiges', '', [p.title, ...merkmale].join(' \u00b7 ')].map(esc).join(';'));
+    const qty = packQty(p);
+    const merkmale = [packSubLabel(p), PACK_STATUS_BY_ID[p.status]?.label, PACK_BAG_BY_ID[p.bag]?.short, p.note].filter(Boolean);
+    // Die Anzahl steht vor dem Namen, so wie in der App: „4 × Hemd“ liest
+    // sich auf Papier wie eine Packliste, „Hemd (4)“ wie eine Inventarnummer.
+    const name = qty > 1 ? `${qty} \u00d7 ${p.title}` : p.title;
+    lines.push(['Packliste', '', '', '', PACK_CATEGORY_BY_ID[p.category]?.label || 'Sonstiges', '', [name, ...merkmale].join(' \u00b7 ')].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';

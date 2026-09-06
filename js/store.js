@@ -11,7 +11,7 @@ import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.
 import { newId } from './ids.js';
 import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
 import { keepCopy, lastCopy, discardCopy } from './trash.js';
-import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare } from './calc.js';
+import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare, packQty } from './calc.js';
 
 let backend = null;
 const listeners = new Set();
@@ -618,12 +618,17 @@ export async function markPlanItemOpen(id) {
  * ist die Art, wie Packlisten entstehen. Ein Titel genügt, alles Weitere hat
  * eine Voreinstellung und lässt sich später an der Zeile ändern.
  */
-export async function addPackItem({ title, category, status, bag, note } = {}) {
+export async function addPackItem({ title, category, sub, status, bag, note, qty } = {}) {
   const now = Date.now();
   const row = {
     id: newId(),
     title: String(title || '').trim(),
     category: category || 'other',
+    // Die Sorte („T-Shirt“, „Wanderschuhe“) ist freiwillig und hat deshalb
+    // keine Voreinstellung: sie zu erraten hieße, die Übersicht mit Zahlen zu
+    // füllen, die niemand eingetragen hat.
+    sub: sub || '',
+    qty: packQty({ qty }),
     status: status || 'open',
     bag: bag || 'none',
     note: (note || '').trim(),

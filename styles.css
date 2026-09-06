@@ -534,6 +534,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   overflow-wrap: anywhere;
 }
 .row__sub { font-size: var(--fs-xs); color: var(--text-faint); display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+/* Die Anzahl vor dem Namen auf der Packliste: blass und schmal, damit „4 ×
+   Hemd“ als ein Titel gelesen wird und nicht als Zahl mit Anhang. */
+.row__qty { margin-right: 5px; color: var(--text-faint); font-weight: 400; font-variant-numeric: tabular-nums; }
 /* Beträge stehen in einer Spalte, an der das Auge sie untereinander vergleicht:
    rechtsbündig, tabellarisch, mit einer Mindestbreite, damit die Kante auch bei
    kurzen Beträgen steht. */
@@ -742,6 +745,37 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .packadd__row { display: flex; align-items: center; gap: var(--sp-2); }
 .packadd__row .field__input { flex: 1; min-width: 0; }
 .packadd__go { flex: none; color: var(--accent); }
+
+
+/* Der Gepäck-Umschalter über der Übersicht steht so frei wie das Schnellfeld
+   über der Liste — an derselben Stelle, in derselben Rolle. */
+.packbags { margin: var(--sp-4) 0 var(--sp-5); }
+
+/*
+ * Die Übersicht: eine Zeile je Sorte, links das Wort, rechts die Zahl.
+ *
+ * Keine Knöpfe, keine Symbole, keine Trennlinie nach oben — das ist eine
+ * Aufstellung zum Lesen, kein Verzeichnis zum Antippen. Die Zahlen stehen
+ * tabellarisch untereinander, damit „4“ und „12“ dieselbe Kante haben; was
+ * vollständig im Koffer liegt, steht dunkler da als das, was noch aussteht.
+ */
+.tally { display: flex; flex-direction: column; }
+.tally__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0;
+}
+.tally__row + .tally__row { border-top: 1px solid var(--border); }
+.tally__label { font-size: var(--fs-md); overflow-wrap: anywhere; }
+.tally__count {
+  flex: none;
+  font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+.tally__count.is-done { color: var(--text); font-weight: 600; }
 
 /* --------------------------------------------------------------- Balken */
 
@@ -1028,6 +1062,10 @@ select.field__input { background-image: none; }
 .stepper__btn:active { background: var(--surface-2); }
 .stepper__btn:disabled { opacity: 0.3; }
 .stepper__value { min-width: 20px; text-align: center; font-weight: 600; }
+/* In einer Maske steht der Schalter in einer Spalte und würde sich sonst über
+   die ganze Breite ziehen — eine Anzahl von 1 bis 99 braucht keine 390 px. */
+.stepper--qty { align-self: flex-start; }
+.stepper--qty .stepper__value { min-width: 2.5ch; }
 
 /*
  * Umschalter als Reiter, nicht als Schalter in einer getönten Rinne: Text auf
@@ -1229,6 +1267,23 @@ select.field__input { background-image: none; }
   font-weight: 600;
 }
 .chip .icon { margin-left: -2px; }
+
+/*
+ * Die zweite Reihe des Schnellfelds: die Sorten der gewählten Kategorie.
+ *
+ * Ohne Rahmen und eine Stufe kleiner als die Kategorien darüber. Zwei gleich
+ * laute Chip-Reihen übereinander wären eine Wand, und die beiden Reihen wiegen
+ * auch nicht gleich schwer: die Kategorie entscheidet, wo der Eintrag steht,
+ * die Sorte ist ein Angebot. Die Höhe bleibt trotzdem die volle Fingerbreite —
+ * blasser heißt nicht schwerer zu treffen.
+ */
+.chip--sub {
+  padding: var(--sp-2) var(--sp-2);
+  border-color: transparent;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+.chip--sub.is-active { border-color: var(--accent); color: var(--accent); }
 .chip--date { position: relative; overflow: hidden; }
 .chip--date input { position: absolute; inset: 0; opacity: 0; width: 100%; }
 

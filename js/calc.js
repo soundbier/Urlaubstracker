@@ -391,6 +391,95 @@ export const PACK_CATEGORIES = [
 ];
 
 /**
+ * Die Sorten innerhalb einer Kategorie — „Kleidung“ allein sagt nicht, ob
+ * jemand vier Hemden oder viermal dieselbe Jeans dabei hat.
+ *
+ * Sie hängen bewusst an der Kategorie und stehen nicht in einer gemeinsamen
+ * Liste: „Sneaker“ unter Hygiene wäre ein Tippfehler, den niemand bemerkt,
+ * und eine Auswahl aus achtzig Sorten wäre keine Auswahl mehr. Was hier steht,
+ * ist deshalb kurz gehalten — es soll die Frage „was genau ist das“ mit einem
+ * Tipp beantworten, nicht jeden Gegenstand der Welt benennen. Was nicht
+ * dabeisteht, bleibt ohne Sorte: die Angabe ist freiwillig, und die Zeile ist
+ * auch ohne sie vollständig.
+ *
+ * „Sonstiges“ bekommt keine — was dort landet, hat sich ja gerade keiner
+ * Sorte fügen wollen.
+ */
+export const PACK_SUBCATEGORIES = {
+  documents: [
+    { id: 'passport', label: 'Ausweis & Pass' },
+    { id: 'ticket', label: 'Ticket' },
+    { id: 'booking', label: 'Buchung' },
+    { id: 'insurance', label: 'Versicherung' },
+    { id: 'license', label: 'Führerschein' },
+    { id: 'money', label: 'Bargeld & Karten' },
+  ],
+  tech: [
+    { id: 'charger', label: 'Ladekabel' },
+    { id: 'powerbank', label: 'Powerbank' },
+    { id: 'adapter', label: 'Adapter' },
+    { id: 'headphones', label: 'Kopfhörer' },
+    { id: 'camera', label: 'Kamera' },
+    { id: 'device', label: 'Gerät' },
+  ],
+  hygiene: [
+    { id: 'teeth', label: 'Zahnpflege' },
+    { id: 'shower', label: 'Duschzeug' },
+    { id: 'hair', label: 'Haarpflege' },
+    { id: 'care', label: 'Pflege & Creme' },
+    { id: 'shave', label: 'Rasur' },
+    { id: 'towel', label: 'Handtuch' },
+  ],
+  meds: [
+    { id: 'pills', label: 'Medikament' },
+    { id: 'painkiller', label: 'Schmerzmittel' },
+    { id: 'plaster', label: 'Pflaster & Verband' },
+    { id: 'sun', label: 'Sonnenschutz' },
+    { id: 'insect', label: 'Insektenschutz' },
+    { id: 'stomach', label: 'Magen & Darm' },
+  ],
+  shoes: [
+    { id: 'sneaker', label: 'Sneaker' },
+    { id: 'sandals', label: 'Sandalen' },
+    { id: 'flipflops', label: 'Badelatschen' },
+    { id: 'hiking', label: 'Wanderschuhe' },
+    { id: 'smart', label: 'Elegante Schuhe' },
+    { id: 'boots', label: 'Stiefel' },
+  ],
+  trips: [
+    { id: 'backpack', label: 'Rucksack' },
+    { id: 'bottle', label: 'Trinkflasche' },
+    { id: 'raingear', label: 'Regenschutz' },
+    { id: 'guide', label: 'Karte & Führer' },
+    { id: 'binoculars', label: 'Fernglas' },
+    { id: 'snack', label: 'Proviant' },
+  ],
+  beach: [
+    { id: 'beachtowel', label: 'Strandtuch' },
+    { id: 'sunglasses', label: 'Sonnenbrille' },
+    { id: 'hat', label: 'Sonnenhut' },
+    { id: 'snorkel', label: 'Schnorchel' },
+    { id: 'float', label: 'Luftmatratze' },
+    { id: 'toys', label: 'Strandspielzeug' },
+  ],
+  clothing: [
+    { id: 'tshirt', label: 'T-Shirt' },
+    { id: 'shirt', label: 'Hemd & Bluse' },
+    { id: 'pullover', label: 'Pullover' },
+    { id: 'jacket', label: 'Jacke' },
+    { id: 'longpants', label: 'Lange Hose' },
+    { id: 'shortpants', label: 'Kurze Hose' },
+    { id: 'dress', label: 'Kleid & Rock' },
+    { id: 'underwear', label: 'Unterwäsche' },
+    { id: 'socks', label: 'Socken' },
+    { id: 'sleepwear', label: 'Schlafanzug' },
+    { id: 'swimwear', label: 'Badesachen' },
+    { id: 'sportswear', label: 'Sportsachen' },
+  ],
+  other: [],
+};
+
+/**
  * Wie weit ein Eintrag ist — in der Reihenfolge, in der ein Ding durch die
  * Woche vor der Abfahrt wandert: es steht auf der Liste, muss vielleicht noch
  * gekauft oder gewaschen werden, liegt dann bereit und liegt am Ende im
@@ -421,6 +510,11 @@ export const PACK_BAGS = [
 export const PACK_CATEGORY_BY_ID = Object.fromEntries(PACK_CATEGORIES.map((c) => [c.id, c]));
 export const PACK_STATUS_BY_ID = Object.fromEntries(PACK_STATUSES.map((s) => [s.id, s]));
 export const PACK_BAG_BY_ID = Object.fromEntries(PACK_BAGS.map((b) => [b.id, b]));
+// Erst die Kategorie, dann die Sorte: dieselbe Kennung kann in zwei
+// Kategorien vorkommen, ohne dass die eine die andere trifft.
+const PACK_SUB_BY_ID = Object.fromEntries(
+  Object.entries(PACK_SUBCATEGORIES).map(([cat, list]) => [cat, Object.fromEntries(list.map((s) => [s.id, s]))]),
+);
 
 // Aus einer Sicherungskopie, von einem älteren Gerät oder aus einer künftigen
 // Fassung kann ein Wert kommen, den diese hier nicht kennt. Gelesen wird
@@ -430,6 +524,35 @@ export const packCategory = (item) => (PACK_CATEGORY_BY_ID[item?.category] ? ite
 export const packStatus = (item) => (PACK_STATUS_BY_ID[item?.status] ? item.status : 'open');
 export const packBag = (item) => (PACK_BAG_BY_ID[item?.bag] ? item.bag : 'none');
 export const packItemPacked = (item) => packStatus(item) === 'packed';
+
+/** Die Sorten, die zu einer Kategorie gehören — leer, wo es keine gibt. */
+export const packSubs = (categoryId) => PACK_SUBCATEGORIES[categoryId] || [];
+
+/**
+ * Die Sorte wird immer gegen die Kategorie geprüft, in der sie steht. Das
+ * erledigt zwei Fälle mit derselben Zeile: eine unbekannte Sorte (aus einer
+ * Sicherung, aus einer künftigen Fassung) und eine, die zu einer anderen
+ * Kategorie gehört — wer „T-Shirt“ nachträglich auf „Schuhe“ umstellt, hat
+ * danach keine Sorte mehr, statt einer falschen.
+ */
+export const packSub = (item) => (PACK_SUB_BY_ID[packCategory(item)]?.[item?.sub] ? item.sub : '');
+export const packSubLabel = (item) => PACK_SUB_BY_ID[packCategory(item)]?.[packSub(item)]?.label || '';
+
+/**
+ * Wie viele Stück ein Eintrag meint.
+ *
+ * Sechs T-Shirts sind sechs Zeilen wert, wenn sie sich unterscheiden — und
+ * eine, wenn nicht. Beides kommt vor, deshalb steht die Anzahl am Eintrag und
+ * nicht bloß in der Notiz: nur so kann die Übersicht „6 T-Shirts“ sagen, ohne
+ * zu raten, was in „6x T-Shirt (blau/weiß)“ die Zahl ist. Voreingestellt ist
+ * eins; alles Unlesbare zählt ebenfalls als eins, denn ein Eintrag ohne
+ * Anzahl ist immer noch ein Ding, das mitmuss.
+ */
+export const PACK_QTY_MAX = 99;
+export const packQty = (item) => {
+  const n = Math.floor(Number(item?.qty));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, PACK_QTY_MAX) : 1;
+};
 
 /** Wie viel schon im Koffer liegt — der Stand über der Liste. */
 export function packProgress(items) {
@@ -460,6 +583,59 @@ export function packItemsByCategory(items) {
 /** Nach Stand gruppiert — für den Blick „was fehlt noch“. */
 export function packItemsByStatus(items) {
   return groupPackItems(items, PACK_STATUSES, packStatus);
+}
+
+/**
+ * Die drei Sichten der Übersicht. „Beides“ steht vorn, weil die Frage meistens
+ * erst beim zweiten Hinsehen auf eine Tasche zielt; wer nur wissen will, was
+ * überhaupt mitkommt, soll nichts umstellen müssen.
+ */
+export const PACK_OVERVIEW_BAGS = [
+  // `where` steht unter der Zahl („14 von 22 Teilen im Handgepäck“) und sagt,
+  // worauf sie sich bezieht — die Auswahl darüber ist beim Lesen der Zahl
+  // längst wieder aus dem Blick.
+  { id: 'both', label: 'Beides', where: 'insgesamt' },
+  { id: 'hand', label: 'Handgepäck', where: 'im Handgepäck' },
+  { id: 'hold', label: 'Aufgabegepäck', where: 'im Aufgabegepäck' },
+];
+
+/**
+ * Die Übersicht: nicht welche Zeilen es gibt, sondern wie viel davon.
+ *
+ * Das ist der eine Ort in dieser App, an dem in Stücken gezählt wird und nicht
+ * in Einträgen — „vier lange Hosen“ ist die Auskunft, die man vor dem
+ * Zuklappen des Koffers sucht, und ob sie aus vier Zeilen kommt oder aus einer
+ * mit der Anzahl vier, ist dabei gleichgültig. Der Stand über der Liste zählt
+ * weiterhin Einträge: er misst das Abhaken, und abgehakt wird eine Zeile.
+ *
+ * Zurück kommt die volle Aufteilung nach Kategorie und Sorte, ohne die
+ * leeren Fächer — dieselbe Zurückhaltung wie bei den Gruppen der Liste. Was
+ * ohne Sorte eingetragen ist, verschwindet nicht, sondern steht am Ende seiner
+ * Kategorie: sonst wäre die Übersicht kleiner als die Liste und niemand
+ * wüsste, warum.
+ */
+export function packOverview(items, bagId = 'both') {
+  const shown = bagId === 'hand' || bagId === 'hold' ? items.filter((i) => packBag(i) === bagId) : items;
+
+  const tally = (list) => list.reduce((acc, i) => {
+    const n = packQty(i);
+    acc.total += n;
+    if (packItemPacked(i)) acc.done += n;
+    return acc;
+  }, { done: 0, total: 0 });
+
+  const categories = PACK_CATEGORIES
+    .map((cat) => {
+      const own = shown.filter((i) => packCategory(i) === cat.id);
+      const rows = [
+        ...packSubs(cat.id).map((sub) => ({ id: sub.id, label: sub.label, ...tally(own.filter((i) => packSub(i) === sub.id)) })),
+        { id: '', label: 'Ohne Angabe', ...tally(own.filter((i) => !packSub(i))) },
+      ].filter((r) => r.total);
+      return { ...cat, ...tally(own), rows };
+    })
+    .filter((c) => c.total);
+
+  return { bag: bagId, ...tally(shown), categories };
 }
 
 // ------------------------------------------------------------- Budget-Kennzahlen

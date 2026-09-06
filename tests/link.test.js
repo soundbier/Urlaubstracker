@@ -142,8 +142,8 @@ test('CSV: der Reiseplan steht als eigene Art dabei', () => {
 
 test('Die Packliste reist mit der Sicherung — ohne Datum und ohne Betrag', () => {
   const packItems = [
-    { id: 'pk1', title: 'Reisepass', category: 'documents', status: 'packed', bag: 'hand', note: '' },
-    { id: 'pk2', title: 'Handtücher', category: 'beach', status: 'wash', bag: 'hold', note: 'zwei große' },
+    { id: 'pk1', title: 'Reisepass', category: 'documents', sub: 'passport', qty: 1, status: 'packed', bag: 'hand', note: '' },
+    { id: 'pk2', title: 'Handtücher', category: 'beach', sub: 'beachtowel', qty: 2, status: 'wash', bag: 'hold', note: 'zwei große' },
   ];
   const back = parseImport(buildExport({ trip: TRIP, contributions: [], expenses: [], packItems }));
 
@@ -169,18 +169,41 @@ test('Ein Eintrag der Packliste ohne Titel ist kein Eintrag', () => {
   assert.equal(back.packItems[0].bag, 'none');
 });
 
+test('Sorte und Anzahl kommen geprüft zurück', () => {
+  const back = parseImport(buildExport({
+    trip: TRIP,
+    contributions: [],
+    expenses: [],
+    packItems: [
+      { id: 'pk1', title: 'Jeans', category: 'clothing', sub: 'longpants', qty: 3, status: 'open', bag: 'none' },
+      // Die Sorte gehört zu einer anderen Kategorie — sie mitzunehmen hieße,
+      // in der Übersicht Schuhe unter Kleidung zu zählen.
+      { id: 'pk2', title: 'Sandalen', category: 'clothing', sub: 'sandals', qty: 'zwei', status: 'open', bag: 'none' },
+      // Rutscht der Eintrag beim Einlesen nach „Sonstiges“, darf die Sorte
+      // nicht mitrutschen.
+      { id: 'pk3', title: 'Schlüssel', category: 'quatsch', sub: 'tshirt', status: 'open', bag: 'none' },
+    ],
+  }));
+
+  assert.deepEqual(back.packItems.map((p) => [p.sub, p.qty]), [
+    ['longpants', 3],
+    ['', 1],
+    ['', 1],
+  ]);
+});
+
 test('CSV: die Packliste steht als eigene Art dabei — dafür druckt man sie', () => {
   const csv = buildCsv({
     trip: TRIP,
     contributions: [],
     expenses: [],
     packItems: [
-      { id: 'pk1', title: 'Reisepass', category: 'documents', status: 'packed', bag: 'hand', note: '' },
-      { id: 'pk2', title: 'Handtücher', category: 'beach', status: 'wash', bag: 'hold', note: 'zwei große' },
+      { id: 'pk1', title: 'Reisepass', category: 'documents', sub: 'passport', status: 'packed', bag: 'hand', note: '' },
+      { id: 'pk2', title: 'Handtücher', category: 'beach', sub: 'beachtowel', qty: 2, status: 'wash', bag: 'hold', note: 'zwei große' },
     ],
   });
 
   assert.ok(csv.includes('"Packliste";"";"";"";"Dokumente"'), 'kein Datum, kein Betrag, aber die Kategorie');
-  assert.ok(csv.includes('"Reisepass · Eingepackt · Handgepäck"'));
-  assert.ok(csv.includes('"Handtücher · Noch zu waschen · Aufgabegepäck · zwei große"'));
+  assert.ok(csv.includes('"Reisepass · Ausweis & Pass · Eingepackt · Handgepäck"'), 'ohne Anzahl steht keine davor');
+  assert.ok(csv.includes('"2 × Handtücher · Strandtuch · Noch zu waschen · Aufgabegepäck · zwei große"'));
 });
