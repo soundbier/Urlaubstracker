@@ -379,10 +379,17 @@ export function planDayProgress(items, expenseById) {
  * hätte beiden Seiten schlecht gepasst.
  */
 export const PACK_CATEGORIES = [
-  { id: 'documents', label: 'Dokumente', icon: 'documents' },
+  // `short`: „Dokumente“ hat keine natürliche Trennstelle und bricht ohne
+  // verlässliche Worttrennung mitten im Wort um („Dokument-e“ ohne
+  // Trennzeichen) — Chromium hat nicht überall eine Silbentrennung parat.
+  { id: 'documents', label: 'Dokumente', short: 'Papiere', icon: 'documents' },
   { id: 'tech', label: 'Technik', icon: 'tech' },
   { id: 'hygiene', label: 'Hygiene', icon: 'hygiene' },
-  { id: 'meds', label: 'Reiseapotheke', icon: 'meds' },
+  // `short` nur hier: als einziger Name in dieser Liste ist „Reiseapotheke“
+  // allein schon breiter als eine Rasterspalte im Eingabe-Sheet und brach
+  // dort mitten im Wort um. Die Filterreiter und Gruppentitel zeigen weiter
+  // den vollen Namen — sie binden `label`, nicht `short`.
+  { id: 'meds', label: 'Reiseapotheke', short: 'Apotheke', icon: 'meds' },
   { id: 'shoes', label: 'Schuhe', icon: 'shoes' },
   { id: 'trips', label: 'Ausflüge', icon: 'backpack' },
   { id: 'beach', label: 'Strand', icon: 'beach' },

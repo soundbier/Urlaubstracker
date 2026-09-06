@@ -1330,6 +1330,7 @@ select.field__input { background-image: none; }
    gewänne sonst die spätere Regel und das Raster bekäme die Chip-Maße. */
 .chip.catgrid__item {
   justify-content: flex-start;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   min-height: var(--tap);
@@ -1339,9 +1340,27 @@ select.field__input { background-image: none; }
   border-radius: 0;
   font-size: var(--fs-sm);
   color: var(--text-muted);
+  /* Lange Bezeichnungen („Pflaster & Verband“, „Ausweis & Pass“) sind breiter
+     als eine Rasterzelle. Ungebrochen liefen sie in die Nachbarspalte und
+     überlagerten deren Text; hier dürfen sie stattdessen in eine zweite Zeile
+     umbrechen. */
+  white-space: normal;
+  line-height: 1.25;
+  text-align: left;
+  overflow-wrap: break-word;
+  /* Silbentrennung statt eines Bruchs mitten im Wort: „Reise-apotheke“ statt
+     „Reiseapot|heke“. Browser trennen zusammengesetzte deutsche Wörter damit
+     an einer Stelle, die man auch von Hand gewählt hätte. */
+  hyphens: auto;
 }
+/* Der Text sitzt in einer eigenen Spanne, weil ein bloßer Textknoten als
+   Flex-Kind eine eigene, unsichtbare Mindestbreite mitbringt — bei einem
+   einzelnen langen Wort ohne Umbruchstelle („Reiseapotheke“) genau die volle
+   Wortbreite. Ohne `min-width: 0` hier bricht der Umbruch oben also nie, und
+   das Wort läuft unverändert in die Nachbarspalte hinein. */
+.catgrid__label { min-width: 0; }
 .chip.catgrid__item.is-active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
-.chip.catgrid__item .icon { margin-left: 0; color: var(--text-faint); }
+.chip.catgrid__item .icon { margin-left: 0; margin-top: 1px; color: var(--text-faint); }
 .chip.catgrid__item.is-active .icon { color: var(--accent); }
 /* Auf sehr schmalen Geräten passt „Sonstiges“ mit Symbol sonst nicht in die
    Zelle und wird abgeschnitten. */
