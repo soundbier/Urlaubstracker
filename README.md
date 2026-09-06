@@ -22,7 +22,11 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
   Reiseapotheke, Schuhe, Ausflüge, Strand, Kleidung, Sonstiges), Stand (noch offen, noch zu kaufen,
   noch zu waschen, liegt bereit, eingepackt) und Gepäck (Hand- oder
   Aufgabegepäck) sortieren. Eigene Reiter für Handgepäck, Aufgabegepäck und
-  „Zu tun“.
+  „Zu tun“. Je Kategorie eine Sorte (T-Shirt, Lange Hose, Wanderschuhe …) und
+  je Eintrag eine Anzahl — beides freiwillig und blass an der Zeile.
+- **Übersicht der Packliste** — ein eigener Reiter, der in Stücken zählt statt
+  in Zeilen: „6 T-Shirts, 4 Hemden, 2 von 4 langen Hosen“, nach Kategorie und
+  Sorte, umschaltbar zwischen Handgepäck, Aufgabegepäck und beidem.
 - Ein Kostenpunkt am Programmpunkt wird sofort zur Vormerkung in der Kasse
   übernommen — dieselbe Vormerkung wie bei einer Ausgabe mit Zukunftsdatum.
 - **Finanzen** — zwei Reiter in einem Bereich: „Ausgaben“ (nach Tagen, mit

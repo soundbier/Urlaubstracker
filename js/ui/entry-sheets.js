@@ -1,10 +1,11 @@
 /** Die Eingabemasken: Ausgabe, Einzahlung, Bargeld, Programmpunkt, Packliste. */
-import { h, icon } from '../dom.js';
+import { h, icon, replace } from '../dom.js';
 import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
 import {
   CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson,
-  PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, packCategory, packStatus, packBag,
+  PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX,
+  packCategory, packStatus, packBag, packSub, packSubs, packQty,
 } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
@@ -94,7 +95,10 @@ function amountField(initialCents, currency) {
  * Detailzeile darunter noch anstupst.
  *
  * `list` ist voreingestellt die Ausgaben-Kategorie; die Packliste bringt ihre
- * eigene mit (siehe `PACK_CATEGORIES`).
+ * eigene mit (siehe `PACK_CATEGORIES`) und stellt ihre Sorten in dasselbe
+ * Raster — dreizehn frei umbrechende Chips waren fünf ungleiche Reihen und
+ * schoben alles Weitere aus der Maske. Ein Symbol haben die Sorten nicht; das
+ * Feld bleibt dann einfach leer statt einen Platzhalter zu tragen.
  */
 function categoryGrid(selectedId, onSelect, list = CATEGORIES) {
   const grid = h('div.catgrid');
@@ -103,7 +107,7 @@ function categoryGrid(selectedId, onSelect, list = CATEGORIES) {
       selectedId = c.id;
       buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
       onSelect(c.id);
-    } }, icon(c.icon, 16), c.short || c.label);
+    } }, c.icon ? icon(c.icon, 16) : null, c.short || c.label);
     b.classList.toggle('is-active', c.id === selectedId);
     return b;
   });
@@ -132,6 +136,32 @@ function chipRow(options, selectedId, onSelect) {
   });
   row.append(...buttons);
   return row;
+}
+
+/**
+ * Die Anzahl als Stufenschalter, nicht als Zahlenfeld.
+ *
+ * Es geht hier fast immer um zwei bis sechs — dafür ist ein Tastenfeld zu
+ * viel Weg, und die Tastatur des Geräts hätte sich über die halbe Maske
+ * gelegt. Derselbe Schalter wie bei den Kostenanteilen unter „Reisegruppe“:
+ * zwei Knöpfe, eine Zahl, keine Eingabe, die leer bleiben kann.
+ */
+function qtyStepper(value, onChange) {
+  const out = h('span.stepper__value', String(value));
+  const set = (n) => {
+    value = Math.max(1, Math.min(PACK_QTY_MAX, n));
+    out.textContent = String(value);
+    sync();
+    onChange(value);
+  };
+  const minus = h('button.stepper__btn', { type: 'button', 'aria-label': 'Eins weniger', onclick: () => set(value - 1) }, '−');
+  const plus = h('button.stepper__btn', { type: 'button', 'aria-label': 'Eins mehr', onclick: () => set(value + 1) }, '+');
+  const sync = () => {
+    minus.disabled = value <= 1;
+    plus.disabled = value >= PACK_QTY_MAX;
+  };
+  sync();
+  return h('div.stepper.stepper--qty', minus, out, plus);
 }
 
 /**
@@ -545,10 +575,12 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
 export function packItemSheet({ packItem = null, defaults = {} } = {}) {
   const editing = Boolean(packItem);
   let category = packItem ? packCategory(packItem) : defaults.category || 'clothing';
+  let sub = packItem ? packSub(packItem) : packSub({ category, sub: defaults.sub });
+  let qty = packItem ? packQty(packItem) : 1;
   let status = packItem ? packStatus(packItem) : defaults.status || 'open';
   let bag = packItem ? packBag(packItem) : defaults.bag || 'none';
   const title = h('input.field__input', { type: 'text', value: packItem?.title || '', placeholder: 'z. B. Reisepass', maxlength: 120, enterkeyhint: 'next' });
-  const note = h('input.field__input', { type: 'text', value: packItem?.note || '', placeholder: 'Menge, Marke, wo es liegt', maxlength: 120, enterkeyhint: 'done' });
+  const note = h('input.field__input', { type: 'text', value: packItem?.note || '', placeholder: 'Marke, Farbe, wo es liegt', maxlength: 120, enterkeyhint: 'done' });
 
   return openSheet({
     title: editing ? 'Eintrag bearbeiten' : 'Was muss mit?',
@@ -565,12 +597,28 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
           return;
         }
         titleError.textContent = '';
-        close({ action: 'save', values: { title: t, category, status, bag, note: note.value } });
+        close({ action: 'save', values: { title: t, category, sub, qty, status, bag, note: note.value } });
       };
+
+      // Die Sorten hängen an der Kategorie und werden deshalb neu gesetzt,
+      // wenn die Kategorie wechselt — mitsamt der Wahl selbst: „T-Shirt“ unter
+      // „Schuhe“ wäre keine Angabe mehr, sondern ein Fehler mit Etikett.
+      const subBox = h('div');
+      const subField = field('Welche Sorte?', subBox);
+      const renderSubs = () => {
+        const list = packSubs(category);
+        subField.hidden = !list.length;
+        replace(subBox, list.length
+          ? categoryGrid(sub, (id) => { sub = id; }, [{ id: '', label: 'Ohne Angabe' }, ...list])
+          : null);
+      };
+      renderSubs();
 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label.field', h('span.field__label', 'Was ist es?'), title, titleError),
-        field('Wohin gehört es?', categoryGrid(category, (id) => { category = id; }, PACK_CATEGORIES)),
+        field('Wie viele?', qtyStepper(qty, (n) => { qty = n; })),
+        field('Wohin gehört es?', categoryGrid(category, (id) => { category = id; sub = ''; renderSubs(); }, PACK_CATEGORIES)),
+        subField,
         field('Wie weit ist es?', chipRow(PACK_STATUSES, status, (id) => { status = id; })),
         field('In welches Gepäck?', chipRow(PACK_BAGS, bag, (id) => { bag = id; })),
         field('Notiz', note),

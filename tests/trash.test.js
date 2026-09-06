@@ -87,7 +87,7 @@ test('die Kopie nimmt Reiseplan und Packliste mit', () => {
   // steht.
   store.clear();
   const planItems = [{ id: 'pl1', date: '2026-07-02', time: '', title: 'Museum', category: 'activity', location: '', note: '', payer: 'pot', linkedExpenseId: null, done: false }];
-  const packItems = [{ id: 'pk1', title: 'Reisepass', category: 'documents', status: 'open', bag: 'hand', note: '' }];
+  const packItems = [{ id: 'pk1', title: 'Reisepass', category: 'documents', sub: '', qty: 1, status: 'open', bag: 'hand', note: '' }];
   keepCopy({ trip, contributions: [], expenses, cashOuts: [], planItems, packItems });
 
   const copy = lastCopy();

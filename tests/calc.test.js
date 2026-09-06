@@ -11,6 +11,7 @@ import {
   cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
   planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip,
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
+  packSub, packSubLabel, packSubs, packQty, packOverview,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -619,4 +620,76 @@ test('Nach Stand gruppiert steht das Offene beieinander', () => {
   const groups = packItemsByStatus(items);
   assert.deepEqual(groups.map((g) => g.id), ['open', 'buy', 'wash', 'packed']);
   assert.deepEqual(groups[0].items.map((i) => i.title), ['Kopfhörer'], 'ohne Stand heißt offen');
+});
+
+test('Eine Sorte gilt nur in ihrer Kategorie', () => {
+  // Die Sorte hängt an der Kategorie, nicht an einer gemeinsamen Liste.
+  // „Sneaker“ an einer Hose wäre sonst eine Angabe, die die Übersicht
+  // ernst nimmt und niemand gemacht hat.
+  assert.equal(packSub({ category: 'clothing', sub: 'tshirt' }), 'tshirt');
+  assert.equal(packSub({ category: 'shoes', sub: 'tshirt' }), '', 'T-Shirt ist keine Sorte Schuh');
+  assert.equal(packSub({ category: 'clothing', sub: 'quatsch' }), '');
+  assert.equal(packSub({ category: 'clothing' }), '', 'ohne Sorte ist ein gültiger Zustand');
+  // Eine unbekannte Kategorie wird zu „Sonstiges“ — und das hat keine Sorten.
+  assert.equal(packSub({ category: 'quatsch', sub: 'tshirt' }), '');
+  assert.equal(packSub({ category: 'other', sub: 'tshirt' }), '');
+
+  assert.equal(packSubLabel({ category: 'shoes', sub: 'hiking' }), 'Wanderschuhe');
+  assert.equal(packSubLabel({ category: 'shoes' }), '', 'ohne Sorte steht nichts an der Zeile');
+
+  assert.equal(packSubs('other').length, 0);
+  assert.equal(packSubs('quatsch').length, 0, 'auch eine unbekannte Kategorie liefert eine Liste');
+  assert.ok(packSubs('clothing').some((x) => x.label === 'Lange Hose'));
+});
+
+test('Ohne Anzahl ist ein Eintrag ein Stück', () => {
+  assert.equal(packQty({ qty: 4 }), 4);
+  assert.equal(packQty({}), 1, 'Einträge aus der Zeit vor der Anzahl zählen als eins');
+  assert.equal(packQty({ qty: 0 }), 1);
+  assert.equal(packQty({ qty: -3 }), 1);
+  assert.equal(packQty({ qty: 'sechs' }), 1);
+  assert.equal(packQty({ qty: 2.7 }), 2, 'halbe Hosen gibt es nicht');
+  assert.equal(packQty({ qty: 5000 }), 99, 'nach oben gedeckelt');
+});
+
+test('Die Übersicht zählt Stücke, nicht Zeilen', () => {
+  const items = [
+    { id: 'a', title: 'T-Shirts', category: 'clothing', sub: 'tshirt', qty: 6, status: 'packed' },
+    { id: 'b', title: 'Jeans', category: 'clothing', sub: 'longpants', status: 'packed' },
+    { id: 'c', title: 'Chino', category: 'clothing', sub: 'longpants', status: 'open' },
+    { id: 'd', title: 'Lieblingspulli', category: 'clothing', status: 'open' },
+    { id: 'e', title: 'Wanderschuhe', category: 'shoes', sub: 'hiking', status: 'packed' },
+  ];
+  const { done, total, categories } = packOverview(items);
+
+  // Fünf Zeilen, aber zehn Dinge: genau dafür gibt es die Anzahl.
+  assert.deepEqual({ done, total }, { done: 8, total: 10 });
+  assert.deepEqual(categories.map((c) => c.id), ['shoes', 'clothing'], 'die Reihenfolge der Kategorienliste');
+
+  const clothing = categories.find((c) => c.id === 'clothing');
+  assert.deepEqual(clothing.rows.map((r) => [r.label, r.done, r.total]), [
+    ['T-Shirt', 6, 6],
+    ['Lange Hose', 1, 2],
+    // Was ohne Sorte eingetragen ist, verschwindet nicht, sondern steht am
+    // Ende seiner Kategorie — sonst wäre die Übersicht kleiner als die Liste.
+    ['Ohne Angabe', 0, 1],
+  ], 'leere Sorten fallen weg, die Reihenfolge ist die der Liste');
+  assert.deepEqual({ done: clothing.done, total: clothing.total }, { done: 7, total: 9 });
+});
+
+test('Die Übersicht lässt sich auf eine Tasche eingrenzen', () => {
+  const items = [
+    { id: 'a', title: 'Reisepass', category: 'documents', sub: 'passport', bag: 'hand', status: 'packed' },
+    { id: 'b', title: 'Hemden', category: 'clothing', sub: 'shirt', qty: 4, bag: 'hold', status: 'open' },
+    { id: 'c', title: 'Zahnbürste', category: 'hygiene', sub: 'teeth', status: 'open' },
+  ];
+
+  assert.equal(packOverview(items, 'both').total, 6, 'ohne Tasche zählt alles mit, auch das Unzugeordnete');
+  assert.deepEqual(
+    packOverview(items, 'hand').categories.map((c) => c.id),
+    ['documents'],
+    'was in keiner Tasche liegt, taucht in keiner Tasche auf',
+  );
+  assert.equal(packOverview(items, 'hold').total, 4, 'die vier Hemden sind vier Stücke');
+  assert.deepEqual(packOverview([], 'both'), { bag: 'both', done: 0, total: 0, categories: [] });
 });
