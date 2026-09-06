@@ -8,9 +8,9 @@
  * zeigt, verschweigt genau die Lücken, die er eigentlich sichtbar machen soll.
  */
 import { h, icon } from '../dom.js';
-import { planItemsByDay, todayISO } from '../calc.js';
+import { planItemsByDay, planDayProgress, todayISO } from '../calc.js';
 import { dayLabel } from '../format.js';
-import { planItemRow } from '../ui/parts.js';
+import { planItemRow, bar } from '../ui/parts.js';
 
 export function renderPlan(state, actions) {
   const { trip, planItems, expenses } = state;
@@ -28,12 +28,21 @@ export function renderPlan(state, actions) {
 }
 
 function dayGroup(group, trip, today, expenseById, actions) {
+  const { done, total } = planDayProgress(group.items, expenseById);
   return h('section.daygroup',
     h('header.daygroup__head',
       h('div.daygroup__line',
         h('h3.daygroup__title', dayLabel(group.date, today)),
         h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: group.date }) }, icon('plus', 16), 'Eintragen'),
       ),
+      // Der Fortschritt eines Tages, nicht nur die Liste selbst: auf einen
+      // Blick über alle Reisetage, wo schon abgehakt ist und wo noch nichts
+      // stattgefunden hat. Blass wie jede Meta-Auskunft hier — Farbe bliebe
+      // dem Verdikt auf „Heute“ vorbehalten.
+      total ? h('div.daygroup__progress',
+        h('p.daygroup__sub', `${done} von ${total} erledigt`),
+        bar(done / total, 'neutral'),
+      ) : null,
     ),
     group.items.length
       ? h('div.list', ...group.items.map((item) => planItemRow(item, trip, {

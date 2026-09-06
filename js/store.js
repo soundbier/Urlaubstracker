@@ -504,7 +504,7 @@ export async function deleteExpense(id) {
  * Anfang an, auch für einen noch nicht besuchten, aber schon teuren
  * Programmpunkt — genau wie bei jeder anderen Vormerkung.
  */
-export async function addPlanItem({ date, time, title, category, note, payer, amount }) {
+export async function addPlanItem({ date, time, title, category, note, payer, amount, location }) {
   const now = Date.now();
   const row = {
     id: newId(),
@@ -512,6 +512,7 @@ export async function addPlanItem({ date, time, title, category, note, payer, am
     time: time || '',
     title: String(title || '').trim(),
     category: category || 'other',
+    location: (location || '').trim(),
     note: (note || '').trim(),
     payer: payer || POT,
     linkedExpenseId: null,

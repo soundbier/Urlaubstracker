@@ -1,9 +1,9 @@
 /**
- * Startbildschirm: eine große Zahl, damit man den Blick aufs Geld in zwei
- * Sekunden erledigt hat und wieder Urlaub machen kann.
+ * Startbildschirm: „Was steht heute an?“ — das Programm des Tages zuerst,
+ * die Kasse als weiterhin wichtige, aber zweite Frage darunter.
  */
 import { h, icon } from '../dom.js';
-import { computeBudget, plannedOnly, planItemsOnDay, todayISO, MAX_PEOPLE } from '../calc.js';
+import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, daymark } from '../ui/parts.js';
 
@@ -12,6 +12,24 @@ import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, ba
 // Amber bzw. Karmesin; „gut“ braucht dafür keine eigene Farbe.
 const TONE = { good: 'neutral', tight: 'warn', over: 'over' };
 
+/**
+ * Welcher Tag im Programm-Abschnitt gerade offen ist — wie der Filter unter
+ * „Ausgaben“ nur für die laufende Sitzung gemerkt, nicht gespeichert: das ist
+ * eine Frage der Ansicht, keine Angabe zur Reise. Voreingestellt ist der
+ * heutige Tag, in den Reisezeitraum gezwungen — vor der Abfahrt zeigt sich
+ * so gleich der erste Reisetag, nach der Rückkehr der letzte.
+ */
+let selectedDate = null;
+
+function resolveSelectedDate(trip) {
+  selectedDate = clampDateToTrip(selectedDate || todayISO(), trip);
+  return selectedDate;
+}
+
+function setSelectedDate(date, trip) {
+  selectedDate = clampDateToTrip(date, trip);
+}
+
 export function renderToday(state, actions) {
   const { trip, expenses, contributions, planItems } = state;
   const knowsMe = trip.people.some((p) => p.id === state.myPersonId);
@@ -19,8 +37,6 @@ export function renderToday(state, actions) {
   const b = computeBudget({ trip, contributions, expenses, today });
   const cur = trip.currency;
   const todays = expenses.filter((e) => e.date === today && !e.planned);
-  const todaysPlan = planItemsOnDay(planItems, today);
-  const expenseById = new Map(expenses.map((e) => [e.id, e]));
   // Fällig heißt: das Datum ist erreicht, der Haken fehlt noch. Alles, was
   // erst nächste Woche dran ist, steht unter „Ausgaben“ — hier wäre es eine
   // zweite Kopie derselben Liste und nichts, was heute jemand anfassen müsste.
@@ -30,9 +46,24 @@ export function renderToday(state, actions) {
   const overdueCount = due.filter((e) => e.date < today).length;
   const rowOpts = { onEdit: actions.editExpense, onRepeat: actions.repeatExpense, me: state.myPersonId };
 
+  const selected = resolveSelectedDate(trip);
+  const dayItems = planItemsOnDay(planItems, selected);
+  const expenseById = new Map(expenses.map((e) => [e.id, e]));
+
   return h('div.view',
-    hero(b, cur, actions, today),
+    // Das Programm des Tages ist jetzt die erste Frage der Seite — dafür
+    // steht die Kasse, bislang der Aufmacher, ab der Trennlinie weiter unten.
+    dayNav(trip, selected, today, actions),
+    h('section.section',
+      sectionTitle('Programm', h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: selected }) }, icon('plus', 16), 'Eintragen')),
+      dayItems.length
+        ? h('div.list', ...dayItems.map((item) => planItemRow(item, trip, { onEdit: actions.editPlanItem, onToggle: actions.togglePlanItem, expenseById })))
+        : h('p.section__note', 'Für diesen Tag ist noch nichts geplant.'),
+    ),
+
+    sectionTitle('Kasse'),
     knowsMe ? null : whoAmI(trip, actions),
+    hero(b, cur, actions, today),
     // Die drei Kennzahlen beantworten, was die große Zahl offenlässt: wie viel
     // insgesamt noch da ist, wie lange es reichen muss, und ob ihr vor oder
     // hinter dem Plan liegt. Jede Zahl steht genau einmal auf dieser Seite.
@@ -58,21 +89,9 @@ export function renderToday(state, actions) {
         { tone: b.elapsedDays && b.buffer < 0 ? 'over' : '' },
       ),
     ),
-    // Die Handlungsebene setzt bewusst größeren Abstand zur Kennzahlreihe
-    // darüber ab: dort endete der Zustand, hier beginnt, was zu tun ist.
-    todaysPlan.length
-      ? h('section.section', { class: 'section--action' },
-          sectionTitle('Programm heute'),
-          h('div.list', ...todaysPlan.map((item) => planItemRow(item, trip, {
-            onEdit: actions.editPlanItem,
-            onToggle: actions.togglePlanItem,
-            expenseById,
-          }))),
-        )
-      : null,
 
     due.length
-      ? h('section.section', { class: todaysPlan.length ? '' : 'section--action' },
+      ? h('section.section', { class: 'section--action' },
           sectionTitle(
             'Fällig',
             h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur)),
@@ -83,7 +102,7 @@ export function renderToday(state, actions) {
         )
       : null,
 
-    h('section.section', { class: !todaysPlan.length && !due.length ? 'section--action' : '' },
+    h('section.section', { class: due.length ? '' : 'section--action' },
       sectionTitle(
         'Heute eingetragen',
         todays.length ? h('span.section__meta.section__meta--amount', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
@@ -99,6 +118,41 @@ export function renderToday(state, actions) {
       h('p', 'Der Urlaub ist vorbei. Wer wem noch was überweist, steht unter ', h('strong', 'Budget'), '.'),
       h('button.btn.btn--ghost', { type: 'button', onclick: () => actions.goto('budget') }, 'Zur Abrechnung'),
     ) : null,
+  );
+}
+
+/**
+ * Die Tageswahl über dem Programm: „Tag X von Y“ als Augenbraue, das Datum
+ * darunter in der Serife — dieselbe Rolle, die früher nur der Tagesstempel im
+ * Kassenblock trug, jetzt aber blätterbar, mit Pfeilen auf beiden Seiten. Der
+ * „Heute“-Knopf taucht nur auf, wenn man tatsächlich woanders hingeblättert
+ * hat und ein echtes Heute im Reisezeitraum liegt, zu dem es sich lohnt,
+ * zurückzuspringen.
+ */
+function dayNav(trip, selected, today, actions) {
+  const dayIndex = daysInclusive(trip.startDate, selected);
+  const totalDays = daysInclusive(trip.startDate, trip.endDate);
+  const atStart = selected <= trip.startDate;
+  const atEnd = selected >= trip.endDate;
+  const canJumpToday = today !== selected && today >= trip.startDate && today <= trip.endDate;
+
+  const go = (delta) => { setSelectedDate(addDays(selected, delta), trip); actions.rerender(); };
+  const jumpToday = () => { setSelectedDate(today, trip); actions.rerender(); };
+
+  return h('div.daynav',
+    h('button.icon-btn.daynav__arrow.daynav__arrow--prev', {
+      type: 'button', disabled: atStart, title: 'Vorheriger Tag', 'aria-label': 'Vorheriger Tag', onclick: () => go(-1),
+    }, icon('chevron', 20)),
+    h('div.daynav__main',
+      h('div.daynav__row',
+        h('p.daynav__eyebrow', `Tag ${String(dayIndex).padStart(2, '0')} / ${totalDays}`),
+        canJumpToday ? h('button.btn.btn--small', { type: 'button', onclick: jumpToday }, 'Heute') : null,
+      ),
+      h('p.daynav__title', `${weekdayShort(selected)}, ${dayMonth(selected)}`),
+    ),
+    h('button.icon-btn.daynav__arrow.daynav__arrow--next', {
+      type: 'button', disabled: atEnd, title: 'Nächster Tag', 'aria-label': 'Nächster Tag', onclick: () => go(1),
+    }, icon('chevron', 20)),
   );
 }
 
@@ -170,9 +224,9 @@ function hero(b, cur, actions, today) {
   // Tinte: eine rote Zahl quer über den halben Schirm liest sich wie ein
   // Fehler, dabei ist „heute drüber“ im Urlaub der halbe Normalfall.
   return h('div.hero', { class: `hero--${tone}` },
-    // Der eine Moment, an dem die App aussieht wie ein Reisetagebuch und nicht
-    // wie ein Haushaltsbuch: ein Tagesstempel, kein zweites Mal „Tag X von Y“
-    // aus der Kopfzeile — hier steht zusätzlich das Datum, in eigenem Register.
+    // Der Tagesstempel gilt hier immer dem echten Heute, nicht dem Tag, der im
+    // Programm oben gerade aufgeschlagen ist — die Kasse rechnet mit dem
+    // Kalender, nicht mit der Blätterei.
     daymark(`Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays}`, `${weekdayShort(today)}, ${dayMonth(today)}`),
     h('p.hero__label', b.leftToday >= 0 ? 'Heute noch übrig' : 'Heute schon drüber'),
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),

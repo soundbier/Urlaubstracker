@@ -9,7 +9,7 @@ import {
   tripPhase, POT, MAX_PEOPLE, PERSON_COLORS, nextPersonColor, personEntryCount,
   normalizeShares, averageShare,
   cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
-  planItemsOnDay, planItemsByDay, planItemDone,
+  planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -546,4 +546,21 @@ test('An wem ein Programmpunkt hängt, zählt beim Entfernen einer Person mit', 
   const planItems = [{ id: 'p1', payer: 'lukas' }];
   assert.equal(personEntryCount('lukas', { planItems }), 1);
   assert.equal(personEntryCount('marie', { planItems }), 0);
+});
+
+test('Ein Datum bleibt für die Tageswahl im Reisezeitraum', () => {
+  assert.equal(clampDateToTrip('2026-06-20', TRIP), TRIP.startDate, 'vor der Abfahrt: der erste Tag');
+  assert.equal(clampDateToTrip('2026-08-01', TRIP), TRIP.endDate, 'nach der Rückkehr: der letzte Tag');
+  assert.equal(clampDateToTrip('2026-07-05', TRIP), '2026-07-05', 'mittendrin bleibt unverändert');
+});
+
+test('Tagesfortschritt im Reiseplan zählt über planItemDone, nicht über das eigene Feld', () => {
+  const expenseById = new Map([['e1', { id: 'e1', planned: false, fromPlan: true }]]);
+  const items = [
+    { id: 'p1', done: true },
+    { id: 'p2', done: false, linkedExpenseId: 'e1' }, // anderswo schon bezahlt
+    { id: 'p3', done: false },
+  ];
+  assert.deepEqual(planDayProgress(items, expenseById), { done: 2, total: 3 });
+  assert.deepEqual(planDayProgress([], expenseById), { done: 0, total: 0 });
 });

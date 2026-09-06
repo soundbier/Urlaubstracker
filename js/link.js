@@ -114,6 +114,7 @@ export function parseImport(text) {
       title: String(p.title || '').trim() || 'Programmpunkt',
       category: CATEGORY_BY_ID[p.category] ? p.category : 'other',
       time: /^\d{2}:\d{2}$/.test(p.time) ? p.time : '',
+      location: String(p.location || '').trim(),
       note: String(p.note || '').trim(),
       payer: validPayer(p.payer) ? p.payer : POT,
       done: p.done === true,
@@ -170,7 +171,7 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   // Kostenpunkt hat kein Geld, das in dieser Tabelle sonst fehlen würde.
   for (const p of [...planItems].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const linked = p.linkedExpenseId ? expenses.find((e) => e.id === p.linkedExpenseId) : null;
-    const notiz = [p.title, p.note].filter(Boolean).join(' · ');
+    const notiz = [p.title, p.location, p.note].filter(Boolean).join(' · ');
     lines.push([
       'Programm', p.date, p.time || '', linked ? money(linked.amount) : '',
       categoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,

@@ -199,6 +199,7 @@ strong { font-weight: 600; }
 .summary__label,
 .field__label,
 .daterow__label,
+.daynav__eyebrow,
 .topbar__sub {
   font-size: var(--fs-eyebrow);
   font-weight: 600;
@@ -398,6 +399,29 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   background: var(--border);
 }
 
+/* ------------------------------------------------------------- Die Tageswahl */
+
+/*
+ * Der Kopf von „Heute“: welcher Tag gerade aufgeschlagen ist, blätterbar in
+ * beide Richtungen. Dieselbe Zweiteilung wie überall — Augenbraue für die
+ * Einordnung im Reisezeitraum, Serife fürs Datum selbst —, nur jetzt mit
+ * Pfeilen an den Seiten statt als reine Auskunft.
+ */
+.daynav { display: flex; align-items: center; gap: var(--sp-2); }
+.daynav__arrow { flex: none; }
+/* Derselbe Pfeil wie in den Einstellungen (`.srow__chevron`), nur in beide
+   Richtungen gedreht statt immer nach rechts. */
+.daynav__arrow--prev .icon { transform: rotate(90deg); }
+.daynav__arrow--next .icon { transform: rotate(-90deg); }
+.daynav__main { flex: 1; min-width: 0; text-align: center; }
+.daynav__row { display: flex; align-items: baseline; justify-content: center; gap: var(--sp-3); }
+.daynav__title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
 /* ----------------------------------------------------- Die große Zahl */
 
 /*
@@ -593,9 +617,30 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   color: inherit;
 }
 .prow__open:active { background: var(--surface-2); }
+/*
+ * Die Uhrzeit im Reiseplan steht links in einer eigenen Spalte, durch eine
+ * Haarlinie vom Rest getrennt — wie im Fahrplan, dem die App ihre Kopfzeile
+ * schon entlehnt (`daymark`). Ohne Uhrzeit steht ein Gedankenstrich da, keine
+ * leere Lücke: der Programmpunkt bleibt trotzdem Teil der Reihe.
+ */
+.trow__time {
+  flex: none;
+  width: 3.2em;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--sp-3);
+  border-right: 1px solid var(--border);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
 .prow__done {
   flex: none;
+  align-self: center;
   width: 44px;
+  height: 44px;
   display: grid;
   place-items: center;
   border: 0;
@@ -614,6 +659,10 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
    ohne Rahmen: zwanzig umrandete Pillen in einer Liste sind zwanzig kleine
    Kästen. Was sie vom Text daneben abhebt, ist die Sperrung. */
 .tag { font-size: var(--fs-xs); color: var(--text-faint); }
+/* Der Ort eines Programmpunkts: derselbe blasse Text wie jedes Beiwort, nur
+   mit dem Tropfen davor, klein genug, um sich der Zeile unterzuordnen. */
+.row__place { display: inline-flex; align-items: center; gap: 3px; }
+.row__place .icon { color: var(--text-faint); }
 .tag--due {
   font-size: var(--fs-eyebrow);
   font-weight: 600;
@@ -664,6 +713,12 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .daygroup__sub { font-size: var(--fs-xs); color: var(--text-faint); }
 .daygroup__sub.is-over { color: var(--text-muted); font-weight: 500; }
 .daygroup__total { font-weight: 600; }
+/* Der Tagesfortschritt im Reiseplan: eine Zahl, ein Haarlinien-Balken —
+   dieselbe blasse Auskunft wie der Kassenbalken auf „Heute“, nur ohne Farbe:
+   hier gibt es kein Verdikt, nur einen Stand. */
+.daygroup__progress { display: flex; align-items: center; gap: var(--sp-3); margin-top: 2px; }
+.daygroup__progress .daygroup__sub { flex: none; white-space: nowrap; }
+.daygroup__progress .bar { flex: 1; }
 
 /* --------------------------------------------------------------- Balken */
 
@@ -1115,6 +1170,7 @@ select.field__input { background-image: none; }
 }
 .icon-btn:active { background: var(--surface-2); }
 .icon-btn.is-active { color: var(--accent); }
+.icon-btn:disabled { opacity: 0.3; }
 
 /*
  * Auswahl in Sheets (Zahler, Person): Haarlinie statt gefüllter Pille. Gewählt
@@ -1215,6 +1271,14 @@ select.field__input { background-image: none; }
   .chip.catgrid__item { font-size: var(--fs-xs); gap: 4px; }
   .chip.catgrid__item .icon { width: 14px; height: 14px; }
 }
+
+/* Die Pfeile zum Verschieben eines Programmpunkts um einen Tag, links und
+   rechts von der Datumswahl — derselbe gedrehte Pfeil wie in der Tageswahl
+   auf „Heute“ (`.daynav__arrow`). */
+.daterow-shift { display: flex; align-items: center; gap: var(--sp-2); }
+.daterow-shift > .daterow { flex: 1; min-width: 0; }
+.daterow-shift > .icon-btn:first-child .icon { transform: rotate(90deg); }
+.daterow-shift > .icon-btn:last-child .icon { transform: rotate(-90deg); }
 
 .daterow { display: flex; flex-direction: column; gap: var(--sp-2); }
 .daterow__quick { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 44px; gap: var(--sp-3); border-bottom: 1px solid var(--border); }

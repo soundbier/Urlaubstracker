@@ -104,8 +104,8 @@ test('Was exportiert wurde, lässt sich wieder einlesen', () => {
 test('Der Reiseplan reist mit der Sicherung — auch ohne eigenen Betrag', () => {
   const expenses = [{ id: 'e1', date: '2026-07-05', amount: 4500, category: 'activity', payer: POT, note: 'Trollstigen', planned: true, fromPlan: false }];
   const planItems = [
-    { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', note: '', payer: POT, linkedExpenseId: 'e1', done: false },
-    { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang am Hafen', category: 'activity', note: '', payer: POT, linkedExpenseId: null, done: false },
+    { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', location: 'Andalsnes', note: '', payer: POT, linkedExpenseId: 'e1', done: false },
+    { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang am Hafen', category: 'activity', location: '', note: '', payer: POT, linkedExpenseId: null, done: false },
   ];
   const back = parseImport(buildExport({ trip: TRIP, contributions: [], expenses, planItems }));
 
@@ -131,10 +131,11 @@ test('CSV: der Reiseplan steht als eigene Art dabei', () => {
     contributions: [],
     expenses: [{ id: 'e1', date: '2026-07-05', amount: 4500, category: 'activity', payer: POT, note: '' }],
     planItems: [
-      { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', note: '', payer: POT, linkedExpenseId: 'e1' },
-      { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang', category: 'activity', note: 'am Hafen', payer: POT, linkedExpenseId: null },
+      { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', location: 'Andalsnes', note: '', payer: POT, linkedExpenseId: 'e1' },
+      { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang', category: 'activity', location: '', note: 'am Hafen', payer: POT, linkedExpenseId: null },
     ],
   });
   assert.ok(csv.includes('"Programm";"2026-07-05";"15:00";"45,00"'), 'verknüpfter Kostenpunkt steht dabei');
-  assert.ok(csv.includes('"Spaziergang · am Hafen"'), 'Titel und Notiz zusammen, ohne Betrag');
+  assert.ok(csv.includes('"Trollstigen · Andalsnes"'), 'Titel und Ort zusammen');
+  assert.ok(csv.includes('"Spaziergang · am Hafen"'), 'ohne Ort bleiben Titel und Notiz zusammen, ohne Betrag');
 });

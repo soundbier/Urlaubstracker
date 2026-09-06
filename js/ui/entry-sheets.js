@@ -443,6 +443,7 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
   let payer = planItem?.payer || linkedExpense?.payer || defaults.payer || POT;
   const title = h('input.field__input', { type: 'text', value: planItem?.title || '', placeholder: 'z. B. Trollstigen', maxlength: 120, enterkeyhint: 'next' });
   const time = h('input.field__input', { type: 'time', value: planItem?.time || '' });
+  const location = h('input.field__input', { type: 'text', value: planItem?.location || '', placeholder: 'z. B. Altstadt, Hafenpromenade', maxlength: 120, enterkeyhint: 'next' });
   const note = h('input.field__input', { type: 'text', value: planItem?.note || '', placeholder: 'Notiz, Adresse, Reservierung', maxlength: 120, enterkeyhint: 'done' });
   const amount = amountField(linkedExpense?.amount || 0, trip.currency);
 
@@ -466,13 +467,22 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
         close({
           action: 'save',
           values: {
-            title: t, date, time: time.value, category, note: note.value, payer,
+            title: t, date, time: time.value, category, location: location.value.trim(), note: note.value, payer,
             // Realisiert wird nichts mehr angetastet — dafür ist der Wert hier
             // gar nicht erst dabei (siehe `store.updatePlanItem`).
             amount: realized ? undefined : Math.max(0, amount.getCents() || 0),
           },
         });
       };
+
+      const when = dateRow(date, (iso) => { date = iso; }, { withTomorrow: true });
+
+      // Ein Programmpunkt rutscht öfter mal einen Tag: die Wanderung war für
+      // Dienstag gedacht, aber der Dienstag wird ein Regentag. Die Pfeile
+      // schieben das Datum um einen Tag, ohne dass man die Kalenderwahl
+      // darunter aufklappen muss — dieselbe Handbewegung wie beim Blättern
+      // im Reiseplan.
+      const shiftDay = (delta) => { const next = addDays(date, delta); date = next; when.set(next); };
 
       const costNote = h(
         'p.field__note',
@@ -491,8 +501,13 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label.field', h('span.field__label', 'Titel'), title, titleError),
         field('Wofür?', categoryGrid(category, (id) => { category = id; })),
-        field('Wann?', dateRow(date, (iso) => { date = iso; }, { withTomorrow: true }).el),
+        field('Wann?', h('div.daterow-shift',
+          h('button.icon-btn', { type: 'button', title: 'Einen Tag früher', 'aria-label': 'Einen Tag früher', onclick: () => shiftDay(-1) }, icon('chevron', 18)),
+          when.el,
+          h('button.icon-btn', { type: 'button', title: 'Einen Tag später', 'aria-label': 'Einen Tag später', onclick: () => shiftDay(1) }, icon('chevron', 18)),
+        )),
         field('Uhrzeit (optional)', time),
+        field('Ort (optional)', location),
         h('div.field',
           h('span.field__label', 'Kosten (optional)'),
           costBody,
