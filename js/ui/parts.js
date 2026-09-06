@@ -32,21 +32,6 @@ export function sectionTitle(text, action, { tone = '' } = {}) {
 }
 
 /**
- * Die Tagesmarke: eine getrackte, tabellarische Datumszeile mit
- * Haarlinien-Trenner statt Satzzeichen, die nach rechts in eine Linie
- * ausläuft — das wiederkehrende Erkennungszeichen der App. Jedes übergebene
- * Textstück wird ein Abschnitt, dazwischen steht der Trenner.
- */
-export function daymark(...parts) {
-  const segments = parts.filter(Boolean);
-  const children = segments.flatMap((text, i) =>
-    i === 0 ? [h('span', text)] : [h('span.daymark__sep', { 'aria-hidden': 'true' }), h('span', text)]);
-  // Die auslaufende Linie bindet die Zeile an den Satzspiegel, statt sie
-  // mitten im Nichts enden zu lassen.
-  return h('p.daymark', ...children, h('span.daymark__rule', { 'aria-hidden': 'true' }));
-}
-
-/**
  * Aufklappbare Zeile für alles, was man selten anfasst.
  *
  * Die Zusammenfassung rechts ist der Preis dafür, dass hier etwas versteckt
@@ -165,12 +150,11 @@ export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null, ma
 
 /**
  * Eine Zeile im Reiseplan: die Uhrzeit steht links in einer eigenen Spalte,
- * abgetrennt durch eine Haarlinie — wie im Fahrplan, dem die App ihre eigene
- * Kopfzeile schon entlehnt (`daymark`). Ohne Uhrzeit steht dort ein
- * Gedankenstrich statt einer leeren Lücke. Ein Haken rechts macht die Zeile
- * in beide Richtungen erledigt oder wieder offen — anders als bei einer
- * Vormerkung bleibt sie dabei an ihrem Platz im Tag, statt in eine andere
- * Liste zu wandern.
+ * abgetrennt durch eine Haarlinie — wie im Fahrplan, bei dem sich diese App
+ * ohnehin bedient. Ohne Uhrzeit steht dort ein Gedankenstrich statt einer
+ * leeren Lücke. Ein Haken rechts macht die Zeile in beide Richtungen
+ * erledigt oder wieder offen — anders als bei einer Vormerkung bleibt sie
+ * dabei an ihrem Platz im Tag, statt in eine andere Liste zu wandern.
  *
  * Ein Kostenpunkt zeigt sich wie überall als Betrag rechts. Der Programmpunkt
  * selbst trägt nur die Kennung der Ausgabe, nicht den Betrag — der steht an

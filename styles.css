@@ -363,42 +363,6 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 }
 .fab:active { transform: translateY(1px); }
 
-/* -------------------------------------------------------- Die Tagesmarke */
-
-/*
- * „TAG 05 / 14 │ MITTWOCH, 2. SEPTEMBER ─────“ über der großen Zahl: die
- * Datumszeile der App. Getrackte Versalien, tabellarische Ziffern, eine feine
- * senkrechte Linie als Trenner und eine waagerechte, die den Rest der Zeile
- * ausläuft — Fahrplan, kein Etikett. Sie steht nur im laufenden Urlaub;
- * davor und danach hat der Hero schon seinen eigenen Kontextsatz.
- */
-.daymark {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-eyebrow);
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-variant-numeric: tabular-nums;
-  margin-bottom: var(--sp-3);
-}
-.daymark__sep {
-  width: 1px;
-  height: 0.85em;
-  flex: none;
-  background: var(--rule);
-}
-/* Die auslaufende Linie: sie füllt, was der Text übrig lässt, und bindet die
-   Zeile an den Satzspiegel — dieselbe Haarlinie wie überall sonst. */
-.daymark__rule {
-  flex: 1;
-  min-width: var(--sp-4);
-  height: 1px;
-  background: var(--border);
-}
-
 /* ------------------------------------------------------------- Die Tageswahl */
 
 /*
@@ -408,6 +372,10 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
  * Pfeilen an den Seiten statt als reine Auskunft.
  */
 .daynav { display: flex; align-items: center; gap: var(--sp-2); }
+/* Dort, wo aus Zustand Handlung wird, steht mehr Luft als zwischen zwei
+   Zustandsblöcken — dieselbe Geste wie `.section--action`, nur an der Stelle,
+   an der auf „Heute“ das Programm beginnt. */
+.stats + .daynav { margin-top: var(--sp-4); }
 .daynav__arrow { flex: none; }
 /* Derselbe Pfeil wie in den Einstellungen (`.srow__chevron`), nur in beide
    Richtungen gedreht statt immer nach rechts. */
@@ -619,9 +587,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .prow__open:active { background: var(--surface-2); }
 /*
  * Die Uhrzeit im Reiseplan steht links in einer eigenen Spalte, durch eine
- * Haarlinie vom Rest getrennt — wie im Fahrplan, dem die App ihre Kopfzeile
- * schon entlehnt (`daymark`). Ohne Uhrzeit steht ein Gedankenstrich da, keine
- * leere Lücke: der Programmpunkt bleibt trotzdem Teil der Reihe.
+ * Haarlinie vom Rest getrennt — wie im Fahrplan, bei dem sich diese App
+ * ohnehin bedient. Ohne Uhrzeit steht ein Gedankenstrich da, keine leere
+ * Lücke: der Programmpunkt bleibt trotzdem Teil der Reihe.
  */
 .trow__time {
   flex: none;

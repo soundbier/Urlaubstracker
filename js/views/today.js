@@ -1,11 +1,12 @@
 /**
- * Startbildschirm: „Was steht heute an?“ — das Programm des Tages zuerst,
- * die Kasse als weiterhin wichtige, aber zweite Frage darunter.
+ * Startbildschirm: der Kassenstand als eine Zahl, die in zwei Sekunden
+ * gelesen ist — und direkt darunter das Programm des Tages, der längere
+ * Blick. Was heute schon eingetragen wurde, steht darunter.
  */
 import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
-import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, daymark } from '../ui/parts.js';
+import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar } from '../ui/parts.js';
 import { setFinancePane } from './finances.js';
 
 // Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
@@ -64,19 +65,11 @@ export function renderToday(state, actions) {
   const expenseById = new Map(expenses.map((e) => [e.id, e]));
 
   return h('div.view',
-    // Das Programm des Tages ist jetzt die erste Frage der Seite — dafür
-    // steht die Kasse, bislang der Aufmacher, ab der Trennlinie weiter unten.
-    dayNav(trip, selected, today, actions),
-    h('section.section',
-      sectionTitle('Programm', h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: selected }) }, icon('plus', 16), 'Eintragen')),
-      dayItems.length
-        ? h('div.list', ...dayItems.map((item) => planItemRow(item, trip, { onEdit: actions.editPlanItem, onToggle: actions.togglePlanItem, expenseById })))
-        : h('p.section__note', 'Für diesen Tag ist noch nichts geplant.'),
-    ),
-
-    sectionTitle('Kasse'),
     knowsMe ? null : whoAmI(trip, actions),
-    hero(b, cur, actions, today),
+    // Die eine laute Zahl steht oben, wo das Auge sie ohne Scrollen findet.
+    // Sie braucht keine Überschrift: die Augenbraue in ihr sagt schon, was
+    // sie ist.
+    hero(b, cur, actions),
     // Die drei Kennzahlen beantworten, was die große Zahl offenlässt: wie viel
     // insgesamt noch da ist, wie lange es reichen muss, und ob ihr vor oder
     // hinter dem Plan liegt. Jede Zahl steht genau einmal auf dieser Seite.
@@ -103,8 +96,19 @@ export function renderToday(state, actions) {
       ),
     ),
 
+    // Ab hier beginnt, was zu tun ist: erst der Tag, dann das Geld, das er
+    // kostet. Die Tageswahl gehört zum Programm darunter, nicht zur Kasse
+    // darüber — deshalb steht sie hier und nicht über der großen Zahl.
+    dayNav(trip, selected, today, actions),
+    h('section.section',
+      sectionTitle('Programm', h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: selected }) }, icon('plus', 16), 'Eintragen')),
+      dayItems.length
+        ? h('div.list', ...dayItems.map((item) => planItemRow(item, trip, { onEdit: actions.editPlanItem, onToggle: actions.togglePlanItem, expenseById })))
+        : h('p.section__note', 'Für diesen Tag ist noch nichts geplant.'),
+    ),
+
     due.length
-      ? h('section.section', { class: 'section--action' },
+      ? h('section.section',
           sectionTitle(
             'Fällig',
             h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur)),
@@ -115,7 +119,7 @@ export function renderToday(state, actions) {
         )
       : null,
 
-    h('section.section', { class: due.length ? '' : 'section--action' },
+    h('section.section',
       sectionTitle(
         'Heute eingetragen',
         todays.length ? h('span.section__meta.section__meta--amount', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,
@@ -204,7 +208,7 @@ function whoAmI(trip, actions) {
  * insgesamt verfügbar ist, steht jetzt in der Kennzahlreihe; was heute schon
  * ausgegeben und was verplant ist, steht in den beiden Abschnitten darunter.
  */
-function hero(b, cur, actions, today) {
+function hero(b, cur, actions) {
   if (b.status === 'empty') {
     // Ohne Kasse gibt es keine Zahl. Der Gedankenstrich, der hier stand, war
     // in Zahlengröße gesetzt ein Strich quer über den halben Schirm — der Satz
@@ -238,11 +242,12 @@ function hero(b, cur, actions, today) {
   // Der Zustand steht an der Augenbraue und am Balken. Die Zahl selbst bleibt
   // Tinte: eine rote Zahl quer über den halben Schirm liest sich wie ein
   // Fehler, dabei ist „heute drüber“ im Urlaub der halbe Normalfall.
+  // Kein Tagesstempel mehr über der Zahl: „Tag 05 / 14 · So, 6. September“
+  // stand damit zweimal im selben Bild, weil die Tageswahl direkt darunter
+  // dasselbe sagt — nur größer und bedienbar. Dass die Kasse den echten
+  // heutigen Tag meint und nicht den, der im Programm aufgeschlagen ist,
+  // sagen hier die Worte: „heute noch übrig“, „für heute“.
   return h('div.hero', { class: `hero--${tone}` },
-    // Der Tagesstempel gilt hier immer dem echten Heute, nicht dem Tag, der im
-    // Programm oben gerade aufgeschlagen ist — die Kasse rechnet mit dem
-    // Kalender, nicht mit der Blätterei.
-    daymark(`Tag ${String(b.elapsedDays).padStart(2, '0')} / ${b.totalDays}`, `${weekdayShort(today)}, ${dayMonth(today)}`),
     h('p.hero__label', b.leftToday >= 0 ? 'Heute noch übrig' : 'Heute schon drüber'),
     h('p.hero__amount', money(Math.abs(b.leftToday), cur)),
     h('p.hero__sub', `von ${money(b.perDayToday, cur)} für heute`),
