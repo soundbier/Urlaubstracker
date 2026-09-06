@@ -363,6 +363,104 @@ export function planDayProgress(items, expenseById) {
   return { done, total: items.length };
 }
 
+// ------------------------------------------------------------------ Packliste
+
+/**
+ * Die andere Hälfte der Planung: nicht „was machen wir“, sondern „was muss
+ * mit“.
+ *
+ * Ein Eintrag der Packliste kennt weder Datum noch Betrag — ein Koffer wird
+ * nicht an einem Dienstag gepackt, sondern bis zur Abfahrt, und was er kostet,
+ * steht (wenn überhaupt) längst unter „Ausgaben“. Übrig bleiben drei Angaben:
+ * was es ist, wie weit es ist, in welche Tasche es gehört.
+ *
+ * Die Kategorien sind eigene, nicht die der Ausgaben: „Essen & Trinken“ ist
+ * keine Sorte Gepäck, „Hygiene“ keine Sorte Ausgabe. Eine geteilte Liste
+ * hätte beiden Seiten schlecht gepasst.
+ */
+export const PACK_CATEGORIES = [
+  { id: 'documents', label: 'Dokumente', icon: 'documents' },
+  { id: 'tech', label: 'Technik', icon: 'tech' },
+  { id: 'hygiene', label: 'Hygiene', icon: 'hygiene' },
+  { id: 'shoes', label: 'Schuhe', icon: 'shoes' },
+  { id: 'trips', label: 'Ausflüge', icon: 'backpack' },
+  { id: 'beach', label: 'Strand', icon: 'beach' },
+  { id: 'clothing', label: 'Kleidung', icon: 'clothing' },
+  { id: 'other', label: 'Sonstiges', icon: 'other' },
+];
+
+/**
+ * Wie weit ein Eintrag ist — in der Reihenfolge, in der ein Ding durch die
+ * Woche vor der Abfahrt wandert: es steht auf der Liste, muss vielleicht noch
+ * gekauft oder gewaschen werden, liegt dann bereit und liegt am Ende im
+ * Koffer.
+ *
+ * `short` steht als Beiwort an der Zeile, wo nur ein Wort Platz hat; `label`
+ * in der Auswahl und über den Gruppen, wo der ganze Satz hingehört.
+ */
+export const PACK_STATUSES = [
+  { id: 'open', label: 'Noch offen', short: 'offen' },
+  { id: 'buy', label: 'Noch zu kaufen', short: 'kaufen' },
+  { id: 'wash', label: 'Noch zu waschen', short: 'waschen' },
+  { id: 'ready', label: 'Liegt bereit', short: 'bereit' },
+  { id: 'packed', label: 'Eingepackt', short: 'eingepackt' },
+];
+
+/**
+ * Handgepäck oder Aufgabegepäck — die Frage, die am Flughafen zählt und die
+ * sich beim Eintragen selten schon beantworten lässt. Deshalb ein dritter
+ * Wert: noch offen ist ein gültiger Zustand, kein fehlender.
+ */
+export const PACK_BAGS = [
+  { id: 'none', label: 'Noch offen', short: '' },
+  { id: 'hand', label: 'Handgepäck', short: 'Handgepäck' },
+  { id: 'hold', label: 'Aufgabegepäck', short: 'Aufgabegepäck' },
+];
+
+export const PACK_CATEGORY_BY_ID = Object.fromEntries(PACK_CATEGORIES.map((c) => [c.id, c]));
+export const PACK_STATUS_BY_ID = Object.fromEntries(PACK_STATUSES.map((s) => [s.id, s]));
+export const PACK_BAG_BY_ID = Object.fromEntries(PACK_BAGS.map((b) => [b.id, b]));
+
+// Aus einer Sicherungskopie, von einem älteren Gerät oder aus einer künftigen
+// Fassung kann ein Wert kommen, den diese hier nicht kennt. Gelesen wird
+// deshalb nie das rohe Feld, sondern immer durch diese drei — sonst stünde ein
+// Eintrag in keiner Gruppe und wäre unauffindbar, obwohl er da ist.
+export const packCategory = (item) => (PACK_CATEGORY_BY_ID[item?.category] ? item.category : 'other');
+export const packStatus = (item) => (PACK_STATUS_BY_ID[item?.status] ? item.status : 'open');
+export const packBag = (item) => (PACK_BAG_BY_ID[item?.bag] ? item.bag : 'none');
+export const packItemPacked = (item) => packStatus(item) === 'packed';
+
+/** Wie viel schon im Koffer liegt — der Stand über der Liste. */
+export function packProgress(items) {
+  return { done: items.filter(packItemPacked).length, total: items.length };
+}
+
+/**
+ * Innerhalb einer Gruppe bleibt die Reihenfolge die der Eingabe: Wer die
+ * Kleidung in einem Rutsch einträgt, denkt dabei in einer Reihenfolge, und ein
+ * alphabetisch sortierendes Feld würde jede Zeile unter dem Finger wegziehen.
+ */
+const byEntryOrder = (a, b) => (a.createdAt || 0) - (b.createdAt || 0);
+
+function groupPackItems(items, buckets, keyOf) {
+  return buckets
+    .map((bucket) => ({ ...bucket, items: items.filter((i) => keyOf(i) === bucket.id).sort(byEntryOrder) }))
+    // Leere Kategorien fallen weg — anders als bei den Reisetagen, wo die
+    // Lücke selbst die Auskunft ist. „Strand“ ohne Einträge sagt nichts, es
+    // fährt ja nicht jeder ans Meer.
+    .filter((g) => g.items.length);
+}
+
+/** Nach Kategorie gruppiert, in der Reihenfolge von `PACK_CATEGORIES`. */
+export function packItemsByCategory(items) {
+  return groupPackItems(items, PACK_CATEGORIES, packCategory);
+}
+
+/** Nach Stand gruppiert — für den Blick „was fehlt noch“. */
+export function packItemsByStatus(items) {
+  return groupPackItems(items, PACK_STATUSES, packStatus);
+}
+
 // ------------------------------------------------------------- Budget-Kennzahlen
 
 /**

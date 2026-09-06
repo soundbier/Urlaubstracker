@@ -23,6 +23,7 @@ let state = {
   expenses: [],
   cashOuts: [],
   planItems: [],
+  packItems: [],
   myPersonId: null,
   invite: null, // offene Einladung aus dem Link
   sync: {
@@ -115,6 +116,9 @@ function handleChange(data) {
     // innerhalb eines Tages nach Uhrzeit (siehe `planItemsByDay`), nicht nach
     // „neueste zuerst“ wie die übrigen Listen.
     planItems: data.planItems || [],
+    // Die Packliste sortiert sich nach Kategorie und Eingabereihenfolge, nicht
+    // nach Datum — sie hat gar keins (siehe `packItemsByCategory`).
+    packItems: data.packItems || [],
     // Eine offene Einladung hat Vorrang, sonst würde sie beim nächsten
     // Datenereignis unter dem Finger verschwinden.
     phase: state.invite ? 'onboarding' : trip ? 'ready' : 'onboarding',
@@ -603,6 +607,44 @@ export async function markPlanItemOpen(id) {
   await backend.putPlanItem({ ...row, done: false, updatedAt: Date.now() });
 }
 
+// ------------------------------------------------------------------ Packliste
+
+/**
+ * Ein Eintrag auf der Packliste — das schlichteste Objekt dieser App: ein
+ * Ding, das mitmuss. Kein Datum, kein Betrag, kein Zahler; nur was es ist,
+ * wie weit es ist und in welche Tasche es gehört.
+ *
+ * Absichtlich anspruchslos beim Anlegen: „erst alles eintragen, dann sortieren“
+ * ist die Art, wie Packlisten entstehen. Ein Titel genügt, alles Weitere hat
+ * eine Voreinstellung und lässt sich später an der Zeile ändern.
+ */
+export async function addPackItem({ title, category, status, bag, note } = {}) {
+  const now = Date.now();
+  const row = {
+    id: newId(),
+    title: String(title || '').trim(),
+    category: category || 'other',
+    status: status || 'open',
+    bag: bag || 'none',
+    note: (note || '').trim(),
+    createdAt: now,
+    updatedAt: now,
+    createdBy: state.myPersonId || null,
+  };
+  await backend.putPackItem(row);
+  return row;
+}
+
+export async function updatePackItem(id, patch) {
+  const row = state.packItems.find((p) => p.id === id);
+  if (!row) return;
+  await backend.putPackItem({ ...row, ...patch, updatedAt: Date.now() });
+}
+
+export async function deletePackItem(id) {
+  await backend.removePackItem(id);
+}
+
 // ------------------------------------------------------------- Einzahlungen
 
 export async function addContribution({ personId, amount, date, note }) {
@@ -692,7 +734,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
       throw new Error('Unter diesem Namen liegt in diesem Projekt schon eine Kasse. Wähle einen anderen Namen.');
     }
     await cloud.createTrip({ ...state.trip, joinName: name }, { personId: state.myPersonId });
-    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems });
+    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems });
   } catch (err) {
     await afterFailedAttempt(cloud);
     throw err;
@@ -707,7 +749,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
 
 /** Zurück in den lokalen Modus — mit einer Kopie des aktuellen Standes. */
 export async function disconnectCloud() {
-  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems };
+  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems };
   const prefs = getPrefs();
   // Sich auch wirklich austragen. Vorher hörte dieses Gerät nur auf zuzuhören
   // und stand serverseitig weiter als Mitglied da — mit vollem Zugriff, bloß
@@ -899,6 +941,7 @@ export async function deleteTrip() {
     expenses: state.expenses,
     cashOuts: state.cashOuts,
     planItems: state.planItems,
+    packItems: state.packItems,
   });
 
   await backend.deleteTrip?.();
@@ -906,7 +949,7 @@ export async function deleteTrip() {
   const local = new LocalBackend();
   // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
   await local.deleteTrip();
-  set({ trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], myPersonId: null, invite: null, phase: 'onboarding' });
+  set({ trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], myPersonId: null, invite: null, phase: 'onboarding' });
   await useBackend(local);
   return { backupKept };
 }
@@ -930,6 +973,7 @@ export async function restoreLastDeleted() {
     expenses: payload.expenses,
     cashOuts: payload.cashOuts || [],
     planItems: payload.planItems || [],
+    packItems: payload.packItems || [],
   });
   setPrefs({
     tripRef: { mode: 'local', joinName: payload.trip.joinName || payload.trip.name || '', joinPassword: '' },
@@ -952,6 +996,7 @@ export async function importData(payload) {
     expenses: payload.expenses,
     cashOuts: payload.cashOuts || [],
     planItems: payload.planItems || [],
+    packItems: payload.packItems || [],
   });
 }
 

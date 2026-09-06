@@ -7,7 +7,7 @@
 
 const KEY = 'urlaubstracker.data.v1';
 
-const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [] };
+const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
 
 function load() {
   try {
@@ -19,6 +19,7 @@ function load() {
       expenses: Array.isArray(raw.expenses) ? raw.expenses : [],
       cashOuts: Array.isArray(raw.cashOuts) ? raw.cashOuts : [],
       planItems: Array.isArray(raw.planItems) ? raw.planItems : [],
+      packItems: Array.isArray(raw.packItems) ? raw.packItems : [],
     };
   } catch {
     return { ...EMPTY };
@@ -61,6 +62,7 @@ export class LocalBackend {
       expenses: [...this.data.expenses],
       cashOuts: [...this.data.cashOuts],
       planItems: [...this.data.planItems],
+      packItems: [...this.data.packItems],
     });
   }
 
@@ -90,7 +92,7 @@ export class LocalBackend {
   }
 
   async createTrip(trip) {
-    this.data = { trip, contributions: [], expenses: [], cashOuts: [], planItems: [] };
+    this.data = { trip, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
     this._persist();
   }
 
@@ -100,7 +102,7 @@ export class LocalBackend {
   }
 
   async deleteTrip() {
-    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [], planItems: [] };
+    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
     try {
       localStorage.removeItem(KEY);
     } catch {
@@ -117,9 +119,11 @@ export class LocalBackend {
   async removeCashOut(id) { this._remove('cashOuts', id); }
   async putPlanItem(row) { this._put('planItems', row); }
   async removePlanItem(id) { this._remove('planItems', id); }
+  async putPackItem(row) { this._put('packItems', row); }
+  async removePackItem(id) { this._remove('packItems', id); }
 
-  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [] }) {
-    this.data = { trip, contributions, expenses, cashOuts, planItems };
+  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
+    this.data = { trip, contributions, expenses, cashOuts, planItems, packItems };
     this._persist();
   }
 }

@@ -86,7 +86,7 @@ export class FirestoreBackend {
     this.db = null;
     this.uid = null;
 
-    this.data = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [] };
+    this.data = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
     this.onChange = null;
     this.onStatus = null;
     this._unsubs = [];
@@ -167,6 +167,7 @@ export class FirestoreBackend {
       expenses: [...this.data.expenses],
       cashOuts: [...this.data.cashOuts],
       planItems: [...this.data.planItems],
+      packItems: [...this.data.packItems],
     });
   }
 
@@ -189,7 +190,7 @@ export class FirestoreBackend {
 
     // Noch nicht übertragene Einträge je Sammlung — zusammengezählt ergibt das
     // die Zahl, die den Leuten offline angezeigt wird.
-    const openWrites = { expenses: 0, contributions: 0, cashOuts: 0, planItems: 0 };
+    const openWrites = { expenses: 0, contributions: 0, cashOuts: 0, planItems: 0, packItems: 0 };
 
     const collectionListener = (name, key) =>
       fb.onSnapshot(
@@ -202,7 +203,7 @@ export class FirestoreBackend {
             ready: true,
             connected: !snap.metadata.fromCache,
             fromCache: snap.metadata.fromCache,
-            pending: openWrites.expenses + openWrites.contributions + openWrites.cashOuts + openWrites.planItems,
+            pending: Object.values(openWrites).reduce((a, n) => a + n, 0),
             error: null,
           });
           this._emit();
@@ -236,6 +237,7 @@ export class FirestoreBackend {
       collectionListener('contributions', 'contributions'),
       collectionListener('cashouts', 'cashOuts'),
       collectionListener('planitems', 'planItems'),
+      collectionListener('packitems', 'packItems'),
     );
   }
 
@@ -421,36 +423,42 @@ export class FirestoreBackend {
   async removeCashOut(id) { await fb.deleteDoc(this._ref('cashouts', id)); }
   async putPlanItem(row) { await fb.setDoc(this._ref('planitems', row.id), stripId(row)); }
   async removePlanItem(id) { await fb.deleteDoc(this._ref('planitems', id)); }
+  async putPackItem(row) { await fb.setDoc(this._ref('packitems', row.id), stripId(row)); }
+  async removePackItem(id) { await fb.deleteDoc(this._ref('packitems', id)); }
 
   /**
    * Sicherung einspielen: was nicht mehr drin vorkommt, fliegt raus. Läuft in
    * einem Rutsch, damit die andere Seite keinen Zwischenstand sieht.
    */
-  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [] }) {
+  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
     const batch = fb.writeBatch(this.db);
     const keepContributions = new Set(contributions.map((c) => c.id));
     const keepExpenses = new Set(expenses.map((e) => e.id));
     const keepCashOuts = new Set(cashOuts.map((c) => c.id));
     const keepPlanItems = new Set(planItems.map((p) => p.id));
+    const keepPackItems = new Set(packItems.map((p) => p.id));
     for (const c of this.data.contributions) if (!keepContributions.has(c.id)) batch.delete(this._ref('contributions', c.id));
     for (const e of this.data.expenses) if (!keepExpenses.has(e.id)) batch.delete(this._ref('expenses', e.id));
     for (const c of this.data.cashOuts) if (!keepCashOuts.has(c.id)) batch.delete(this._ref('cashouts', c.id));
     for (const p of this.data.planItems) if (!keepPlanItems.has(p.id)) batch.delete(this._ref('planitems', p.id));
+    for (const p of this.data.packItems) if (!keepPackItems.has(p.id)) batch.delete(this._ref('packitems', p.id));
     for (const c of contributions) batch.set(this._ref('contributions', c.id), stripId(c));
     for (const e of expenses) batch.set(this._ref('expenses', e.id), stripId(e));
     for (const c of cashOuts) batch.set(this._ref('cashouts', c.id), stripId(c));
     for (const p of planItems) batch.set(this._ref('planitems', p.id), stripId(p));
+    for (const p of packItems) batch.set(this._ref('packitems', p.id), stripId(p));
     batch.update(fb.doc(this.db, 'trips', this.tripId), pickTripFields(trip));
     await batch.commit();
   }
 
   /** Einen kompletten lokalen Trip in die Cloud schieben. */
-  async importAll({ contributions = [], expenses = [], cashOuts = [], planItems = [] }) {
+  async importAll({ contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
     const batch = fb.writeBatch(this.db);
     for (const c of contributions) batch.set(this._ref('contributions', c.id), stripId(c));
     for (const e of expenses) batch.set(this._ref('expenses', e.id), stripId(e));
     for (const c of cashOuts) batch.set(this._ref('cashouts', c.id), stripId(c));
     for (const p of planItems) batch.set(this._ref('planitems', p.id), stripId(p));
+    for (const p of packItems) batch.set(this._ref('packitems', p.id), stripId(p));
     await batch.commit();
   }
 
@@ -470,6 +478,7 @@ export class FirestoreBackend {
     for (const e of this.data.expenses) batch.delete(this._ref('expenses', e.id));
     for (const c of this.data.cashOuts) batch.delete(this._ref('cashouts', c.id));
     for (const p of this.data.planItems) batch.delete(this._ref('planitems', p.id));
+    for (const p of this.data.packItems) batch.delete(this._ref('packitems', p.id));
     batch.delete(fb.doc(this.db, 'trips', this.tripId));
     await batch.commit();
   }

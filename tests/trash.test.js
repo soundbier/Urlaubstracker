@@ -80,3 +80,20 @@ test('ohne Trip gibt es nichts zu sichern', () => {
   assert.equal(keepCopy({ trip: null }), false);
   assert.equal(store.size, 0);
 });
+
+test('die Kopie nimmt Reiseplan und Packliste mit', () => {
+  // Beide Listen führen kein Geld — und wären deshalb genau die, die still
+  // fehlen, bis jemand die Kasse zurückholt und vor einem leeren Reiseplan
+  // steht.
+  store.clear();
+  const planItems = [{ id: 'pl1', date: '2026-07-02', time: '', title: 'Museum', category: 'activity', location: '', note: '', payer: 'pot', linkedExpenseId: null, done: false }];
+  const packItems = [{ id: 'pk1', title: 'Reisepass', category: 'documents', status: 'open', bag: 'hand', note: '' }];
+  keepCopy({ trip, contributions: [], expenses, cashOuts: [], planItems, packItems });
+
+  const copy = lastCopy();
+  assert.equal(copy.entries, 3, 'gezählt wird alles, was verloren ginge');
+
+  const back = parseImport(copy.json);
+  assert.deepEqual(back.planItems, planItems);
+  assert.deepEqual(back.packItems, packItems);
+});

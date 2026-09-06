@@ -1,8 +1,11 @@
-/** Die Eingabemasken: Ausgabe, Einzahlung, Bargeld, Programmpunkt. */
+/** Die Eingabemasken: Ausgabe, Einzahlung, Bargeld, Programmpunkt, Packliste. */
 import { h, icon } from '../dom.js';
 import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
-import { CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson } from '../calc.js';
+import {
+  CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson,
+  PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, packCategory, packStatus, packBag,
+} from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
 /**
@@ -82,22 +85,25 @@ function amountField(initialCents, currency) {
 }
 
 /**
- * Die sechs Kategorien als festes 3×2-Raster.
+ * Die Kategorien als festes Raster mit drei Spalten.
  *
  * Als frei umbrechende Chips ergaben sie drei ungleich lange Reihen: viel
  * Platz für wenig Inhalt, und die Zeilen sprangen je nach Wortlänge. Gleich
  * breite Felder sind ruhiger, immer an derselben Stelle — man trifft „Essen“
  * irgendwann ohne hinzusehen — und sparen die Höhe, die es braucht, damit die
  * Detailzeile darunter noch anstupst.
+ *
+ * `list` ist voreingestellt die Ausgaben-Kategorie; die Packliste bringt ihre
+ * eigene mit (siehe `PACK_CATEGORIES`).
  */
-function categoryGrid(selectedId, onSelect) {
+function categoryGrid(selectedId, onSelect, list = CATEGORIES) {
   const grid = h('div.catgrid');
-  const buttons = CATEGORIES.map((c) => {
+  const buttons = list.map((c) => {
     const b = h('button.chip.catgrid__item', { type: 'button', dataset: { id: c.id }, onclick: () => {
       selectedId = c.id;
       buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
       onSelect(c.id);
-    } }, icon(c.icon, 16), c.short);
+    } }, icon(c.icon, 16), c.short || c.label);
     b.classList.toggle('is-active', c.id === selectedId);
     return b;
   });
@@ -513,6 +519,60 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
           costBody,
           costNote,
         ),
+        field('Notiz', note),
+        h('div.entry__actions',
+          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
+        ),
+      );
+    },
+  });
+}
+
+/**
+ * Ein Eintrag der Packliste anlegen oder bearbeiten.
+ *
+ * Die schlichteste Maske der App, und das mit Absicht: eine Packliste entsteht
+ * in einem Rutsch — Handtuch, Ladekabel, Sonnencreme, Reisepass —, und jede
+ * Pflichtangabe zwischendurch bricht diesen Fluss. Deshalb reicht ein Titel;
+ * Kategorie, Stand und Gepäck stehen offen da und lassen sich beim
+ * Durchgehen der Liste an jeder Zeile nachziehen.
+ *
+ * Für das reine Eintragen gibt es außerdem das Schnellfeld über der Liste
+ * (siehe `views/packing.js`) — diese Maske ist der Weg, wenn etwas
+ * dazugehört, was dort nicht hinpasst: eine Notiz, ein anderer Stand.
+ */
+export function packItemSheet({ packItem = null, defaults = {} } = {}) {
+  const editing = Boolean(packItem);
+  let category = packItem ? packCategory(packItem) : defaults.category || 'clothing';
+  let status = packItem ? packStatus(packItem) : defaults.status || 'open';
+  let bag = packItem ? packBag(packItem) : defaults.bag || 'none';
+  const title = h('input.field__input', { type: 'text', value: packItem?.title || '', placeholder: 'z. B. Reisepass', maxlength: 120, enterkeyhint: 'next' });
+  const note = h('input.field__input', { type: 'text', value: packItem?.note || '', placeholder: 'Menge, Marke, wo es liegt', maxlength: 120, enterkeyhint: 'done' });
+
+  return openSheet({
+    title: editing ? 'Eintrag bearbeiten' : 'Was muss mit?',
+    fullHeight: true,
+    bodyClass: 'sheet__body--entry',
+    build: (close) => {
+      const titleError = h('p.field__error');
+
+      const save = () => {
+        const t = title.value.trim();
+        if (!t) {
+          titleError.textContent = 'Bitte einen Titel eingeben';
+          title.focus();
+          return;
+        }
+        titleError.textContent = '';
+        close({ action: 'save', values: { title: t, category, status, bag, note: note.value } });
+      };
+
+      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        h('label.field', h('span.field__label', 'Was ist es?'), title, titleError),
+        field('Wohin gehört es?', categoryGrid(category, (id) => { category = id; }, PACK_CATEGORIES)),
+        field('Wie weit ist es?', chipRow(PACK_STATUSES, status, (id) => { status = id; })),
+        field('In welches Gepäck?', chipRow(PACK_BAGS, bag, (id) => { bag = id; })),
         field('Notiz', note),
         h('div.entry__actions',
           editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,

@@ -1,6 +1,9 @@
 /** Bausteine, die in mehreren Ansichten vorkommen. */
 import { h, icon } from '../dom.js';
-import { CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone } from '../calc.js';
+import {
+  CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone,
+  PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packCategory, packStatus, packBag, packItemPacked,
+} from '../calc.js';
 import { money, dayLabel } from '../format.js';
 import { openSheet } from './sheet.js';
 import { isIOS } from '../install.js';
@@ -187,6 +190,45 @@ export function planItemRow(item, trip, { onEdit, onToggle, expenseById } = {}) 
       class: done ? 'is-done' : '',
       title: done ? 'Als offen markieren' : 'Als erledigt eintragen',
       'aria-label': done ? 'Als offen markieren' : 'Als erledigt eintragen',
+      onclick: () => onToggle(item),
+    }, icon('check', 20)),
+  );
+}
+
+/**
+ * Eine Zeile der Packliste. Dieselbe Bauart wie ein Programmpunkt — antippen
+ * zum Ändern, der Haken rechts packt ein und wieder aus —, nur ohne Uhrzeit
+ * und ohne Betrag: ein Ding hat weder das eine noch das andere.
+ *
+ * In der Unterzeile steht nur, was das Symbol nicht schon sagt. „Noch offen“
+ * gehört nicht dazu: das ist der Normalfall, und an jeder zweiten Zeile stünde
+ * dann ein Wort, das nichts unterscheidet. „Eingepackt“ auch nicht — dafür ist
+ * der gefüllte Haken da.
+ */
+export function packItemRow(item, { onEdit, onToggle } = {}) {
+  const cat = PACK_CATEGORY_BY_ID[packCategory(item)];
+  const status = PACK_STATUS_BY_ID[packStatus(item)];
+  const bag = PACK_BAG_BY_ID[packBag(item)];
+  const packed = packItemPacked(item);
+  const sub = [
+    packed || status.id === 'open' ? null : h('span.tag.tag--todo', status.short),
+    bag.short ? h('span.tag', bag.short) : null,
+    item.note ? h('span', item.note) : null,
+  ].filter(Boolean);
+
+  return h('div.prow', { class: packed ? 'is-done' : '' },
+    h('button.prow__open', { type: 'button', onclick: () => onEdit(item) },
+      h('span.row__icon', icon(cat.icon, 20)),
+      h('span.row__main',
+        h('span.row__title', item.title),
+        sub.length ? h('span.row__sub', ...sub) : null,
+      ),
+    ),
+    h('button.prow__done', {
+      type: 'button',
+      class: packed ? 'is-done' : '',
+      title: packed ? 'Wieder auspacken' : 'Als eingepackt eintragen',
+      'aria-label': packed ? `${item.title} wieder auspacken` : `${item.title} als eingepackt eintragen`,
       onclick: () => onToggle(item),
     }, icon('check', 20)),
   );

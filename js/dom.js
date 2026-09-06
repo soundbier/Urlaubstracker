@@ -142,4 +142,19 @@ const ICONS = {
   activity: ['M4 8.5A1.5 1.5 0 015.5 7h13A1.5 1.5 0 0120 8.5v1.6a2 2 0 000 3.8v1.6A1.5 1.5 0 0118.5 17h-13A1.5 1.5 0 014 15.5v-1.6a2 2 0 000-3.8V8.5z', 'M14 8.6v1.3M14 11.3v1.4M14 14.1v1.3'],
   shopping: ['M5.2 8h13.6l-1.1 12.5H6.3L5.2 8z', 'M9 8V6a3 3 0 016 0v2'],
   other: ['M6 12h.01M12 12h.01M18 12h.01'],
+
+  // Packliste. Wieder dieselbe Strichstärke — und bewusst Gegenstände statt
+  // Sinnbilder: bei 20 px erkennt man einen Schuh, aber keinen „Bereich
+  // Schuhe“.
+  documents: ['M6.5 3h7.2L18 7.3V20a1 1 0 01-1 1H6.5a1 1 0 01-1-1V4a1 1 0 011-1z', 'M13.5 3.2v4.3H17.8', 'M8.5 12.5h7M8.5 16h4.5'],
+  // Ein Stecker, kein Handy: vergessen wird das Ladekabel, nicht das Telefon.
+  tech: ['M9 3v5M15 3v5', 'M6 8h12v2.5a6 6 0 01-12 0V8z', 'M12 16.5V21'],
+  // Flasche mit Deckel und Etikettenlinie — Shampoo, Duschgel, Sonnencreme.
+  hygiene: ['M10 2.5h4v2.5h-4z', 'M8 9a4 4 0 014-4 4 4 0 014 4v10.5a1.5 1.5 0 01-1.5 1.5h-5A1.5 1.5 0 018 19.5V9z', 'M8 12.5h8'],
+  shoes: ['M3.5 17.5v-6h2.6l2.2 2.2c.9.9 2.1 1.4 3.4 1.4h3.6c1.9 0 3.8.6 5.2 1.7v.7a1 1 0 01-1 1H4.5a1 1 0 01-1-1z', 'M6.2 11.5l1.6 1.6M9 14l1.6-1.6'],
+  backpack: ['M5.5 20.5A1.5 1.5 0 014 19v-7.5A5.5 5.5 0 019.5 6h5a5.5 5.5 0 015.5 5.5V19a1.5 1.5 0 01-1.5 1.5h-13z', 'M9.5 6V4.5A1.5 1.5 0 0111 3h2a1.5 1.5 0 011.5 1.5V6', 'M8.5 20.5V15h7v5.5'],
+  // Sonnenschirm: die Kuppel und der Stock. Die Sonne allein ist am unteren
+  // Rand schon der Reiter „Heute“.
+  beach: ['M12 21V10.5', 'M3.5 10.5a8.5 8.5 0 0117 0z'],
+  clothing: ['M9 3.5L4.8 5.8l1.5 3.4 2.2-.9V20a1 1 0 001 1h5a1 1 0 001-1V8.3l2.2.9L19.2 5.8 15 3.5a3 3 0 01-6 0z'],
 };

@@ -30,15 +30,18 @@ const day = 86400000;
  * Kopie ablegen. Gibt `false` zurück, wenn das nicht geklappt hat — die
  * Oberfläche sagt dann, dass es nur die Datei von Hand gibt.
  */
-export function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [] }) {
+export function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
   if (!trip) return false;
   try {
-    const json = buildExport({ trip, contributions, expenses, cashOuts });
+    const json = buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems });
     if (json.length > MAX_CHARS) return false;
     localStorage.setItem(KEY, JSON.stringify({
       savedAt: Date.now(),
       name: trip.name || 'Urlaubskasse',
-      entries: contributions.length + expenses.length + cashOuts.length,
+      // Was hier gezählt wird, steht der Person auf dem Schirm, die gerade
+      // gelöscht hat — es muss also alles sein, was verloren ginge, nicht nur
+      // das Geld. Reiseplan und Packliste zählen mit.
+      entries: contributions.length + expenses.length + cashOuts.length + planItems.length + packItems.length,
       json,
     }));
     return true;

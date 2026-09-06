@@ -461,6 +461,7 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .summary { display: flex; flex-direction: column; gap: 2px; }
 .summary__value { font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.03em; }
 .summary__meta { font-size: var(--fs-xs); color: var(--text-faint); }
+.summary .bar { margin-top: var(--sp-3); }
 
 /*
  * Ein Hinweis, der zum Umfeld gehört: zwischen zwei Linien statt in einer
@@ -638,6 +639,16 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   text-transform: uppercase;
   color: var(--warn);
 }
+/* Der Stand auf der Packliste („kaufen“, „waschen“, „bereit“). Dieselbe
+   gesperrte Versalienzeile wie „fällig“, aber ohne Farbe: das ist eine
+   Zuordnung, kein Verdikt — dreißig Zeilen in Amber wären ein Alarm über eine
+   Liste, auf der noch alles offen ist. */
+.tag--todo {
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
 
 .empty { padding: var(--sp-4) 0 var(--sp-5); }
 .empty__text { font-size: var(--fs-sm); color: var(--text-faint); }
@@ -709,6 +720,28 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .daygroup__progress { display: flex; align-items: center; gap: var(--sp-3); margin-top: 2px; }
 .daygroup__progress .daygroup__sub { flex: none; white-space: nowrap; }
 .daygroup__progress .bar { flex: 1; }
+
+/* ------------------------------------------------------------- Packliste */
+
+/*
+ * Die Gruppen der Packliste stehen so weit auseinander wie die Reisetage —
+ * es sind dieselbe Sorte Abschnitt, nur nach Kategorie statt nach Datum
+ * geschnitten.
+ */
+.packgroups { display: flex; flex-direction: column; gap: var(--sp-6); }
+
+/*
+ * Das Schnellfeld über der Liste.
+ *
+ * Eine Packliste entsteht in einem Schwung: Handtuch, Ladekabel, Zahnbürste.
+ * Für jeden dieser Handgriffe eine Maske zu öffnen, wäre dreimal so viel Weg
+ * wie Inhalt — deshalb steht die Eingabe offen da, mit der Kategorie als
+ * Chip-Reihe darüber und dem Knopf am rechten Rand des Feldes.
+ */
+.packadd { display: flex; flex-direction: column; gap: var(--sp-3); margin: var(--sp-4) 0 var(--sp-5); }
+.packadd__row { display: flex; align-items: center; gap: var(--sp-2); }
+.packadd__row .field__input { flex: 1; min-width: 0; }
+.packadd__go { flex: none; color: var(--accent); }
 
 /* --------------------------------------------------------------- Balken */
 
