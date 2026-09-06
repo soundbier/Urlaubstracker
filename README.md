@@ -18,8 +18,8 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
   auf einen Blick, mit Tagesfortschritt; ein Tipp auf die Datumszeile schlägt
   den Tag auf „Heute“ auf) und „Packliste“.
 - **Packliste** — was mit muss, offline und ohne Datum: eintragen im
-  Schnellfeld, danach nach Kategorie (Dokumente, Technik, Hygiene, Schuhe,
-  Ausflüge, Strand, Kleidung, Sonstiges), Stand (noch offen, noch zu kaufen,
+  Schnellfeld, danach nach Kategorie (Dokumente, Technik, Hygiene,
+  Reiseapotheke, Schuhe, Ausflüge, Strand, Kleidung, Sonstiges), Stand (noch offen, noch zu kaufen,
   noch zu waschen, liegt bereit, eingepackt) und Gepäck (Hand- oder
   Aufgabegepäck) sortieren. Eigene Reiter für Handgepäck, Aufgabegepäck und
   „Zu tun“.

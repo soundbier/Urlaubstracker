@@ -156,5 +156,8 @@ const ICONS = {
   // Sonnenschirm: die Kuppel und der Stock. Die Sonne allein ist am unteren
   // Rand schon der Reiter „Heute“.
   beach: ['M12 21V10.5', 'M3.5 10.5a8.5 8.5 0 0117 0z'],
+  // Der Erste-Hilfe-Koffer: Kasten, Griff, Kreuz — dieselbe Strichstärke wie
+  // die übrigen Symbole, kein rotes Kreuz als Fläche.
+  meds: ['M3.5 8h17a1 1 0 011 1v9.5a1 1 0 01-1 1h-17a1 1 0 01-1-1V9a1 1 0 011-1z', 'M9 8V6.2a1.7 1.7 0 011.7-1.7h2.6A1.7 1.7 0 0115 6.2V8', 'M12 11.6v4.4M9.8 13.8h4.4'],
   clothing: ['M9 3.5L4.8 5.8l1.5 3.4 2.2-.9V20a1 1 0 001 1h5a1 1 0 001-1V8.3l2.2.9L19.2 5.8 15 3.5a3 3 0 01-6 0z'],
 };
