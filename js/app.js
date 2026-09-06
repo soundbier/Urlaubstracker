@@ -8,12 +8,13 @@ import { money, days, compactDate } from './format.js';
 import { toast, confirmSheet, promptSheet, closeAllSheets, hideToast } from './ui/sheet.js';
 import * as lock from './lock.js';
 import { lockScreen } from './ui/lock-screen.js';
-import { expenseSheet, contributionSheet, cashOutSheet } from './ui/entry-sheets.js';
+import { expenseSheet, contributionSheet, cashOutSheet, planItemSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
 import { renderExpenses } from './views/expenses.js';
 import { renderBudget } from './views/budget.js';
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
+import { renderPlan } from './views/plan.js';
 
 const TABS = [
   { id: 'heute', label: 'Heute', icon: 'sun', render: renderToday },
@@ -29,6 +30,10 @@ let state = store.getState();
 
 function currentTab() {
   const id = (location.hash.match(/^#\/([a-z]+)/) || [])[1];
+  // Der Reiseplan ist kein Tab (die Bottom-Navigation bleibt bei vier
+  // ruhigen Zielen), aber eine eigene Adresse — erreichbar über das
+  // Kalender-Symbol in der Kopfzeile, nicht über die Leiste unten.
+  if (id === 'plan') return 'plan';
   return TABS.find((t) => t.id === id) ? id : 'heute';
 }
 
@@ -232,6 +237,64 @@ const actions = {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
   },
+
+  async addPlanItem(defaults = {}) {
+    const result = await planItemSheet({ trip: state.trip, defaults });
+    if (result?.action !== 'save') return;
+    try {
+      const row = await store.addPlanItem(result.values);
+      undoable(`„${row.title}“ eingeplant`, () => store.deletePlanItem(row.id));
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  async editPlanItem(item) {
+    const linked = item.linkedExpenseId ? state.expenses.find((e) => e.id === item.linkedExpenseId) : null;
+    const result = await planItemSheet({ trip: state.trip, planItem: item, linkedExpense: linked });
+    if (!result) return;
+    try {
+      if (result.action === 'save') {
+        await store.updatePlanItem(item.id, result.values);
+      } else if (result.action === 'delete') {
+        // Eine noch offene Vormerkung geht mit weg — das steht in der
+        // Rückfrage, damit es niemanden überrascht.
+        const stillOpen = linked?.planned;
+        const ok = await confirmSheet({
+          title: 'Programmpunkt löschen?',
+          text: stillOpen ? `Die vorgemerkten ${money(linked.amount, state.trip.currency)} werden mit entfernt.` : undefined,
+          confirmLabel: 'Löschen',
+          danger: true,
+        });
+        if (ok) await store.deletePlanItem(item.id);
+      }
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  /** Der Haken im Reiseplan — in beide Richtungen, siehe `store.markPlanItemDone/Open`. */
+  async togglePlanItem(item) {
+    const linked = item.linkedExpenseId ? state.expenses.find((e) => e.id === item.linkedExpenseId) : null;
+    const done = item.done || (linked ? !linked.planned : false);
+    try {
+      if (done) {
+        await store.markPlanItemOpen(item.id);
+        undoable('Zurück auf offen.', async () => {
+          await store.updatePlanItem(item.id, { done: true });
+          if (linked?.fromPlan) await store.updateExpense(linked.id, { planned: false, fromPlan: true });
+        });
+      } else {
+        await store.markPlanItemDone(item.id);
+        undoable('Als erledigt eingetragen.', async () => {
+          await store.updatePlanItem(item.id, { done: false });
+          if (linked?.planned) await store.updateExpense(linked.id, { planned: true, fromPlan: false, date: linked.date });
+        });
+      }
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
 };
 
 // ------------------------------------------------------------------- Aufbau
@@ -269,19 +332,20 @@ function render() {
   }
 
   document.body.classList.remove('is-onboarding');
-  const tab = TABS.find((t) => t.id === currentTab());
+  const route = currentTab();
+  const tab = TABS.find((t) => t.id === route);
 
   replace(app,
-    header(),
+    header(route),
     deletionBar(),
-    h('main.main', { id: 'main' }, tab.render(state, actions)),
-    fab(tab.id),
-    nav(tab.id),
+    h('main.main', { id: 'main' }, route === 'plan' ? renderPlan(state, actions) : tab.render(state, actions)),
+    fab(route),
+    nav(route),
   );
   document.title = `${state.trip.name} — Urlaubstracker`;
 }
 
-function header() {
+function header(route) {
   const { trip, sync } = state;
   const today = todayISO();
   const b = computeBudget({ trip, contributions: state.contributions, expenses: state.expenses, today });
@@ -307,8 +371,17 @@ function header() {
       h('h1.topbar__title', trip.name),
       h('p.topbar__sub', subtitle),
     ),
-    h('button.syncdot', { type: 'button', class: `syncdot--${syncTone}`, title: syncTitle, 'aria-label': syncTitle, onclick: () => goto('mehr') },
-      icon(syncTone === 'on' ? 'cloud' : syncTone === 'off' ? 'cloudOff' : syncTone === 'error' ? 'cloudOff' : 'cloud', 18),
+    h('div.topbar__icons',
+      // Der Reiseplan ist kein Tab, sondern eine eigene Adresse — dieser
+      // Knopf ist der einzige Weg dahin, deshalb steht er in der Kopfzeile,
+      // nicht in der Bottom-Navigation.
+      h('button.icon-btn', {
+        type: 'button', class: route === 'plan' ? 'is-active' : '',
+        title: 'Reiseplan', 'aria-label': 'Reiseplan', onclick: () => goto('plan'),
+      }, icon('calendar', 20)),
+      h('button.syncdot', { type: 'button', class: `syncdot--${syncTone}`, title: syncTitle, 'aria-label': syncTitle, onclick: () => goto('mehr') },
+        icon(syncTone === 'on' ? 'cloud' : syncTone === 'off' ? 'cloudOff' : syncTone === 'error' ? 'cloudOff' : 'cloud', 18),
+      ),
     ),
   );
 }
@@ -352,10 +425,17 @@ function deletionBar() {
   );
 }
 
-function fab(tabId) {
+function fab(route) {
   // Budget und Einstellungen haben ihre Knöpfe im Inhalt — dort würde der
   // schwebende Knopf nur die Liste verdecken.
-  if (tabId === 'budget' || tabId === 'mehr') return null;
+  if (route === 'budget' || route === 'mehr') return null;
+  if (route === 'plan') {
+    return h('button.fab', {
+      type: 'button',
+      onclick: () => actions.addPlanItem(),
+      'aria-label': 'Programmpunkt eintragen',
+    }, icon('plus', 24));
+  }
   return h('button.fab', {
     type: 'button',
     onclick: () => actions.addExpense(),

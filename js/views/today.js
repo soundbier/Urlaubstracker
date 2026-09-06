@@ -3,9 +3,9 @@
  * Sekunden erledigt hat und wieder Urlaub machen kann.
  */
 import { h, icon } from '../dom.js';
-import { computeBudget, plannedOnly, todayISO, MAX_PEOPLE } from '../calc.js';
+import { computeBudget, plannedOnly, planItemsOnDay, todayISO, MAX_PEOPLE } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
-import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar, daymark } from '../ui/parts.js';
+import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, daymark } from '../ui/parts.js';
 
 // Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
 // Verdikt, kein Dauerzustand. Erst beim Kippen ins Knappe oder Über zeigt er
@@ -13,12 +13,14 @@ import { stat, sectionTitle, expenseRow, plannedRow, emptyState, bar, daymark } 
 const TONE = { good: 'neutral', tight: 'warn', over: 'over' };
 
 export function renderToday(state, actions) {
-  const { trip, expenses, contributions } = state;
+  const { trip, expenses, contributions, planItems } = state;
   const knowsMe = trip.people.some((p) => p.id === state.myPersonId);
   const today = todayISO();
   const b = computeBudget({ trip, contributions, expenses, today });
   const cur = trip.currency;
   const todays = expenses.filter((e) => e.date === today && !e.planned);
+  const todaysPlan = planItemsOnDay(planItems, today);
+  const expenseById = new Map(expenses.map((e) => [e.id, e]));
   // Fällig heißt: das Datum ist erreicht, der Haken fehlt noch. Alles, was
   // erst nächste Woche dran ist, steht unter „Ausgaben“ — hier wäre es eine
   // zweite Kopie derselben Liste und nichts, was heute jemand anfassen müsste.
@@ -58,8 +60,19 @@ export function renderToday(state, actions) {
     ),
     // Die Handlungsebene setzt bewusst größeren Abstand zur Kennzahlreihe
     // darüber ab: dort endete der Zustand, hier beginnt, was zu tun ist.
-    due.length
+    todaysPlan.length
       ? h('section.section', { class: 'section--action' },
+          sectionTitle('Programm heute'),
+          h('div.list', ...todaysPlan.map((item) => planItemRow(item, trip, {
+            onEdit: actions.editPlanItem,
+            onToggle: actions.togglePlanItem,
+            expenseById,
+          }))),
+        )
+      : null,
+
+    due.length
+      ? h('section.section', { class: todaysPlan.length ? '' : 'section--action' },
           sectionTitle(
             'Fällig',
             h('span.section__meta.section__meta--amount', money(due.reduce((a, e) => a + e.amount, 0), cur)),
@@ -70,7 +83,7 @@ export function renderToday(state, actions) {
         )
       : null,
 
-    h('section.section', { class: due.length ? '' : 'section--action' },
+    h('section.section', { class: !todaysPlan.length && !due.length ? 'section--action' : '' },
       sectionTitle(
         'Heute eingetragen',
         todays.length ? h('span.section__meta.section__meta--amount', money(todays.reduce((a, e) => a + e.amount, 0), cur)) : null,

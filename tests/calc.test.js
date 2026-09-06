@@ -9,6 +9,7 @@ import {
   tripPhase, POT, MAX_PEOPLE, PERSON_COLORS, nextPersonColor, personEntryCount,
   normalizeShares, averageShare,
   cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
+  planItemsOnDay, planItemsByDay, planItemDone,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -496,4 +497,53 @@ test('Anteile in Prozent summieren sich auf 100', () => {
   // Die Anzeige neben den Steppern nutzt dieselbe Verteilung wie das Geld.
   assert.equal(allocateByShares(100, [1, 1, 1, 1, 1, 1, 1, 1]).reduce((a, b) => a + b, 0), 100);
   assert.deepEqual(allocateByShares(100, [2, 1, 1]), [50, 25, 25]);
+});
+
+// -------------------------------------------------------------------- Reiseplan
+
+test('Programmpunkte eines Tages: ohne Uhrzeit zuerst, sonst nach Uhrzeit', () => {
+  const items = [
+    { id: 'p1', date: '2026-07-03', time: '15:00', title: 'Museum' },
+    { id: 'p2', date: '2026-07-03', time: '', title: 'Frühstück im Hotel' },
+    { id: 'p3', date: '2026-07-03', time: '09:30', title: 'Wanderung' },
+    { id: 'p4', date: '2026-07-04', time: '12:00', title: 'Anderer Tag' },
+  ];
+  const day = planItemsOnDay(items, '2026-07-03');
+  assert.deepEqual(day.map((p) => p.id), ['p2', 'p3', 'p1']);
+});
+
+test('Reiseplan zeigt jeden Reisetag, auch ohne Einträge', () => {
+  const items = [{ id: 'p1', date: '2026-07-02', time: '', title: 'Ankunft' }];
+  const days = planItemsByDay(items, '2026-07-01', '2026-07-03');
+  assert.equal(days.length, 3);
+  assert.deepEqual(days.map((d) => d.date), ['2026-07-01', '2026-07-02', '2026-07-03']);
+  assert.deepEqual(days[0].items, []);
+  assert.equal(days[1].items.length, 1);
+
+  // Ein Punkt außerhalb des Reisezeitraums geht nicht verloren.
+  const withStray = planItemsByDay([...items, { id: 'p2', date: '2026-07-10', title: 'Verlängerung' }], '2026-07-01', '2026-07-03');
+  assert.equal(withStray.length, 4);
+  assert.equal(withStray.at(-1).date, '2026-07-10');
+});
+
+test('Erledigt gilt auch, wenn die Vormerkung anderswo bezahlt wurde', () => {
+  const expenseById = new Map([
+    ['e1', { id: 'e1', planned: true }],
+    ['e2', { id: 'e2', planned: false, fromPlan: true }],
+  ]);
+  // Eigenes Feld sagt „offen“, ist aber selbst erledigt markiert.
+  assert.equal(planItemDone({ done: true, linkedExpenseId: null }, expenseById), true);
+  // Verknüpfte Vormerkung ist noch offen — der Programmpunkt bleibt es auch.
+  assert.equal(planItemDone({ done: false, linkedExpenseId: 'e1' }, expenseById), false);
+  // Die Vormerkung wurde unter „Ausgaben“ bezahlt, ohne den Programmpunkt
+  // anzufassen — er gilt trotzdem als erledigt.
+  assert.equal(planItemDone({ done: false, linkedExpenseId: 'e2' }, expenseById), true);
+  // Kein Kostenpunkt: nur das eigene Feld zählt.
+  assert.equal(planItemDone({ done: false, linkedExpenseId: null }, expenseById), false);
+});
+
+test('An wem ein Programmpunkt hängt, zählt beim Entfernen einer Person mit', () => {
+  const planItems = [{ id: 'p1', payer: 'lukas' }];
+  assert.equal(personEntryCount('lukas', { planItems }), 1);
+  assert.equal(personEntryCount('marie', { planItems }), 0);
 });
