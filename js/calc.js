@@ -316,6 +316,83 @@ export function groupByDay(expenses) {
 // ------------------------------------------------------------------ Reiseplan
 
 /**
+ * Die Kategorien eines Programmpunkts — eigene, nicht die der Ausgaben
+ * (`CATEGORIES` oben): „Museum“ ist keine Art, wofür Geld draufgeht, sondern
+ * eine Art, was ansteht, und „Sprit & Transport“ unterscheidet nicht, ob es
+ * der Flug hinüber war oder die Fähre zur Insel. Dieselbe Trennung wie bei
+ * der Packliste, deren Kategorien aus demselben Grund eigene sind (siehe
+ * `PACK_CATEGORIES`).
+ *
+ * Bekommt ein Programmpunkt einen Kostenpunkt, braucht die verknüpfte
+ * Ausgabe trotzdem eine der sechs Ausgaben-Kategorien — dafür sorgt
+ * `planExpenseCategory` weiter unten.
+ */
+export const PLAN_CATEGORIES = [
+  { id: 'flight', label: 'Flug', icon: 'flight' },
+  { id: 'train', label: 'Bahn', icon: 'train' },
+  { id: 'transport', label: 'Transport', icon: 'transport' },
+  { id: 'stay', label: 'Unterkunft', icon: 'stay' },
+  { id: 'activity', label: 'Erleben', icon: 'activity' },
+  { id: 'food', label: 'Essen & Trinken', short: 'Essen', icon: 'food' },
+  { id: 'shopping', label: 'Einkaufen', short: 'Einkauf', icon: 'shopping' },
+  { id: 'other', label: 'Sonstiges', icon: 'other' },
+];
+
+export const PLAN_CATEGORY_BY_ID = Object.fromEntries(PLAN_CATEGORIES.map((c) => [c.id, c]));
+
+/**
+ * Die Sorten unter „Erleben“ — der Bogen von der Stadtbesichtigung bis zum
+ * Ausgehen abends, den eine einzelne Kategorie nicht mehr auseinanderhält.
+ * Nach demselben Muster wie die Sorten der Packliste (siehe
+ * `PACK_SUBCATEGORIES`): freiwillig, und nur unter „Erleben“ überhaupt
+ * vorhanden — ein Flug hat keine Sorte, die ihn genauer beschreibt.
+ */
+export const PLAN_SUBCATEGORIES = {
+  activity: [
+    { id: 'sightseeing', label: 'Sightseeing' },
+    { id: 'museum', label: 'Museum' },
+    { id: 'nature', label: 'Natur & Wandern' },
+    { id: 'sport', label: 'Sport & Baden' },
+    { id: 'event', label: 'Veranstaltung' },
+    { id: 'nightlife', label: 'Ausgehen' },
+  ],
+};
+
+// Erst die Kategorie, dann die Sorte: dieselbe Kennung könnte sonst in einer
+// anderen Kategorie etwas anderes treffen.
+const PLAN_SUB_BY_ID = Object.fromEntries(
+  Object.entries(PLAN_SUBCATEGORIES).map(([cat, list]) => [cat, Object.fromEntries(list.map((s) => [s.id, s]))]),
+);
+
+/**
+ * Welche Ausgaben-Kategorie die mit einem Programmpunkt verknüpfte
+ * Vormerkung bekommt (siehe `store.js`, `addPlanItem`/`updatePlanItem`).
+ * Flug und Bahn zählen dort als „Sprit & Transport“ — für die Kasse ist ein
+ * Bahnticket schlicht eine Transportausgabe, eine eigene Geld-Kategorie
+ * dafür bräuchte niemand. Alles andere trifft direkt dieselbe Kennung.
+ */
+const PLAN_TO_EXPENSE_CATEGORY = {
+  flight: 'transport', train: 'transport', transport: 'transport',
+  stay: 'stay', activity: 'activity', food: 'food', shopping: 'shopping', other: 'other',
+};
+export const planExpenseCategory = (planCategoryId) =>
+  PLAN_TO_EXPENSE_CATEGORY[PLAN_CATEGORY_BY_ID[planCategoryId] ? planCategoryId : 'other'];
+
+/** Wie `packCategory`: unbekannt oder fehlt wird zu „Sonstiges“, nie zu nichts. */
+export const planCategory = (item) => (PLAN_CATEGORY_BY_ID[item?.category] ? item.category : 'other');
+
+/** Die Sorten, die zu einer Kategorie gehören — leer, wo es keine gibt. */
+export const planSubs = (categoryId) => PLAN_SUBCATEGORIES[categoryId] || [];
+
+/**
+ * Wie `packSub`: hängt an der *geprüften* Kategorie, nicht an der rohen —
+ * „Museum“ unter „Flug“ wäre keine Sorte mehr, sondern ein Fehler mit
+ * Etikett.
+ */
+export const planSub = (item) => (PLAN_SUB_BY_ID[planCategory(item)]?.[item?.sub] ? item.sub : '');
+export const planSubLabel = (item) => PLAN_SUB_BY_ID[planCategory(item)]?.[planSub(item)]?.label || '';
+
+/**
  * Ob ein Programmpunkt „erledigt“ wirkt.
  *
  * Das ist nicht immer dasselbe wie sein eigenes `done`-Feld: Wird die

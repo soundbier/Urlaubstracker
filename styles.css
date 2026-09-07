@@ -608,6 +608,12 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   font-variant-numeric: tabular-nums;
   color: var(--text-faint);
 }
+/*
+ * Mit einer Dauer: „von“ und „bis“ untereinander statt nebeneinander — die
+ * Spalte ist für zwei Uhrzeiten nebeneinander zu schmal, senkrecht ist genug
+ * Höhe da (wie Abfahrt und Ankunft im selben Fahrplan).
+ */
+.trow__time--range { flex-direction: column; justify-content: center; gap: 1px; line-height: 1.25; }
 .prow__done {
   flex: none;
   align-self: center;

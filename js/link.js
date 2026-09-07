@@ -9,6 +9,7 @@
 import {
   CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packSub, packSubLabel, packQty,
+  PLAN_CATEGORY_BY_ID, planSub, planSubLabel,
 } from './calc.js';
 
 function toBase64Url(str) {
@@ -113,20 +114,29 @@ export function parseImport(text) {
   // generischen `rows()`, die einen gültigen Betrag voraussetzt.
   const planItems = (Array.isArray(data.planItems) ? data.planItems : [])
     .filter((p) => p && typeof p.id === 'string' && p.id && isValidDate(p.date))
-    .map((p) => ({
-      ...p,
-      title: String(p.title || '').trim() || 'Programmpunkt',
-      category: CATEGORY_BY_ID[p.category] ? p.category : 'other',
-      time: /^\d{2}:\d{2}$/.test(p.time) ? p.time : '',
-      location: String(p.location || '').trim(),
-      note: String(p.note || '').trim(),
-      payer: validPayer(p.payer) ? p.payer : POT,
-      done: p.done === true,
-      // Zeigt die Verknüpfung ins Leere (Ausgabe fehlt oder kam nicht durch
-      // die Prüfung), ist der Programmpunkt eben ohne Kostenpunkt da — besser
-      // als eine Kennung, die nirgendwohin führt.
-      linkedExpenseId: typeof p.linkedExpenseId === 'string' && expenseIds.has(p.linkedExpenseId) ? p.linkedExpenseId : null,
-    }));
+    .map((p) => {
+      const category = PLAN_CATEGORY_BY_ID[p.category] ? p.category : 'other';
+      const time = /^\d{2}:\d{2}$/.test(p.time) ? p.time : '';
+      return {
+        ...p,
+        title: String(p.title || '').trim() || 'Programmpunkt',
+        category,
+        // Die Sorte wird gegen die *geprüfte* Kategorie gehalten, nicht gegen
+        // die rohe — wie bei der Packliste (siehe dort).
+        sub: planSub({ category, sub: p.sub }),
+        time,
+        // Ohne Anfang keine Dauer, also auch kein Ende.
+        endTime: time && /^\d{2}:\d{2}$/.test(p.endTime) ? p.endTime : '',
+        location: String(p.location || '').trim(),
+        note: String(p.note || '').trim(),
+        payer: validPayer(p.payer) ? p.payer : POT,
+        done: p.done === true,
+        // Zeigt die Verknüpfung ins Leere (Ausgabe fehlt oder kam nicht durch
+        // die Prüfung), ist der Programmpunkt eben ohne Kostenpunkt da — besser
+        // als eine Kennung, die nirgendwohin führt.
+        linkedExpenseId: typeof p.linkedExpenseId === 'string' && expenseIds.has(p.linkedExpenseId) ? p.linkedExpenseId : null,
+      };
+    });
 
   // Die Packliste hat weder Datum noch Betrag — von der generischen `rows()`
   // bliebe da nichts übrig. Gebraucht wird nur ein Titel; die drei Merkmale
@@ -174,8 +184,10 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   const money = (cents) => (cents / 100).toFixed(2).replace('.', ',');
   const personName = (id) => trip.people.find((p) => p.id === id)?.name || 'Unbekannt';
   // In der Tabelle stehen die Namen, die auch in der App stehen — nicht die
-  // internen Kennungen wie `food` oder `pot`.
+  // internen Kennungen wie `food` oder `pot`. Der Reiseplan hat eigene
+  // Kategorien (siehe `PLAN_CATEGORY_BY_ID`), deshalb ein eigenes Nachschlagen.
   const categoryLabel = (id) => (CATEGORY_BY_ID[id] || CATEGORY_BY_ID.other).label;
+  const planCategoryLabel = (id) => (PLAN_CATEGORY_BY_ID[id] || PLAN_CATEGORY_BY_ID.other).label;
   const payerLabel = (payer) => {
     if (payer === POT) return 'Gemeinsame Kasse';
     if (isCashPayer(payer)) return `Bargeld (${personName(cashPayerPerson(payer))})`;
@@ -198,10 +210,11 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   // Kostenpunkt hat kein Geld, das in dieser Tabelle sonst fehlen würde.
   for (const p of [...planItems].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const linked = p.linkedExpenseId ? expenses.find((e) => e.id === p.linkedExpenseId) : null;
-    const notiz = [p.title, p.location, p.note].filter(Boolean).join(' · ');
+    const zeit = p.time && p.endTime ? `${p.time}–${p.endTime}` : p.time || '';
+    const notiz = [p.title, planSubLabel(p), p.location, p.note].filter(Boolean).join(' · ');
     lines.push([
-      'Programm', p.date, p.time || '', linked ? money(linked.amount) : '',
-      categoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,
+      'Programm', p.date, zeit, linked ? money(linked.amount) : '',
+      planCategoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,
     ].map(esc).join(';'));
   }
   // Die Packliste hat in dieser Tabelle keine Spalte für sich: kein Datum,

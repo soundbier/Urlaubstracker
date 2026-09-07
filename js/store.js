@@ -11,7 +11,7 @@ import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.
 import { newId } from './ids.js';
 import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
 import { keepCopy, lastCopy, discardCopy } from './trash.js';
-import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare, packQty } from './calc.js';
+import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare, packQty, planExpenseCategory } from './calc.js';
 
 let backend = null;
 const listeners = new Set();
@@ -518,14 +518,17 @@ export async function deleteExpense(id) {
  * Anfang an, auch für einen noch nicht besuchten, aber schon teuren
  * Programmpunkt — genau wie bei jeder anderen Vormerkung.
  */
-export async function addPlanItem({ date, time, title, category, note, payer, amount, location }) {
+export async function addPlanItem({ date, time, endTime, title, category, sub, note, payer, amount, location }) {
   const now = Date.now();
   const row = {
     id: newId(),
     date: date || todayISO(),
     time: time || '',
+    // Nur mit Start sinnvoll — ein Ende ohne Anfang wäre keine Dauer.
+    endTime: time ? endTime || '' : '',
     title: String(title || '').trim(),
     category: category || 'other',
+    sub: sub || '',
     location: (location || '').trim(),
     note: (note || '').trim(),
     payer: payer || POT,
@@ -536,7 +539,7 @@ export async function addPlanItem({ date, time, title, category, note, payer, am
     createdBy: state.myPersonId || null,
   };
   if (amount > 0) {
-    const expense = await addExpense({ amount, date: row.date, category: row.category, note: row.title, payer: row.payer, planned: true });
+    const expense = await addExpense({ amount, date: row.date, category: planExpenseCategory(row.category), note: row.title, payer: row.payer, planned: true });
     row.linkedExpenseId = expense.id;
   }
   await backend.putPlanItem(row);
@@ -563,10 +566,10 @@ export async function updatePlanItem(id, patch) {
 
   if (stillOpen && patch.amount !== undefined) {
     if (patch.amount > 0 && !linked) {
-      const expense = await addExpense({ amount: patch.amount, date: next.date, category: next.category, note: next.title, payer: next.payer, planned: true });
+      const expense = await addExpense({ amount: patch.amount, date: next.date, category: planExpenseCategory(next.category), note: next.title, payer: next.payer, planned: true });
       next.linkedExpenseId = expense.id;
     } else if (patch.amount > 0 && linked) {
-      await updateExpense(linked.id, { amount: patch.amount, date: next.date, category: next.category, note: next.title, payer: next.payer });
+      await updateExpense(linked.id, { amount: patch.amount, date: next.date, category: planExpenseCategory(next.category), note: next.title, payer: next.payer });
     } else if (!(patch.amount > 0) && linked) {
       await deleteExpense(linked.id);
       next.linkedExpenseId = null;
@@ -575,7 +578,7 @@ export async function updatePlanItem(id, patch) {
     // Kein neuer Betrag im Patch — aber Datum, Kategorie, Titel oder Zahler
     // können sich geändert haben, und die noch offene Vormerkung soll dieselbe
     // Auskunft tragen wie der Programmpunkt selbst.
-    await updateExpense(linked.id, { date: next.date, category: next.category, note: next.title, payer: next.payer });
+    await updateExpense(linked.id, { date: next.date, category: planExpenseCategory(next.category), note: next.title, payer: next.payer });
   }
 
   await backend.putPlanItem(next);
