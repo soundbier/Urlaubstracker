@@ -1,7 +1,7 @@
 /** Bausteine, die in mehreren Ansichten vorkommen. */
 import { h, icon } from '../dom.js';
 import {
-  CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone,
+  CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone, MAX_PEOPLE,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packCategory, packStatus, packBag, packItemPacked,
   packSubLabel, packQty,
 } from '../calc.js';
@@ -33,6 +33,31 @@ export function stat(label, value, sub, { tone = '' } = {}) {
  */
 export function sectionTitle(text, action, { tone = '' } = {}) {
   return h('div.section__head', h('h2.section__title', { class: tone && `section__title--${tone}` }, text), action || null);
+}
+
+/**
+ * Fragt, wer an diesem Gerät sitzt — überall dort, wo die App das für sich
+ * braucht: privat bezahlte Ausgaben (siehe `views/today.js`) und die eigene,
+ * private Packliste (siehe `views/packing.js`) gehören ohne diese Angabe
+ * niemandem.
+ *
+ * Wer über einen geteilten Link dazukommt, steht oft noch gar nicht in der
+ * Liste — deshalb der letzte Knopf: er trägt die Person selbst ein, statt sie
+ * darauf zu verweisen, dass jemand anderes das zuerst tun muss.
+ */
+export function whoAmICallout(trip, actions) {
+  return h('div.callout',
+    h('p.callout__title', 'Wer bist du?'),
+    h('p', 'Die App ordnet dir dann zum Beispiel privat bezahlte Ausgaben und deine eigene Packliste zu.'),
+    h('div.chips',
+      ...trip.people.map((p) =>
+        h('button.chip', { type: 'button', onclick: () => actions.setMyPerson(p.id) },
+          h('span.dot', { style: { background: p.color } }), p.name)),
+      trip.people.length < MAX_PEOPLE
+        ? h('button.chip', { type: 'button', onclick: () => actions.addPerson({ setAsMe: true }) }, icon('plus', 15), 'Ich stehe noch nicht da')
+        : null,
+    ),
+  );
 }
 
 /**

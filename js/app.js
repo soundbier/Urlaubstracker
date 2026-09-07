@@ -14,6 +14,7 @@ import { renderFinances, financePane, setFinancePane } from './views/finances.js
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
 import { renderPlanning, planningPane } from './views/planning.js';
+import { packingScope } from './views/packing.js';
 
 /**
  * Vier Ziele, in der Reihenfolge, in der man sie im Urlaub braucht: was steht
@@ -507,9 +508,12 @@ function fab(route) {
     // Zwei Reiter, zwei Sorten Eintrag: unter „Tagesplanung“ ein Programmpunkt,
     // unter „Packliste“ ein Ding, das mit muss.
     const packing = planningPane() === 'packliste';
+    // Auf der eigenen Liste ohne gewählte Person gibt es nichts einzutragen —
+    // der Bildschirm selbst fragt in dem Fall nach, wer hier sitzt.
+    if (packing && packingScope() === 'mine' && !state.myPersonId) return null;
     return h('button.fab', {
       type: 'button',
-      onclick: () => (packing ? actions.addPackItem() : actions.addPlanItem()),
+      onclick: () => (packing ? actions.addPackItem({ shared: packingScope() === 'shared' }) : actions.addPlanItem()),
       'aria-label': packing ? 'Auf die Packliste setzen' : 'Programmpunkt eintragen',
     }, icon('plus', 24));
   }

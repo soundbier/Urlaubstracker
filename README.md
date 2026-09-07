@@ -23,7 +23,10 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
   noch zu waschen, liegt bereit, eingepackt) und Gepäck (Hand- oder
   Aufgabegepäck) sortieren. Eigene Reiter für Handgepäck, Aufgabegepäck und
   „Zu tun“. Je Kategorie eine Sorte (T-Shirt, Lange Hose, Wanderschuhe …) und
-  je Eintrag eine Anzahl — beides freiwillig und blass an der Zeile.
+  je Eintrag eine Anzahl — beides freiwillig und blass an der Zeile. Zwei
+  Listen zur Wahl: die eigene, die nur der sieht, der sie angelegt hat, und
+  die gemeinsame, die alle in der Reisegruppe sehen, abhaken und bearbeiten
+  können — voreingestellt ist die gemeinsame.
 - **Übersicht der Packliste** — ein eigener Reiter, der in Stücken zählt statt
   in Zeilen: „6 T-Shirts, 4 Hemden, 2 von 4 langen Hosen“, nach Kategorie und
   Sorte, umschaltbar zwischen Handgepäck, Aufgabegepäck und beidem.

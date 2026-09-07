@@ -435,15 +435,16 @@ export async function addPerson(name, { setAsMe = false } = {}) {
  *
  * Nur solange kein Geld an der Person hängt: eine Einzahlung ohne Einzahler
  * oder eine privat bezahlte Ausgabe ohne Zahler würde die Abrechnung
- * verfälschen, ohne dass es jemandem auffällt. Wer schon eingetragen ist,
- * bleibt deshalb drin — Namen ändern geht weiterhin.
+ * verfälschen, ohne dass es jemandem auffällt. Genauso wenig, solange sie
+ * noch eine private Packliste hat — die gehörte danach niemandem mehr. Wer
+ * schon eingetragen ist, bleibt deshalb drin — Namen ändern geht weiterhin.
  */
 export async function removePerson(personId) {
   const people = state.trip?.people || [];
   const person = people.find((p) => p.id === personId);
   if (!person) return;
   if (people.length <= 1) throw new Error('Eine Person muss bleiben.');
-  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems });
+  const used = personEntryCount(personId, { contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems });
   if (used) {
     throw new Error(
       used === 1
@@ -627,7 +628,7 @@ export async function markPlanItemOpen(id) {
  * ist die Art, wie Packlisten entstehen. Ein Titel genügt, alles Weitere hat
  * eine Voreinstellung und lässt sich später an der Zeile ändern.
  */
-export async function addPackItem({ title, category, sub, status, bag, note, qty } = {}) {
+export async function addPackItem({ title, category, sub, status, bag, note, qty, shared } = {}) {
   const now = Date.now();
   const row = {
     id: newId(),
@@ -641,6 +642,12 @@ export async function addPackItem({ title, category, sub, status, bag, note, qty
     status: status || 'open',
     bag: bag || 'none',
     note: (note || '').trim(),
+    // Immer ausdrücklich `true` oder `false`, nie unbestimmt — nur so bleibt
+    // ein Eintrag ohne das Feld sicher als „aus der Zeit vor der Unterscheidung“
+    // erkennbar (siehe `packItemShared`). Privat geht nur mit gewählter
+    // Person: sonst gehörte der Eintrag niemandem und wäre auf keiner der
+    // beiden Listen mehr zu finden (siehe `packItemsMine`).
+    shared: shared === true || !state.myPersonId,
     createdAt: now,
     updatedAt: now,
     createdBy: state.myPersonId || null,
@@ -652,7 +659,23 @@ export async function addPackItem({ title, category, sub, status, bag, note, qty
 export async function updatePackItem(id, patch) {
   const row = state.packItems.find((p) => p.id === id);
   if (!row) return;
-  await backend.putPackItem({ ...row, ...patch, updatedAt: Date.now() });
+  const next = { ...row, ...patch };
+  if (patch.shared === false) {
+    if (!state.myPersonId) {
+      // Dasselbe Sicherheitsnetz wie beim Anlegen: ohne gewählte Person bleibt
+      // der Eintrag gemeinsam, statt für niemanden mehr auffindbar zu sein.
+      next.shared = true;
+    } else if (row.shared !== false) {
+      // Wer einen Eintrag auf „Meine Liste“ umstellt, macht ihn zu seinem
+      // eigenen. Ohne das bliebe `createdBy` an der Person hängen, die ihn
+      // ursprünglich angelegt hat — der Eintrag verschwände dann für beide:
+      // aus der gemeinsamen Liste, weil nicht mehr geteilt, und aus der
+      // eigenen der bearbeitenden Person, weil `createdBy` weiter auf jemand
+      // anderen zeigt.
+      next.createdBy = state.myPersonId;
+    }
+  }
+  await backend.putPackItem({ ...next, updatedAt: Date.now() });
 }
 
 export async function deletePackItem(id) {

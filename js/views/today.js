@@ -4,9 +4,9 @@
  * Blick. Was heute schon eingetragen wurde, steht darunter.
  */
 import { h, icon } from '../dom.js';
-import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO, MAX_PEOPLE } from '../calc.js';
+import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO } from '../calc.js';
 import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
-import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar } from '../ui/parts.js';
+import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, whoAmICallout } from '../ui/parts.js';
 import { setFinancePane } from './finances.js';
 
 // Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
@@ -65,7 +65,7 @@ export function renderToday(state, actions) {
   const expenseById = new Map(expenses.map((e) => [e.id, e]));
 
   return h('div.view',
-    knowsMe ? null : whoAmI(trip, actions),
+    knowsMe ? null : whoAmICallout(trip, actions),
     // Die eine laute Zahl steht oben, wo das Auge sie ohne Scrollen findet.
     // Sie braucht keine Überschrift: die Augenbraue in ihr sagt schon, was
     // sie ist.
@@ -172,30 +172,6 @@ function dayNav(trip, selected, today, actions) {
     h('button.icon-btn.daynav__arrow.daynav__arrow--next', {
       type: 'button', disabled: atEnd, title: 'Nächster Tag', 'aria-label': 'Nächster Tag', onclick: () => go(1),
     }, icon('chevron', 20)),
-  );
-}
-
-/**
- * Nach dem Beitritt über eine Einladung weiß das Gerät noch nicht, wer daran
- * sitzt. Ohne diese Angabe landen privat bezahlte Ausgaben in der Abrechnung
- * bei niemandem.
- *
- * Wer über einen geteilten Link dazukommt, steht oft noch gar nicht in der
- * Liste — deshalb der letzte Knopf: er trägt die Person selbst ein, statt sie
- * darauf zu verweisen, dass jemand anderes das zuerst tun muss.
- */
-function whoAmI(trip, actions) {
-  return h('div.callout',
-    h('p.callout__title', 'Wer bist du?'),
-    h('p', 'Die App ordnet privat bezahlte Ausgaben deinem Namen zu. Ohne die Angabe fehlen sie in der Endabrechnung.'),
-    h('div.chips',
-      ...trip.people.map((p) =>
-        h('button.chip', { type: 'button', onclick: () => actions.setMyPerson(p.id) },
-          h('span.dot', { style: { background: p.color } }), p.name)),
-      trip.people.length < MAX_PEOPLE
-        ? h('button.chip', { type: 'button', onclick: () => actions.addPerson({ setAsMe: true }) }, icon('plus', 15), 'Ich stehe noch nicht da')
-        : null,
-    ),
   );
 }
 

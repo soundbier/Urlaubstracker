@@ -12,6 +12,7 @@ import {
   planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip,
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
   packSub, packSubLabel, packSubs, packQty, packOverview,
+  packItemShared, packItemsMine, packItemsShared,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -371,6 +372,16 @@ test('An wem Bargeld hängt, lässt sich auch zählen', () => {
   assert.equal(personEntryCount('lukas', daten), 2);
 });
 
+test('Eine private Packliste hängt genauso an einer Person wie Geld', () => {
+  const packItems = [
+    { id: 'a', title: 'Zahnbürste', shared: false, createdBy: 'marie' },
+    { id: 'b', title: 'Erste-Hilfe-Set', shared: true, createdBy: 'marie' }, // gemeinsam: zählt nicht
+    { id: 'c', title: 'Reisepass', createdBy: 'marie' }, // aus der Zeit davor: gemeinsam, zählt nicht
+  ];
+  assert.equal(personEntryCount('marie', { packItems }), 1, 'nur der private Eintrag hängt an ihr');
+  assert.equal(personEntryCount('lukas', { packItems }), 0);
+});
+
 test('Gruppierungen für die Listen', () => {
   const cats = spentByCategory(EXPENSES);
   assert.equal(cats[0].id, 'stay');
@@ -692,4 +703,29 @@ test('Die Übersicht lässt sich auf eine Tasche eingrenzen', () => {
   );
   assert.equal(packOverview(items, 'hold').total, 4, 'die vier Hemden sind vier Stücke');
   assert.deepEqual(packOverview([], 'both'), { bag: 'both', done: 0, total: 0, categories: [] });
+});
+
+test('Ein Eintrag ohne das Feld ist gemeinsam — aus der Zeit vor der Unterscheidung', () => {
+  assert.equal(packItemShared({}), true);
+  assert.equal(packItemShared({ shared: undefined }), true);
+  assert.equal(packItemShared({ shared: true }), true);
+  assert.equal(packItemShared({ shared: false }), false);
+});
+
+test('Meine Liste ist leer, solange niemand gewählt ist', () => {
+  const items = [
+    { id: 'a', title: 'Zahnbürste', shared: false, createdBy: 'p1' },
+    { id: 'b', title: 'Erste-Hilfe-Set', shared: true, createdBy: 'p1' },
+    { id: 'c', title: 'Sonnencreme', shared: false, createdBy: 'p2' },
+    { id: 'd', title: 'Reisepass', createdBy: 'p1' }, // aus der Zeit davor: gemeinsam
+  ];
+
+  assert.deepEqual(packItemsMine(items, 'p1').map((i) => i.title), ['Zahnbürste']);
+  assert.deepEqual(packItemsMine(items, 'p2').map((i) => i.title), ['Sonnencreme']);
+  // Ohne Person keine private Liste — sonst landeten mehrere Geräte ohne
+  // gewählte Person alle im selben Topf, nur weil `createdBy` bei allen fehlt.
+  assert.deepEqual(packItemsMine(items, null), []);
+  assert.deepEqual(packItemsMine(items, undefined), []);
+
+  assert.deepEqual(packItemsShared(items).map((i) => i.title), ['Erste-Hilfe-Set', 'Reisepass']);
 });
