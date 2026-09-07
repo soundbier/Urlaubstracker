@@ -83,22 +83,29 @@ Bremse — für den eigenen Familien- und Freundeskreis mag das reichen. Für
 jede Auslieferung, die öffentlich erreichbar ist, sind aber **beide**
 Schritte unten nötig; der erste allein bremst noch nichts:
 
-1. **Nachweis einrichten** (in der Web-App: reCAPTCHA v3, siehe
+1. **Nachweis einrichten** (in der Web-App: reCAPTCHA Enterprise, siehe
    [Firebase-Dokumentation, „App Check mit reCAPTCHA
-   v3“](https://firebase.google.com/docs/app-check/web/recaptcha-provider) —
-   Firebase empfiehlt für neue Einrichtungen inzwischen reCAPTCHA
-   Enterprise; wer schon einen v3-Schlüssel hat oder den einfacheren Weg
-   ohne eigenes Google-Cloud-Setup will, bleibt bei v3):
-   - Unter [g.co/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create)
-     einen Schlüssel vom Typ **reCAPTCHA v3** anlegen, die eigene(n)
-     Domain(s) eintragen. Der **Site Key** aus diesem Schritt ist
-     `appCheckSiteKey`.
+   Enterprise“](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider) —
+   die von Firebase für neue Einrichtungen empfohlene Variante; sie läuft
+   über ein Google-Cloud-Projekt, nicht über die klassische
+   `g.co/recaptcha/admin`-Konsole):
+   - In der [Google-Cloud-Konsole unter reCAPTCHA
+     Enterprise](https://console.cloud.google.com/security/recaptcha) einen
+     Websiteschlüssel anlegen, die eigene(n) Domain(s) eintragen. Der
+     **Websiteschlüssel** aus diesem Schritt ist `appCheckSiteKey`.
    - In der Firebase-Konsole unter **App Check** die Web-App registrieren,
-     Provider **reCAPTCHA v3** wählen und denselben Site Key eintragen.
+     Anbieter **reCAPTCHA Enterprise** wählen und denselben Websiteschlüssel
+     eintragen.
    - Den Schlüssel als `appCheckSiteKey` in `firebase-config.json`
      eintragen (siehe [`firebase-config.example.json`](firebase-config.example.json))
      oder bei Cloudflare Pages als `FIREBASE_APPCHECK_SITE_KEY` setzen
-     (siehe unten, „Veröffentlichen“).
+     (siehe unten, „Veröffentlichen”). **Wichtig:** der Anbieter in der
+     Firebase-Konsole und im Code müssen zusammenpassen — ist dort
+     Enterprise registriert, aber der Websiteschlüssel eines *klassischen*
+     reCAPTCHA-v3-Schlüssels eingetragen (oder umgekehrt), scheitert jeder
+     Nachweis, ohne dass die App das erkennen kann; die Firebase-Konsole
+     unter App Check → API zeigt das dann als durchgehend 0 % bestätigte
+     Anfragen.
 2. **Erzwingen** — ohne diesen Schritt akzeptiert Firebase Anfragen auch
    ohne gültigen Nachweis weiterhin, der Schlüssel allein bewirkt also noch
    nichts:
