@@ -102,10 +102,18 @@ export class FirestoreBackend {
 
     this.app = fb.initializeApp(this.config, APP_NAME);
     this._startAppCheck();
+    // `persistentLocalCache` legt Firestore selbst eine eigene, unverschlüsselte
+    // Ablage in IndexedDB an — außerhalb dessen, was `secure-storage.js`
+    // verschlüsselt, und außerhalb dessen, was diese App beeinflussen kann. Der
+    // Preis für Offline-Betrieb bei verbundener Kasse; siehe `privacy.js`, wo
+    // das entsprechend steht.
     this.db = fb.initializeFirestore(this.app, {
       localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }),
     });
 
+    // Dasselbe gilt für die Anmeldung selbst: Firebase legt ihre eigene
+    // Sitzung (anonyme Kennung, Erneuerungs-Merkmal) in ihrer eigenen Ablage
+    // ab, ebenfalls unverschlüsselt und ebenfalls außerhalb dieser Datei.
     const auth = fb.getAuth(this.app);
     await fb.setPersistence(auth, fb.browserLocalPersistence);
     this.uid = await new Promise((resolve, reject) => {

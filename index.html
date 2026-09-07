@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de" data-version="2.0.1">
+<html lang="de" data-version="2.1.0">
 <head>
 <meta charset="utf-8">
 <title>Urlaubstracker</title>
@@ -9,10 +9,13 @@
 <meta name="color-scheme" content="light dark">
 <script>
   /* Hell oder dunkel entscheidet sich, bevor das Stylesheet da ist — sonst
-     blitzt abends erst eine weiße Seite auf. Denselben Schlüssel liest später
-     js/prefs.js; hier steht bewusst nur diese eine Zeile Logik. */
+     blitzt abends erst eine weiße Seite auf. Eigener, unverschlüsselter
+     Schlüssel: die übrigen Einstellungen liegen verschlüsselt (siehe
+     js/secure-storage.js), Entschlüsseln ist aber unvermeidlich asynchron —
+     für eine Farbe, die niemandes Daten preisgibt, lohnt sich der Umweg vor
+     dem ersten Bild nicht. js/prefs.js hält beide Stellen synchron. */
   try {
-    var t = (JSON.parse(localStorage.getItem('urlaubstracker.prefs.v1') || '{}') || {}).theme;
+    var t = localStorage.getItem('urlaubstracker.theme.v1');
     if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     document.documentElement.dataset.theme = t;
   } catch (e) {

@@ -523,7 +523,7 @@ function lockSetup(close, actions) {
     error,
     save,
     h('p.field__note', 'Der Code steht nirgends — auch nicht auf diesem Gerät. Vergessen heißt: neu beitreten mit Name und Passwort der Kasse.'),
-    h('p.field__note', 'Er hält jemanden ab, der das entsperrte Handy in die Hand nimmt. Verschlüsselt sind die Daten damit nicht — dafür sorgt die Sperre des Geräts selbst.'),
+    h('p.field__note', 'Er hält jemanden ab, der das entsperrte Handy in die Hand nimmt und die App öffnet. Die Daten liegen davon unabhängig ohnehin verschlüsselt im Speicher — was dieser Code zusätzlich schützt, ist der Zugriff über die App selbst.'),
   );
 }
 
@@ -545,7 +545,7 @@ function lockSettings(close, actions) {
           current: String(status.minutes),
         });
         if (pick == null) return;
-        lock.setDelay(Number(pick));
+        await lock.setDelay(Number(pick));
         close(true);
         actions.rerender();
       },
@@ -555,7 +555,7 @@ function lockSettings(close, actions) {
       sub: status.biometrics ? 'Der Code bleibt daneben gültig.' : 'Statt den Code zu tippen — sofern das Gerät das anbietet.',
       onClick: async () => {
         if (status.biometrics) {
-          lock.disableBiometrics();
+          await lock.disableBiometrics();
           close(true);
           toast('Nur noch mit Code.');
           actions.rerender();
@@ -942,8 +942,10 @@ function changePasswordSheet(sharing) {
 
 /**
  * Das Passwort aus den geräteeigenen Einstellungen löschen — für alle, denen
- * der Klartext dort (siehe `prefs.js`) zu weit geht. Die Kasse bleibt
- * verbunden, nur anzeigen oder weitergeben kann dieses Gerät die
+ * zu weit geht, dass die App es auf diesem Gerät überhaupt wiederfinden kann.
+ * Verschlüsselt liegt es dort ohnehin (siehe `prefs.js`), aber eben so, dass
+ * die App selbst es sich zurückholen kann; das hier nimmt ihr genau das. Die
+ * Kasse bleibt verbunden, nur anzeigen oder weitergeben kann dieses Gerät die
  * Beitrittsdaten danach nicht mehr.
  */
 async function forgetJoinPassword(sharing) {

@@ -114,10 +114,10 @@ function restoreCard() {
             danger: true,
           });
           if (!ok) return;
-          store.discardLastDeleted();
+          await store.discardLastDeleted();
           toast('Kopie entfernt.');
-          // Der Anfangsbildschirm wird nicht neu gezeichnet, solange sich am
-          // Trip nichts ändert — die Karte räumt sich deshalb selbst weg.
+          // Die Karte räumt sich sofort selbst weg, statt auf den Neuaufbau
+          // durch den aktualisierten Zustand zu warten.
           card.remove();
         },
       }, 'Endgültig entfernen'),

@@ -26,6 +26,10 @@ let state = {
   packItems: [],
   myPersonId: null,
   invite: null, // offene Einladung aus dem Link
+  // Die zuletzt gelöschte Kasse, solange sie noch zurückzuholen ist — siehe
+  // `handleChange`. Nur relevant, solange kein Trip offen ist; dort lohnt
+  // sich das Nachsehen in `trash.js` nicht bei jeder Änderung.
+  lastDeletedSummary: null,
   sync: {
     mode: 'local',
     ready: false,
@@ -94,7 +98,7 @@ function makeTrip({ name, joinName, startDate, endDate, currency = 'EUR', budget
 
 // -------------------------------------------------------------------- Backend
 
-function handleChange(data) {
+async function handleChange(data) {
   const trip = data.trip;
   // Wer an diesem Gerät sitzt, wird lokal gemerkt — die Person kann aber aus
   // einem anderen Trip stammen (Einladung angenommen) oder inzwischen aus der
@@ -109,6 +113,11 @@ function handleChange(data) {
   set({
     trip,
     myPersonId,
+    // Nur nachsehen, solange es keinen Trip gibt — genau dort, wo der
+    // Anfangsbildschirm die Karte zum Zurückholen zeigen könnte. Bei jeder
+    // Änderung an einer laufenden Kasse wäre das Nachsehen in `trash.js`
+    // reine Verschwendung.
+    lastDeletedSummary: trip ? null : await lastCopy(),
     contributions: sortByDate(data.contributions),
     expenses: sortByDate(data.expenses),
     cashOuts: sortByDate(data.cashOuts || []),
@@ -940,7 +949,7 @@ export async function deleteTrip() {
     );
   }
 
-  const backupKept = keepCopy({
+  const backupKept = await keepCopy({
     trip: state.trip,
     contributions: state.contributions,
     expenses: state.expenses,
@@ -954,19 +963,26 @@ export async function deleteTrip() {
   const local = new LocalBackend();
   // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
   await local.deleteTrip();
-  set({ trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], myPersonId: null, invite: null, phase: 'onboarding' });
+  set({
+    trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [],
+    myPersonId: null, invite: null, phase: 'onboarding',
+    // `keepCopy` ist zu diesem Zeitpunkt schon durch — sofort mitgeben, statt
+    // auf das nächste `handleChange` zu warten und die Karte zum
+    // Zurückholen einen Wimpernschlag lang zu verpassen.
+    lastDeletedSummary: await lastCopy(),
+  });
   await useBackend(local);
   return { backupKept };
 }
 
 /** Die zuletzt gelöschte Kasse, solange sie noch zurückzuholen ist. */
 export function lastDeleted() {
-  return lastCopy();
+  return state.lastDeletedSummary;
 }
 
 /** Sie doch behalten: zurück auf dieses Gerät, ohne Cloud. */
 export async function restoreLastDeleted() {
-  const copy = lastCopy();
+  const copy = await lastCopy();
   if (!copy) throw new Error('Es gibt nichts mehr zurückzuholen.');
   const { parseImport } = await import('./link.js');
   const payload = parseImport(copy.json);
@@ -983,13 +999,14 @@ export async function restoreLastDeleted() {
   setPrefs({
     tripRef: { mode: 'local', joinName: payload.trip.joinName || payload.trip.name || '', joinPassword: '' },
   });
-  discardCopy();
+  await discardCopy();
   await useBackend(local);
 }
 
 /** Die Kopie endgültig wegwerfen. */
-export function discardLastDeleted() {
-  discardCopy();
+export async function discardLastDeleted() {
+  await discardCopy();
+  set({ lastDeletedSummary: null });
 }
 
 // ------------------------------------------------------------------- Daten
