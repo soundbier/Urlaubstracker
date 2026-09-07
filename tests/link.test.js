@@ -104,8 +104,8 @@ test('Was exportiert wurde, lässt sich wieder einlesen', () => {
 test('Der Reiseplan reist mit der Sicherung — auch ohne eigenen Betrag', () => {
   const expenses = [{ id: 'e1', date: '2026-07-05', amount: 4500, category: 'activity', payer: POT, note: 'Trollstigen', planned: true, fromPlan: false }];
   const planItems = [
-    { id: 'pl1', date: '2026-07-05', time: '15:00', title: 'Trollstigen', category: 'activity', location: 'Andalsnes', note: '', payer: POT, linkedExpenseId: 'e1', done: false },
-    { id: 'pl2', date: '2026-07-06', time: '', title: 'Spaziergang am Hafen', category: 'activity', location: '', note: '', payer: POT, linkedExpenseId: null, done: false },
+    { id: 'pl1', date: '2026-07-05', time: '15:00', endTime: '17:30', title: 'Trollstigen', category: 'activity', sub: 'nature', location: 'Andalsnes', note: '', payer: POT, linkedExpenseId: 'e1', done: false },
+    { id: 'pl2', date: '2026-07-06', time: '', endTime: '', title: 'Spaziergang am Hafen', category: 'activity', sub: '', location: '', note: '', payer: POT, linkedExpenseId: null, done: false },
   ];
   const back = parseImport(buildExport({ trip: TRIP, contributions: [], expenses, planItems }));
 

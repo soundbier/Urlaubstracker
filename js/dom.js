@@ -142,6 +142,13 @@ const ICONS = {
   activity: ['M4 8.5A1.5 1.5 0 015.5 7h13A1.5 1.5 0 0120 8.5v1.6a2 2 0 000 3.8v1.6A1.5 1.5 0 0118.5 17h-13A1.5 1.5 0 014 15.5v-1.6a2 2 0 000-3.8V8.5z', 'M14 8.6v1.3M14 11.3v1.4M14 14.1v1.3'],
   shopping: ['M5.2 8h13.6l-1.1 12.5H6.3L5.2 8z', 'M9 8V6a3 3 0 016 0v2'],
   other: ['M6 12h.01M12 12h.01M18 12h.01'],
+  // Der Papierflieger, nicht die Silhouette von der Seite: bei 20 px ist er
+  // aus derselben dünnen Linie wie der Rest noch klar als Flugzeug lesbar,
+  // eine Silhouette liefe dort zu einem grauen Fleck zusammen.
+  flight: ['M21 3l-9.3 9.3', 'M21 3l-6.3 16.7-4-7.4L3 8.4 21 3z'],
+  // Der Zugkopf von vorn: Kasten, Fensterband, zwei Räder — wie beim
+  // Bus-Symbol (`transport`), nur mit geradem statt geschwungenem Dach.
+  train: ['M4 7.5a3 3 0 013-3h10a3 3 0 013 3V15a1 1 0 01-1 1H5a1 1 0 01-1-1V7.5z', 'M4 10.5h16', 'M7.5 15.5a1.7 1.7 0 100 3.4 1.7 1.7 0 000-3.4z', 'M16.5 15.5a1.7 1.7 0 100 3.4 1.7 1.7 0 000-3.4z'],
 
   // Packliste. Wieder dieselbe Strichstärke — und bewusst Gegenstände statt
   // Sinnbilder: bei 20 px erkennt man einen Schuh, aber keinen „Bereich

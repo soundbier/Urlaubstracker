@@ -4,6 +4,7 @@ import {
   CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone, MAX_PEOPLE,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packCategory, packStatus, packBag, packItemPacked,
   packSubLabel, packQty,
+  PLAN_CATEGORY_BY_ID, planSubLabel,
 } from '../calc.js';
 import { money, dayLabel } from '../format.js';
 import { openSheet } from './sheet.js';
@@ -181,9 +182,11 @@ export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null, ma
  * Eine Zeile im Reiseplan: die Uhrzeit steht links in einer eigenen Spalte,
  * abgetrennt durch eine Haarlinie — wie im Fahrplan, bei dem sich diese App
  * ohnehin bedient. Ohne Uhrzeit steht dort ein Gedankenstrich statt einer
- * leeren Lücke. Ein Haken rechts macht die Zeile in beide Richtungen
- * erledigt oder wieder offen — anders als bei einer Vormerkung bleibt sie
- * dabei an ihrem Platz im Tag, statt in eine andere Liste zu wandern.
+ * leeren Lücke. Mit einer Dauer stehen „von“ und „bis“ übereinander in
+ * derselben Spalte, wie Abfahrt und Ankunft. Ein Haken rechts macht die
+ * Zeile in beide Richtungen erledigt oder wieder offen — anders als bei
+ * einer Vormerkung bleibt sie dabei an ihrem Platz im Tag, statt in eine
+ * andere Liste zu wandern.
  *
  * Ein Kostenpunkt zeigt sich wie überall als Betrag rechts. Der Programmpunkt
  * selbst trägt nur die Kennung der Ausgabe, nicht den Betrag — der steht an
@@ -191,19 +194,24 @@ export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null, ma
  * `expenseById` löst sie hier auf.
  */
 export function planItemRow(item, trip, { onEdit, onToggle, expenseById } = {}) {
-  const cat = CATEGORY_BY_ID[item.category] || CATEGORY_BY_ID.other;
+  const cat = PLAN_CATEGORY_BY_ID[item.category] || PLAN_CATEGORY_BY_ID.other;
   const linkedExpense = item.linkedExpenseId ? expenseById.get(item.linkedExpenseId) : null;
   const done = planItemDone(item, expenseById);
   const privatelyPaid = linkedExpense && linkedExpense.payer !== POT;
+  const subLabel = planSubLabel(item);
   const sub = [
+    subLabel ? h('span.tag', subLabel) : null,
     item.location ? h('span.row__place', icon('pin', 13), item.location) : null,
     privatelyPaid ? h('span.tag', payerLabel(trip, linkedExpense.payer)) : null,
     item.note ? h('span', item.note) : null,
   ].filter(Boolean);
+  const timeCell = item.time && item.endTime
+    ? h('span.trow__time.trow__time--range', h('span', item.time), h('span', item.endTime))
+    : h('span.trow__time', item.time || item.endTime || '–');
 
   return h('div.prow', { class: done ? 'is-done' : '' },
     h('button.prow__open', { type: 'button', onclick: () => onEdit(item) },
-      h('span.trow__time', item.time || '–'),
+      timeCell,
       h('span.row__icon', icon(cat.icon, 20)),
       h('span.row__main',
         h('span.row__title', item.title),

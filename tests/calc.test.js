@@ -10,6 +10,7 @@ import {
   normalizeShares, averageShare,
   cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
   planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip,
+  planCategory, planSub, planSubLabel, planSubs, planExpenseCategory,
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
   packSub, packSubLabel, packSubs, packQty, packOverview,
   packItemShared, packItemsMine, packItemsShared,
@@ -576,6 +577,39 @@ test('Tagesfortschritt im Reiseplan zählt über planItemDone, nicht über das e
   ];
   assert.deepEqual(planDayProgress(items, expenseById), { done: 2, total: 3 });
   assert.deepEqual(planDayProgress([], expenseById), { done: 0, total: 0 });
+});
+
+test('Der Reiseplan hat eigene Kategorien, unabhängig von den Ausgaben', () => {
+  assert.equal(planCategory({ category: 'flight' }), 'flight');
+  assert.equal(planCategory({ category: 'food' }), 'food', 'trifft hier zufällig dieselbe Kennung wie bei den Ausgaben');
+  assert.equal(planCategory({ category: 'quatsch' }), 'other');
+  assert.equal(planCategory({}), 'other');
+});
+
+test('Flug und Bahn zählen für die verknüpfte Ausgabe als Transport', () => {
+  // Die Kasse kennt nur ihre sechs Kategorien (siehe `CATEGORIES`) — Flug und
+  // Bahn sind dort keine eigene Geld-Kategorie, sondern beide Transport.
+  assert.equal(planExpenseCategory('flight'), 'transport');
+  assert.equal(planExpenseCategory('train'), 'transport');
+  assert.equal(planExpenseCategory('transport'), 'transport');
+  assert.equal(planExpenseCategory('activity'), 'activity', 'alles andere trifft direkt dieselbe Kennung');
+  assert.equal(planExpenseCategory('stay'), 'stay');
+  assert.equal(planExpenseCategory('quatsch'), 'other', 'unbekannt wird zu Sonstiges, wie überall');
+});
+
+test('Die Sorten unter „Erleben“ gelten nur dort', () => {
+  assert.equal(planSub({ category: 'activity', sub: 'museum' }), 'museum');
+  assert.equal(planSub({ category: 'flight', sub: 'museum' }), '', 'ein Flug hat keine Sorten');
+  assert.equal(planSub({ category: 'activity', sub: 'quatsch' }), '');
+  assert.equal(planSub({ category: 'activity' }), '', 'ohne Sorte ist ein gültiger Zustand');
+  assert.equal(planSub({ category: 'quatsch', sub: 'museum' }), '', 'unbekannte Kategorie wird Sonstiges, das hat keine Sorten');
+
+  assert.equal(planSubLabel({ category: 'activity', sub: 'sightseeing' }), 'Sightseeing');
+  assert.equal(planSubLabel({ category: 'activity' }), '', 'ohne Sorte steht nichts an der Zeile');
+
+  assert.equal(planSubs('flight').length, 0);
+  assert.equal(planSubs('quatsch').length, 0, 'auch eine unbekannte Kategorie liefert eine Liste');
+  assert.ok(planSubs('activity').some((x) => x.label === 'Museum'));
 });
 
 // ------------------------------------------------------------------ Packliste

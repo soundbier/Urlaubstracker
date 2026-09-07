@@ -6,6 +6,7 @@ import {
   CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson,
   PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX, PACK_SCOPES,
   packCategory, packStatus, packBag, packSub, packSubs, packQty, packItemShared,
+  PLAN_CATEGORIES, planSub, planSubs,
 } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
@@ -475,10 +476,12 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
   const editing = Boolean(planItem);
   const realized = Boolean(linkedExpense && !linkedExpense.planned);
   let category = planItem?.category || defaults.category || 'activity';
+  let sub = planItem ? planSub(planItem) : planSub({ category, sub: defaults.sub });
   let date = planItem?.date || defaults.date || todayISO();
   let payer = planItem?.payer || linkedExpense?.payer || defaults.payer || POT;
   const title = h('input.field__input', { type: 'text', value: planItem?.title || '', placeholder: 'z. B. Trollstigen', maxlength: 120, enterkeyhint: 'next' });
   const time = h('input.field__input', { type: 'time', value: planItem?.time || '' });
+  const endTime = h('input.field__input', { type: 'time', value: planItem?.endTime || '' });
   const location = h('input.field__input', { type: 'text', value: planItem?.location || '', placeholder: 'z. B. Altstadt, Hafenpromenade', maxlength: 120, enterkeyhint: 'next' });
   const note = h('input.field__input', { type: 'text', value: planItem?.note || '', placeholder: 'Notiz, Adresse, Reservierung', maxlength: 120, enterkeyhint: 'done' });
   const amount = amountField(linkedExpense?.amount || 0, trip.currency);
@@ -503,7 +506,11 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
         close({
           action: 'save',
           values: {
-            title: t, date, time: time.value, category, location: location.value.trim(), note: note.value, payer,
+            title: t, date, time: time.value,
+            // Ein Ende ohne Anfang wäre keine Dauer, sondern nur ein zweites
+            // leeres Feld — bleibt „Von“ leer, fällt „Bis“ mit weg.
+            endTime: time.value ? endTime.value : '',
+            category, sub, location: location.value.trim(), note: note.value, payer,
             // Realisiert wird nichts mehr angetastet — dafür ist der Wert hier
             // gar nicht erst dabei (siehe `store.updatePlanItem`).
             amount: realized ? undefined : Math.max(0, amount.getCents() || 0),
@@ -534,15 +541,34 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
             h('label.field', h('span.field__label', 'Bezahlt von'), chipRow(payers, payer, (id) => { payer = id; })),
           );
 
+      // Die Sorten hängen an der Kategorie und werden deshalb neu gesetzt,
+      // wenn die Kategorie wechselt — mitsamt der Wahl selbst: „Museum“ unter
+      // „Flug“ wäre keine Angabe mehr, sondern ein Fehler mit Etikett. Wie
+      // bei der Packliste (siehe `packItemSheet`).
+      const subBox = h('div');
+      const subField = field('Welche Art?', subBox);
+      const renderSubs = () => {
+        const list = planSubs(category);
+        subField.hidden = !list.length;
+        replace(subBox, list.length
+          ? categoryGrid(sub, (id) => { sub = id; }, [{ id: '', label: 'Ohne Angabe' }, ...list])
+          : null);
+      };
+      renderSubs();
+
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label.field', h('span.field__label', 'Titel'), title, titleError),
-        field('Wofür?', categoryGrid(category, (id) => { category = id; })),
+        field('Wofür?', categoryGrid(category, (id) => { category = id; sub = ''; renderSubs(); }, PLAN_CATEGORIES)),
+        subField,
         field('Wann?', h('div.daterow-shift',
           h('button.icon-btn', { type: 'button', title: 'Einen Tag früher', 'aria-label': 'Einen Tag früher', onclick: () => shiftDay(-1) }, icon('chevron', 18)),
           when.el,
           h('button.icon-btn', { type: 'button', title: 'Einen Tag später', 'aria-label': 'Einen Tag später', onclick: () => shiftDay(1) }, icon('chevron', 18)),
         )),
-        field('Uhrzeit (optional)', time),
+        h('div.field__pair',
+          h('label.field', h('span.field__label', 'Von (optional)'), time),
+          h('label.field', h('span.field__label', 'Bis (optional)'), endTime),
+        ),
         field('Ort (optional)', location),
         h('div.field',
           h('span.field__label', 'Kosten (optional)'),

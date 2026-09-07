@@ -99,7 +99,7 @@ test('die Kopie nimmt Reiseplan und Packliste mit', async () => {
   // fehlen, bis jemand die Kasse zurückholt und vor einem leeren Reiseplan
   // steht.
   store.clear();
-  const planItems = [{ id: 'pl1', date: '2026-07-02', time: '', title: 'Museum', category: 'activity', location: '', note: '', payer: 'pot', linkedExpenseId: null, done: false }];
+  const planItems = [{ id: 'pl1', date: '2026-07-02', time: '', endTime: '', title: 'Museum', category: 'activity', sub: 'museum', location: '', note: '', payer: 'pot', linkedExpenseId: null, done: false }];
   const packItems = [{ id: 'pk1', title: 'Reisepass', category: 'documents', sub: '', qty: 1, status: 'open', bag: 'hand', note: '' }];
   await keepCopy({ trip, contributions: [], expenses, cashOuts: [], planItems, packItems });
 
