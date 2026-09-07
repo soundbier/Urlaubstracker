@@ -164,8 +164,8 @@ export function privacySections({ contact = '', region = null, mode = 'local' } 
     {
       title: 'Wo die Daten liegen',
       text: cloud
-        ? `${advice.title}: ${advice.text} Auf jedem verbundenen Gerät liegt zusätzlich eine vollständige Kopie im Speicher des Browsers, damit die App offline weiterläuft. Wer sie dort vor fremden Blicken schützen will, schaltet unter „Dieses Gerät → App-Sperre“ einen Code davor.`
-        : 'Im Speicher dieses Browsers (IndexedDB und localStorage). Auf keinem Server. Vor fremden Blicken auf demselben Gerät schützt die App-Sperre unter „Dieses Gerät“.',
+        ? `${advice.title}: ${advice.text} Auf jedem verbundenen Gerät liegt zusätzlich eine vollständige Kopie im Speicher des Browsers, verschlüsselt (AES-256-GCM, Schlüssel getrennt auf demselben Gerät), damit die App offline weiterläuft. Das schützt den Speicher selbst — eine Datensicherung, ein synchronisierter Profilordner —, nicht die App auf einem entsperrten Gerät; davor schützt „Dieses Gerät → App-Sperre“. Eine zweite, technisch bedingte Kopie hält außerdem die Firestore-Bibliothek selbst für ihren eigenen Offline-Betrieb vor, unverschlüsselt und außerhalb des Einflusses dieser App.`
+        : 'Im Speicher dieses Browsers, verschlüsselt (AES-256-GCM, Schlüssel getrennt auf demselben Gerät). Auf keinem Server. Das schützt den Speicher selbst — eine Datensicherung, ein synchronisierter Profilordner —, nicht die App auf einem entsperrten Gerät; davor schützt die App-Sperre unter „Dieses Gerät“.',
     },
     {
       title: 'Wie lange',

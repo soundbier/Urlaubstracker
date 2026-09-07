@@ -9,6 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { installFakeIndexedDB } from './helpers/fake-indexeddb.mjs';
 
 // Ein Speicher wie im Browser, damit sich nachsehen lässt, was dort wirklich
 // landet. Muss vor dem Import stehen: `lock.js` liest ihn beim Laden.
@@ -18,8 +19,10 @@ globalThis.localStorage = {
   setItem: (k, v) => store.set(k, String(v)),
   removeItem: (k) => store.delete(k),
 };
+installFakeIndexedDB();
 
 const lock = await import('../js/lock.js');
+const { secureRead } = await import('../js/secure-storage.js');
 
 test('zu einfache Codes lässt die App gar nicht erst zu', () => {
   assert.match(lock.checkCode(''), /Code eintragen/);
@@ -65,23 +68,33 @@ test('Durchprobieren wird teuer', async () => {
   await lock.disable('4071').catch(() => {});
 });
 
-test('der Code selbst steht nirgends', async () => {
+test('der Code selbst steht nirgends — und der Datensatz liegt verschlüsselt', async () => {
   await lock.setCode('4071');
-  // Gespeichert wird der PBKDF2-Wert samt zufälligem Salz — nicht der Code.
-  // Wer den Speicher des Browsers ausliest, kommt damit nicht weiter, als es
-  // die 200 000 Runden erlauben.
-  const stored = [...store.values()].join('\n');
-  assert.ok(stored, 'es wurde überhaupt etwas gespeichert');
-  assert.ok(!stored.includes('4071'), 'der Code steht nicht im Klartext da');
-  assert.match(stored, /"salt":"[0-9a-f]{32}"/, 'mit zufälligem Salz');
-  assert.match(stored, /"iterations":200000/);
+
+  // Verschlüsselt heißt: am Speicherplatz selbst steht nicht einmal mehr die
+  // Struktur des Datensatzes, geschweige denn der Code.
+  const raw = store.get('urlaubstracker.lock.v1');
+  assert.ok(raw, 'es wurde überhaupt etwas gespeichert');
+  assert.ok(!raw.includes('4071'), 'der Code steht nicht im Klartext da');
+  assert.ok(!raw.includes('salt') && !raw.includes('iterations'), 'auch die Struktur ist nicht mehr ablesbar');
+  const envelope = JSON.parse(raw);
+  assert.equal(envelope.v, 1);
+  assert.ok(envelope.iv && envelope.ct, 'IV und Ciphertext stehen da');
+
+  // Entschlüsselt steht der PBKDF2-Wert samt zufälligem Salz da — nicht der
+  // Code. Wer nur den Speicher des Browsers ausliest, kommt (ohne diesen
+  // zweiten Schlüssel aus IndexedDB) gar nicht erst so weit; wer beides hat,
+  // käme nicht weiter, als es die 200 000 Runden erlauben.
+  const stored = await secureRead('urlaubstracker.lock.v1');
+  assert.match(stored.code.salt, /^[0-9a-f]{32}$/, 'mit zufälligem Salz');
+  assert.equal(stored.code.iterations, 200000);
 
   // Und derselbe Code ergibt in einer zweiten Einrichtung einen anderen Wert.
-  const first = JSON.parse(store.get('urlaubstracker.lock.v1')).code.hash;
+  const first = stored.code.hash;
   await lock.setCode('4071');
-  const second = JSON.parse(store.get('urlaubstracker.lock.v1')).code.hash;
+  const second = (await secureRead('urlaubstracker.lock.v1')).code.hash;
   assert.notEqual(first, second);
 
   await lock.disable('4071');
-  assert.equal(JSON.parse(store.get('urlaubstracker.lock.v1')).code, null, 'ausgeschaltet bleibt nichts stehen');
+  assert.equal((await secureRead('urlaubstracker.lock.v1')).code, null, 'ausgeschaltet bleibt nichts stehen');
 });

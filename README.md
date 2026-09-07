@@ -39,6 +39,8 @@ Läuft offline, auf allen Geräten der Gruppe, ohne Abo.
 - Verplante (noch nicht bezahlte) Ausgaben, App-Sperre (Code/Biometrie).
 - Mehrgeräte-Sync über Firebase, Beitritt mit Name + Passwort.
 - Offline-fähig, Export als CSV/JSON, hell/dunkel.
+- Alles, was lokal auf dem Gerät liegt, verschlüsselt (AES-256-GCM über die
+  Web-Crypto-API, Details in [`js/secure-storage.js`](js/secure-storage.js)).
 
 Details zur Tagesbudget-Berechnung stehen in [`js/calc.js`](js/calc.js).
 
@@ -94,8 +96,8 @@ index.html    App-Hülle
 styles.css    Stylesheet
 sw.js         Service Worker (Offline, Update-Steuerung)
 js/           app.js, calc.js (Rechenlogik), store.js, backend-*.js,
-              prefs.js, privacy.js, join.js, lock.js, trash.js, link.js,
-              ui/, views/
+              secure-storage.js (Verschlüsselung), prefs.js, privacy.js,
+              join.js, lock.js, trash.js, link.js, ui/, views/
 tests/        Tests
 tools/        Icon-Generator, Dev-Server, Firebase-Bündelung
 vendor/       gebündeltes Firebase-SDK

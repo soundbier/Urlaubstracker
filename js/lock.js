@@ -9,18 +9,22 @@
  * Was diese Sperre ist: ein Riegel vor der Oberfläche. Ohne Code kommt niemand
  * an die Ansichten, die Beitrittsdaten oder den Export.
  *
- * Was sie nicht ist: eine Verschlüsselung. Die Daten liegen weiterhin im
- * Speicher des Browsers, und wer das Gerät entsperrt in der Hand hält und sich
- * mit Entwicklerwerkzeugen auskennt, kommt daran vorbei. Der eigentliche Schutz
- * ist und bleibt die Sperre des Geräts selbst; diese hier ist die zweite Tür
- * für den Fall, dass das Handy unbeaufsichtigt und entsperrt herumliegt.
- * Deshalb steht sie auch so in den Einstellungen.
+ * Was sie nicht ist: ein Ersatz für die Verschlüsselung, die diese Daten
+ * ohnehin tragen (siehe `secure-storage.js`). Die schützt den *Speicher* —
+ * eine Datensicherung, ein synchronisierter Profilordner —, nicht die *App*.
+ * Wer das Gerät entsperrt in der Hand hält und die App selbst aufruft, sieht
+ * dieselben Daten, die die App auch ohne Sperre zeigen würde: Verschlüsselung
+ * verwehrt den Zugriff auf den Datenträger, nicht auf die laufende Seite. Der
+ * eigentliche Schutz ist und bleibt die Sperre des Geräts selbst; diese hier
+ * ist die zweite Tür für den Fall, dass das Handy unbeaufsichtigt und
+ * entsperrt herumliegt. Deshalb steht sie auch so in den Einstellungen.
  *
  * Der Code selbst wird nirgends gespeichert — nur ein PBKDF2-Wert mit
  * zufälligem Salz, wie beim Beitrittspasswort in `join.js`. Vergessen heißt
  * deshalb: Sperre nur noch mit den Daten dieses Geräts zusammen loszuwerden.
  * Danach kommt man über Name und Passwort wieder in die Kasse.
  */
+import { secureRead, secureWrite } from './secure-storage.js';
 
 const KEY = 'urlaubstracker.lock.v1';
 
@@ -41,26 +45,38 @@ const MAX_WAIT_MS = 5 * 60000;
 
 const DEFAULTS = { code: null, minutes: 5, biometrics: null, failures: 0, blockedUntil: 0 };
 
-function read() {
+async function read() {
   try {
-    return { ...DEFAULTS, ...(JSON.parse(localStorage.getItem(KEY) || '{}') || {}) };
+    const raw = await secureRead(KEY);
+    return { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
   } catch {
     return { ...DEFAULTS };
   }
 }
 
-function write(patch) {
+/**
+ * Ändert `config` und meldet es — beides synchron, wie es Aufsperren und
+ * Einrichten schon immer waren: die Oberfläche reagiert nicht erst, wenn das
+ * Verschlüsseln fertig ist. Wer sichergehen will, dass der neue Stand auch
+ * wirklich abgelegt ist (bevor gleich danach anderswo nachgesehen wird — ein
+ * zweiter Tab, ein Test), erhält dafür über den Rückgabewert die Zusage des
+ * Schreibvorgangs; alle Aufrufe hier im Modul warten deshalb darauf.
+ */
+async function write(patch) {
   config = { ...config, ...patch };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(config));
-  } catch {
-    /* Privater Modus: die Sperre gilt dann nur für diese Sitzung. */
-  }
   emit();
+  try {
+    await secureWrite(KEY, config);
+  } catch {
+    /* Privater Modus oder kein Speicher: die Sperre gilt dann nur für diese Sitzung. */
+  }
   return config;
 }
 
-let config = read();
+// Modul-Ebene mit `await`: der gespeicherte Stand ist entschlüsselt, sobald
+// dieses Modul fertig geladen ist — jeder Aufruf von `isLocked()` & Co.
+// danach bleibt synchron.
+let config = await read();
 // Beim Kaltstart ist zu: eine Sperre, die einen Neustart nicht übersteht, ist keine.
 let locked = !!config.code;
 const listeners = new Set();
@@ -160,7 +176,7 @@ export async function setCode(code) {
   if (problem) throw new Error(problem);
   const salt = randomHex(16);
   const iterations = 200000;
-  write({ code: { salt, iterations, hash: await derive(code, salt, iterations) }, failures: 0, blockedUntil: 0 });
+  await write({ code: { salt, iterations, hash: await derive(code, salt, iterations) }, failures: 0, blockedUntil: 0 });
   locked = false;
   emit();
 }
@@ -168,14 +184,14 @@ export async function setCode(code) {
 /** Sperre ausschalten — nur mit dem gültigen Code. */
 export async function disable(code) {
   if (!(await verify(code))) throw new Error('Der Code stimmt nicht.');
-  write({ ...DEFAULTS });
+  await write({ ...DEFAULTS });
   locked = false;
   emit();
 }
 
-export function setDelay(minutes) {
+export async function setDelay(minutes) {
   const allowed = DELAYS.map(([m]) => m);
-  write({ minutes: allowed.includes(minutes) ? minutes : 5 });
+  await write({ minutes: allowed.includes(minutes) ? minutes : 5 });
 }
 
 // --------------------------------------------------------------- Aufsperren
@@ -195,14 +211,14 @@ export async function verify(code) {
 
   const hash = await derive(code, config.code.salt, config.code.iterations);
   if (sameSecret(hash, config.code.hash)) {
-    write({ failures: 0, blockedUntil: 0 });
+    await write({ failures: 0, blockedUntil: 0 });
     return true;
   }
 
   const failures = (config.failures || 0) + 1;
   const over = failures - FREE_TRIES;
   const wait = over > 0 ? Math.min(MAX_WAIT_MS, 2 ** (over - 1) * 5000) : 0;
-  write({ failures, blockedUntil: wait ? Date.now() + wait : 0 });
+  await write({ failures, blockedUntil: wait ? Date.now() + wait : 0 });
   return false;
 }
 
@@ -266,11 +282,11 @@ export async function enrollBiometrics() {
     },
   });
   if (!credential) throw new Error('Das hat nicht geklappt.');
-  write({ biometrics: { id: toBase64(credential.rawId) } });
+  await write({ biometrics: { id: toBase64(credential.rawId) } });
 }
 
-export function disableBiometrics() {
-  write({ biometrics: null });
+export async function disableBiometrics() {
+  await write({ biometrics: null });
 }
 
 export async function unlockWithBiometrics() {
@@ -285,7 +301,7 @@ export async function unlockWithBiometrics() {
     },
   });
   if (!assertion) return false;
-  write({ failures: 0, blockedUntil: 0 });
+  await write({ failures: 0, blockedUntil: 0 });
   locked = false;
   emit();
   return true;
@@ -313,9 +329,9 @@ if (typeof document !== 'undefined') {
 
   // Ein zweiter Tab, der die Sperre einschaltet oder den Code ändert, gilt
   // auch hier — sonst steht auf einem Gerät beides gleichzeitig.
-  addEventListener('storage', (e) => {
+  addEventListener('storage', async (e) => {
     if (e.key !== KEY) return;
-    config = read();
+    config = await read();
     if (!config.code) locked = false;
     emit();
   });

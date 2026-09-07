@@ -7,7 +7,10 @@
  *
  * Deshalb legt die App vor dem Löschen selbst eine Kopie ab, auf dem Gerät,
  * das gelöscht hat. Dieselbe Datei, die auch „Sicherungskopie speichern“
- * erzeugt: sie lässt sich zurückholen oder herunterladen.
+ * erzeugt: sie lässt sich zurückholen oder herunterladen. Verschlüsselt wie
+ * jede andere Ablage dieses Geräts (siehe `secure-storage.js`) — eine
+ * gelöschte Kasse ist in den sieben Tagen bis zum endgültigen Wegräumen
+ * genauso schützenswert wie eine, die noch aktiv läuft.
  *
  * Sie liegt hier nicht ewig. Nach `TRASH_DAYS` Tagen räumt die App sie selbst
  * weg — sonst wäre die Löschung genau das nicht (Art. 17 DSGVO), und niemand
@@ -15,6 +18,7 @@
  * Sofort weg geht auch: „Endgültig entfernen“.
  */
 import { buildExport } from './link.js';
+import { secureRead, secureWrite, secureRemove } from './secure-storage.js';
 
 const KEY = 'urlaubstracker.trash.v1';
 
@@ -30,12 +34,12 @@ const day = 86400000;
  * Kopie ablegen. Gibt `false` zurück, wenn das nicht geklappt hat — die
  * Oberfläche sagt dann, dass es nur die Datei von Hand gibt.
  */
-export function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
+export async function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
   if (!trip) return false;
   try {
     const json = buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems });
     if (json.length > MAX_CHARS) return false;
-    localStorage.setItem(KEY, JSON.stringify({
+    await secureWrite(KEY, {
       savedAt: Date.now(),
       name: trip.name || 'Urlaubskasse',
       // Was hier gezählt wird, steht der Person auf dem Schirm, die gerade
@@ -43,26 +47,26 @@ export function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [
       // das Geld. Reiseplan und Packliste zählen mit.
       entries: contributions.length + expenses.length + cashOuts.length + planItems.length + packItems.length,
       json,
-    }));
+    });
     return true;
   } catch {
     return false;
   }
 }
 
-/** Die letzte gelöschte Kasse — oder `null`, wenn es keine gibt oder die Frist um ist. */
-export function lastCopy() {
+/** Die letzte gelöschte Kasse — oder `null`, wenn es keine gibt, die Frist um ist, oder sie sich nicht lesen lässt. */
+export async function lastCopy() {
   let row;
   try {
-    row = JSON.parse(localStorage.getItem(KEY) || 'null');
+    row = await secureRead(KEY);
   } catch {
-    row = null;
+    row = null; // beschädigt oder mit fremdem Schlüssel verschlüsselt — dann lieber ehrlich nichts
   }
   if (!row?.json || !row.savedAt) return null;
 
   const expiresAt = row.savedAt + TRASH_DAYS * day;
   if (Date.now() > expiresAt) {
-    discardCopy();
+    await discardCopy();
     return null;
   }
   return {
@@ -72,9 +76,9 @@ export function lastCopy() {
   };
 }
 
-export function discardCopy() {
+export async function discardCopy() {
   try {
-    localStorage.removeItem(KEY);
+    secureRemove(KEY);
   } catch {
     /* egal */
   }

@@ -1,13 +1,26 @@
 /**
- * Geräteeigene Einstellungen im localStorage.
+ * Geräteeigene Einstellungen — verschlüsselt im localStorage.
  *
- * Hier landet nur, was zum Gerät gehört: welcher Trip geöffnet ist, wer an
- * diesem Handy sitzt, wie hell es aussehen soll, und — falls eingerichtet —
- * die Firebase-Zugangsdaten. Die Urlaubsdaten selbst liegen im Backend (lokal
- * oder Firestore).
+ * Hier landet, was zum Gerät gehört: welcher Trip geöffnet ist, wer an diesem
+ * Handy sitzt, wie hell es aussehen soll, und — falls eingerichtet — die
+ * Firebase-Zugangsdaten samt Beitrittspasswort. Die Urlaubsdaten selbst liegen
+ * im Backend (lokal oder Firestore).
+ *
+ * Das Beitrittspasswort ist der Grund, warum der ganze Datensatz verschlüsselt
+ * abgelegt wird, nicht nur einzelne Felder: wer damit hereinkäme, sähe die
+ * Finanzen der ganzen Gruppe.
+ *
+ * Eine Ausnahme: die Farbwahl (hell/dunkel) steht zusätzlich unverschlüsselt
+ * unter einem eigenen Schlüssel (`THEME_KEY`). Sie muss feststehen, bevor
+ * dieses Modul überhaupt geladen ist — das Anfangsskript in `index.html`
+ * liest sie synchron, noch vor dem Stylesheet, damit abends nicht erst eine
+ * helle Seite aufblitzt. Entschlüsseln ist unvermeidlich asynchron; für eine
+ * Farbe, die niemandes Daten preisgibt, lohnt sich der Umweg nicht.
  */
+import { secureRead, secureWrite, secureRemove } from './secure-storage.js';
 
 const KEY = 'urlaubstracker.prefs.v1';
+const THEME_KEY = 'urlaubstracker.theme.v1';
 
 const DEFAULTS = {
   firebaseConfig: null, // { apiKey, authDomain, projectId, appId, … }
@@ -20,15 +33,34 @@ const DEFAULTS = {
   theme: 'auto',        // auto | light | dark
 };
 
-function read() {
+function writeThemeMirror(theme) {
   try {
-    return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
+    if (theme === 'light' || theme === 'dark') localStorage.setItem(THEME_KEY, theme);
+    else localStorage.removeItem(THEME_KEY);
+  } catch {
+    /* egal — dann blitzt es beim nächsten Start eben einmal auf */
+  }
+}
+
+async function load() {
+  try {
+    const raw = await secureRead(KEY);
+    const merged = { ...DEFAULTS, ...(raw && typeof raw === 'object' ? raw : {}) };
+    // Unbedingt nachziehen, nicht nur beim ersten Mal: aus einer Fassung vor
+    // der eigenen Theme-Ablage fehlt sie sonst bis zur nächsten bewussten
+    // Wahl, und genau bis dahin blitzt beim Start das falsche Thema auf.
+    writeThemeMirror(merged.theme);
+    return merged;
   } catch {
     return { ...DEFAULTS };
   }
 }
 
-let cache = read();
+// Modul-Ebene mit `await`: die Einstellungen sind entschlüsselt, sobald
+// dieses Modul fertig geladen ist (ES-Module warten aufeinander) — jeder
+// Aufruf von `getPrefs()`/`setPrefs()` danach bleibt synchron, genau wie
+// zuvor. Nur dieser eine Ladevorgang ist asynchron.
+let cache = await load();
 
 export function getPrefs() {
   return { ...cache };
@@ -36,18 +68,20 @@ export function getPrefs() {
 
 export function setPrefs(patch) {
   cache = { ...cache, ...patch };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(cache));
-  } catch {
-    // Privater Modus oder volle Quote: die App läuft weiter, merkt sich nur nichts.
-  }
+  if ('theme' in patch) writeThemeMirror(cache.theme);
+  // Im Hintergrund verschlüsselt schreiben — der Aufruf hier bleibt
+  // synchron, wie es die ganze App an dieser Stelle erwartet. Schlägt es
+  // fehl (Speicher voll, privates Fenster), merkt sich die App währenddessen
+  // trotzdem den neuen Stand im Arbeitsspeicher weiter.
+  secureWrite(KEY, cache).catch(() => {});
   return getPrefs();
 }
 
 export function clearPrefs() {
   cache = { ...DEFAULTS };
   try {
-    localStorage.removeItem(KEY);
+    secureRemove(KEY);
+    localStorage.removeItem(THEME_KEY);
   } catch {
     /* egal */
   }
