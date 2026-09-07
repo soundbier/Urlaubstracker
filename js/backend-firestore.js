@@ -190,6 +190,17 @@ export class FirestoreBackend {
       if (isLocalDevHost() && this.config?.appCheckDebugToken) {
         self.FIREBASE_APPCHECK_DEBUG_TOKEN = this.config.appCheckDebugToken;
       }
+      // `_connect()` löscht und legt die Firebase-App bei jedem Verbindungs-
+      // aufbau unter demselben Namen neu an (siehe store.js, `afterFailedAttempt`) —
+      // App Check bekommt das nicht mit: es hängt beim ersten Mal ein
+      // unsichtbares `<div id="fire_app_check_…">` an `document.body` und
+      // rendert das reCAPTCHA-Badge hinein, räumt das beim Löschen der App
+      // aber nicht wieder ab. Ohne dieses Aufräumen fände reCAPTCHA beim
+      // zweiten Verbindungsaufbau zuerst das alte, schon gerenderte Element
+      // und würfe „reCAPTCHA has already been rendered in this element“.
+      if (typeof document !== 'undefined') {
+        document.getElementById(`fire_app_check_${this.app.name}`)?.remove();
+      }
       fb.initializeAppCheck(this.app, {
         provider: new fb.ReCaptchaV3Provider(siteKey),
         isTokenAutoRefreshEnabled: true,
