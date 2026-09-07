@@ -13,7 +13,7 @@
  * gegen eine Wortliste vorrechnen kann es trotzdem, wenn es den Namen der
  * Kasse kennt (siehe join.js). Dagegen bremst Firestore von sich aus nichts;
  * steht `appCheckSiteKey` in der Konfiguration, meldet sich dieses Gerät
- * zusätzlich mit einem Nachweis von Firebase App Check (reCAPTCHA v3) an —
+ * zusätzlich mit einem Nachweis von Firebase App Check (reCAPTCHA Enterprise) an —
  * ausgeschlossen wird darüber nicht das falsche Passwort, sondern das
  * automatisierte Durchprobieren vieler davon. Der Nachweis allein bremst
  * aber nur, wenn er in der Firebase-Konsole auch *erzwungen* wird (App Check
@@ -202,7 +202,7 @@ export class FirestoreBackend {
         document.getElementById(`fire_app_check_${this.app.name}`)?.remove();
       }
       fb.initializeAppCheck(this.app, {
-        provider: new fb.ReCaptchaV3Provider(siteKey),
+        provider: new fb.ReCaptchaEnterpriseProvider(siteKey),
         isTokenAutoRefreshEnabled: true,
       });
     } catch (err) {
