@@ -15,8 +15,11 @@
  * steht `appCheckSiteKey` in der Konfiguration, meldet sich dieses Gerät
  * zusätzlich mit einem Nachweis von Firebase App Check (reCAPTCHA v3) an —
  * ausgeschlossen wird darüber nicht das falsche Passwort, sondern das
- * automatisierte Durchprobieren vieler davon. Siehe README, Abschnitt
- * „Automatisiertes Ausprobieren erschweren (App Check)“.
+ * automatisierte Durchprobieren vieler davon. Der Nachweis allein bremst
+ * aber nur, wenn er in der Firebase-Konsole auch *erzwungen* wird (App Check
+ * → APIs → Firestore und Authentication → „Erzwingen“) — ohne das lässt
+ * Firebase Anfragen ohne gültigen Nachweis weiterhin durch. Siehe README,
+ * Abschnitt „App Check“.
  */
 import * as fb from '../vendor/firebase.js';
 
@@ -31,6 +34,17 @@ function pickTripFields(trip) {
   const out = {};
   for (const k of TRIP_FIELDS) if (trip[k] !== undefined) out[k] = trip[k];
   return out;
+}
+
+/**
+ * Läuft das hier auf einem Entwicklungsgerät (lokaler Server, kein echtes
+ * Deployment)? Nur dort darf ein Debug-Token für App Check überhaupt wirken —
+ * kopiert sich `firebase-config.json` versehentlich mit einem Debug-Token in
+ * eine echte Auslieferung, greift die Prüfung hier trotzdem nicht.
+ */
+function isLocalDevHost() {
+  const host = typeof location !== 'undefined' ? location.hostname : '';
+  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '';
 }
 
 /**
@@ -143,23 +157,45 @@ export class FirestoreBackend {
    * App Check anmelden, falls die Gruppe es eingerichtet hat.
    *
    * Ohne `appCheckSiteKey` in der Konfiguration passiert hier nichts — die
-   * Kasse läuft dann wie bisher, nur eben ohne diese zusätzliche Bremse.
+   * Kasse läuft dann wie bisher, nur eben ohne diese zusätzliche Bremse. Das
+   * ist auf einem echten Gerät (kein `localhost`) kein Normalfall, sondern
+   * eine unvollständige Einrichtung — deshalb landet dazu eine Warnung in der
+   * Konsole, statt es kommentarlos durchzuwinken.
+   *
    * Scheitert die Anmeldung (kein Empfang, falscher Schlüssel), darf das den
-   * Verbindungsaufbau nicht verhindern: ohne „Erzwingen“ in der
-   * Firebase-Konsole ändert ein fehlender Nachweis an den Zugriffsrechten
-   * nichts, und mit „Erzwingen“ meldet sich Firestore gleich selbst mit
-   * „Kein Zugriff“ — beides fängt `describeError` schon ab.
+   * Verbindungsaufbau nicht verhindern — sonst wäre ein Tippfehler im
+   * Schlüssel gleichbedeutend mit „Kasse offline“, obwohl `firestore.rules`
+   * den Zugriff weiterhin regelt. Ob mit „Erzwingen“ in der Firebase-Konsole
+   * scharfgestellt oder nicht: ohne gültigen Nachweis meldet sich Firestore
+   * im ersten Fall selbst mit „Kein Zugriff“ — das fängt `describeError`
+   * schon ab. Sichtbar wird der Fehlschlag trotzdem, in der Konsole, damit er
+   * nicht als „läuft“ missverstanden wird.
    */
   _startAppCheck() {
     const siteKey = this.config?.appCheckSiteKey;
-    if (!siteKey) return;
+    if (!siteKey) {
+      if (!isLocalDevHost()) {
+        console.warn(
+          'Firebase App Check ist nicht eingerichtet (appCheckSiteKey fehlt) — diese Kasse läuft ohne diese ' +
+          'zusätzliche Bremse gegen automatisiertes Durchprobieren. Siehe README, Abschnitt „App Check“.',
+        );
+      }
+      return;
+    }
     try {
+      // Debug-Token nur auf einem lokalen Entwicklungsgerät: die Prüfung
+      // steht hier im Code, nicht nur in der Dokumentation, damit ein
+      // versehentlich mitgegebener Debug-Token eine echte Auslieferung nicht
+      // schwächt — auf einem echten Host greift dieser Zweig gar nicht erst.
+      if (isLocalDevHost() && this.config?.appCheckDebugToken) {
+        self.FIREBASE_APPCHECK_DEBUG_TOKEN = this.config.appCheckDebugToken;
+      }
       fb.initializeAppCheck(this.app, {
         provider: new fb.ReCaptchaV3Provider(siteKey),
         isTokenAutoRefreshEnabled: true,
       });
-    } catch {
-      // Kein Grund, die Kasse deswegen offline zu lassen — siehe oben.
+    } catch (err) {
+      console.error('Firebase App Check konnte nicht gestartet werden — die Kasse läuft ohne diese Bremse weiter.', err);
     }
   }
 

@@ -26,6 +26,12 @@ rules_version = '2';
 //   (ein einziges Mitglied) bleibt Löschen sofort möglich — dort gibt es
 //   niemanden, den die Bedenkzeit schützen würde.
 //
+// App Check (siehe README, Abschnitt „App Check“) ist eine zusätzliche,
+// eigene Ebene davor — sie entscheidet in der Firebase-Konsole, nicht hier,
+// ob eine Anfrage überhaupt einen gültigen Nachweis mitbringen muss. Diese
+// Regeln bleiben unabhängig davon die einzige Instanz, die entscheidet, *wer*
+// auf welchen Trip zugreifen darf; App Check ersetzt sie nicht.
+//
 // Veröffentlichen:  firebase deploy --only firestore:rules
 // (oder in der Firebase-Konsole unter Firestore Database → Regeln einfügen)
 

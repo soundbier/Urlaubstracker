@@ -66,9 +66,63 @@ Für Mehrgeräte-Sync braucht es ein kostenloses Firebase-Projekt:
 4. Andere Geräte treten über *Einer bestehenden Kasse beitreten* mit Name
    und Passwort bei.
 
-Weitere Härtung: **App Check** (reCAPTCHA v3) gegen automatisiertes
+Weitere Härtung: **App Check** (siehe unten) gegen automatisiertes
 Durchprobieren, *Mehr → Verbundene Geräte* zum Aussperren verlorener
 Geräte, *Mehr → App-Sperre* für eine Codesperre auf dem Gerät selbst.
+
+### App Check
+
+`firestore.rules` regelt, *wer* auf eine Kasse zugreifen darf, und bleibt
+das auch mit App Check — App Check ersetzt die Regeln nicht, sondern
+bremst zusätzlich, *was* überhaupt bei Firestore und Authentication
+ankommt: automatisiert gestellte Anfragen, zum Beispiel ein Skript, das
+Passwörter gegen `join.js` durchprobiert, statt ein Browser mit dieser App.
+
+Ohne Einrichtung läuft die Kasse unverändert weiter, nur eben ohne diese
+Bremse — für den eigenen Familien- und Freundeskreis mag das reichen. Für
+jede Auslieferung, die öffentlich erreichbar ist, sind aber **beide**
+Schritte unten nötig; der erste allein bremst noch nichts:
+
+1. **Nachweis einrichten** (in der Web-App: reCAPTCHA v3, siehe
+   [Firebase-Dokumentation, „App Check mit reCAPTCHA
+   v3“](https://firebase.google.com/docs/app-check/web/recaptcha-provider) —
+   Firebase empfiehlt für neue Einrichtungen inzwischen reCAPTCHA
+   Enterprise; wer schon einen v3-Schlüssel hat oder den einfacheren Weg
+   ohne eigenes Google-Cloud-Setup will, bleibt bei v3):
+   - Unter [g.co/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create)
+     einen Schlüssel vom Typ **reCAPTCHA v3** anlegen, die eigene(n)
+     Domain(s) eintragen. Der **Site Key** aus diesem Schritt ist
+     `appCheckSiteKey`.
+   - In der Firebase-Konsole unter **App Check** die Web-App registrieren,
+     Provider **reCAPTCHA v3** wählen und denselben Site Key eintragen.
+   - Den Schlüssel als `appCheckSiteKey` in `firebase-config.json`
+     eintragen (siehe [`firebase-config.example.json`](firebase-config.example.json))
+     oder bei Cloudflare Pages als `FIREBASE_APPCHECK_SITE_KEY` setzen
+     (siehe unten, „Veröffentlichen“).
+2. **Erzwingen** — ohne diesen Schritt akzeptiert Firebase Anfragen auch
+   ohne gültigen Nachweis weiterhin, der Schlüssel allein bewirkt also noch
+   nichts:
+   - Firebase-Konsole → **App Check** → **APIs** → bei **Cloud Firestore**
+     und bei **Authentication** jeweils **Erzwingen** einschalten.
+   - Das lohnt sich erst, nachdem echte Geräte erfolgreich mit App Check
+     verbunden waren (Konsole zeigt „gültige Anfragen“ pro API) — sonst
+     sperrt „Erzwingen“ die eigenen Geräte mit aus.
+
+Ohne Schritt 2 bleibt die Kasse technisch ungeschützt gegen automatisiertes
+Durchprobieren, auch wenn `appCheckSiteKey` gesetzt ist — Firebase warnt
+davor nicht von sich aus, die App aber schon: fehlt der Schlüssel auf einem
+Gerät, das nicht `localhost` ist, steht eine Warnung in der
+Browser-Konsole.
+
+**Entwicklung:** App Check lässt sich auf `localhost`/`127.0.0.1` mit einem
+Debug-Token statt einem echten reCAPTCHA-Nachweis testen. Dazu in der
+Firebase-Konsole unter App Check → App Check-Debug-Tokens einen Token
+anlegen und ihn als `appCheckDebugToken` in einer lokalen
+`firebase-config.json` eintragen — die App liest dieses Feld nur auf einem
+lokalen Entwicklungsgerät, auf jedem anderen Host bleibt es wirkungslos.
+Dieses Feld gehört nie in eine `firebase-config.json`, die tatsächlich
+ausgeliefert wird, und `write-firebase-config.mjs` (Cloudflare-Build) kennt
+es entsprechend gar nicht erst.
 
 ## Veröffentlichen (Cloudflare Pages)
 
@@ -76,7 +130,10 @@ Push auf `main` baut und veröffentlicht automatisch. Einrichtung:
 Build command `npm run build`, Build output directory `/`. Firebase-Werte
 optional als Environment Variables (`FIREBASE_API_KEY`,
 `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, `FIREBASE_APP_ID`, …) —
-`npm run build` schreibt daraus `firebase-config.json`.
+`npm run build` schreibt daraus `firebase-config.json`. Für eine öffentlich
+erreichbare Auslieferung gehört `FIREBASE_APPCHECK_SITE_KEY` dazu, siehe
+oben, Abschnitt „App Check“ — inklusive „Erzwingen“ in der
+Firebase-Konsole, das lässt sich nicht per Environment Variable setzen.
 
 Firestore-Regeln werden separat veröffentlicht (siehe oben), nicht über
 Cloudflare.

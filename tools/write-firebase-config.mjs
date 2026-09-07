@@ -15,16 +15,26 @@
  *   FIREBASE_APP_ID               (Pflicht)
  *   FIREBASE_STORAGE_BUCKET       (optional)
  *   FIREBASE_MESSAGING_SENDER_ID  (optional)
- *   FIREBASE_APPCHECK_SITE_KEY    (optional, siehe README „App Check“)
+ *   FIREBASE_APPCHECK_SITE_KEY    (dringend empfohlen, siehe README „App Check“ —
+ *                                  ohne sie liefert dieser Build eine Auslieferung
+ *                                  ohne die zusätzliche Bremse gegen automatisiertes
+ *                                  Durchprobieren aus)
  *   FIREBASE_PRIVACY_CONTACT      (optional: verantwortliche Stelle, Art. 13 DSGVO)
  *   FIREBASE_DATA_REGION          (optional: Region der Firestore-Datenbank, z. B. eur3)
  *
- * Ist keine einzige davon gesetzt, tut das Skript nichts — dann liefert
- * Cloudflare wie bisher ohne firebase-config.json aus, und die Konfiguration
- * kommt von Hand ins Gerät oder über einen Einladungslink. Sind einige, aber
- * nicht alle Pflichtfelder gesetzt, bricht der Build ab: das ist dann eine
- * unvollständige Einrichtung und kein Normalfall, der still übergangen werden
- * sollte.
+ * Bewusst nicht dabei: ein Debug-Token für App Check. Der gehört nie in eine
+ * echte Auslieferung — auf einem lokalen Entwicklungsgerät greift er ohnehin
+ * nur über `firebase-config.json` von Hand, nicht über diesen Build-Schritt
+ * (siehe js/backend-firestore.js, isLocalDevHost).
+ *
+ * Ist keine einzige der Variablen oben gesetzt, tut das Skript nichts — dann
+ * liefert Cloudflare wie bisher ohne firebase-config.json aus, und die
+ * Konfiguration kommt von Hand ins Gerät oder über einen Einladungslink. Sind
+ * einige, aber nicht alle Pflichtfelder gesetzt, bricht der Build ab: das ist
+ * dann eine unvollständige Einrichtung und kein Normalfall, der still
+ * übergangen werden sollte. Fehlt nur FIREBASE_APPCHECK_SITE_KEY, baut der
+ * Build trotzdem — App Check bleibt dann aus, aber `firestore.rules` regelt
+ * den Zugriff weiterhin.
  */
 import { writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
