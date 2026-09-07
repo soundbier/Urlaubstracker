@@ -299,9 +299,9 @@ function splitSummary(trip) {
 }
 
 function personSheet(state, person) {
-  const { trip, myPersonId, contributions, expenses, cashOuts, planItems } = state;
+  const { trip, myPersonId, contributions, expenses, cashOuts, planItems, packItems } = state;
   const isMe = myPersonId === person.id;
-  const entries = personEntryCount(person.id, { contributions, expenses, cashOuts, planItems });
+  const entries = personEntryCount(person.id, { contributions, expenses, cashOuts, planItems, packItems });
   const canRemove = trip.people.length > 1 && !entries;
 
   return openSheet({
@@ -327,8 +327,9 @@ function personSheet(state, person) {
         canRemove
           ? h('button.btn.btn--ghost.btn--danger.btn--wide', { type: 'button', onclick: async () => { close(false); await removePerson(state, person); } },
               icon('trash', 18), 'Aus der Gruppe entfernen')
-          // Wer schon Geld in der Kasse hat, kann nicht verschwinden — sonst
-          // fehlten seine Einträge in der Abrechnung bei niemandem.
+          // Wer schon Geld in der Kasse hat oder eine private Packliste,
+          // kann nicht verschwinden — sonst fehlten seine Einträge in der
+          // Abrechnung bei niemandem, oder seine Liste gehörte niemandem mehr.
           : entries
             ? h('p.field__note', `${plural(entries, 'Eintrag hängt', 'Einträge hängen')} an dieser Person — sie kann deshalb nicht entfernt werden.`)
             : null,

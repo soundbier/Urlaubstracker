@@ -14,11 +14,11 @@
  */
 import { h, icon, replace } from '../dom.js';
 import {
-  PACK_CATEGORIES, PACK_OVERVIEW_BAGS, packBag, packItemPacked, packItemsByCategory, packItemsByStatus,
-  packOverview, packProgress, packSubs,
+  PACK_CATEGORIES, PACK_OVERVIEW_BAGS, PACK_SCOPES, packBag, packItemPacked, packItemsByCategory, packItemsByStatus,
+  packItemsMine, packItemsShared, packOverview, packProgress, packSubs,
 } from '../calc.js';
 import { plural } from '../format.js';
-import { packItemRow, sectionTitle, emptyState, bar } from '../ui/parts.js';
+import { packItemRow, sectionTitle, emptyState, bar, whoAmICallout } from '../ui/parts.js';
 
 /**
  * Fünf Fragen, die man an eine Packliste stellt — nicht fünf Filter über
@@ -54,11 +54,26 @@ let tab = 'alles';
 let quickCategory = 'clothing';
 let quickSub = '';
 let overviewBag = 'both';
+/**
+ * Meine Liste oder die gemeinsame — ebenfalls nur für diese Sitzung gemerkt.
+ *
+ * Voreingestellt ist „Gemeinsame Liste“: bevor es diese Unterscheidung gab,
+ * war jeder Eintrag automatisch für alle sichtbar (siehe `packItemShared` in
+ * `calc.js`). Wer die Packliste öffnet, soll deshalb erst einmal denselben
+ * Stand sehen wie bisher — nicht eine leere eigene Liste, während die
+ * eigentlichen Einträge eine Wahl entfernt liegen.
+ */
+let scope = 'shared';
 // Welcher Reiter zuletzt in den sichtbaren Bereich geschoben wurde. Ohne das
 // stünde der gewählte Reiter nach jedem Neuaufbau wieder außerhalb — und mit
 // „bei jedem Aufbau“ würde die Reihe unter dem Finger wegspringen, sobald im
 // Hintergrund etwas hereinkommt.
 let tabScrolledTo = null;
+
+/** Für den schwebenden Knopf in `app.js`: neue Einträge landen in dieser Liste. */
+export function packingScope() {
+  return scope;
+}
 
 /** Was ein Reiter zeigt. */
 function itemsFor(items, id) {
@@ -70,33 +85,64 @@ function itemsFor(items, id) {
 }
 
 export function renderPacking(state, actions) {
-  const items = state.packItems;
+  // Die eigene Liste gibt es erst, sobald das Gerät weiß, wer daran sitzt —
+  // sonst gehörte sie niemandem, und „meine Liste“ wäre eine Zusage, die die
+  // App nicht halten kann.
+  const needsPerson = scope === 'mine' && !state.myPersonId;
+  const items = needsPerson
+    ? []
+    : scope === 'shared'
+      ? packItemsShared(state.packItems)
+      : packItemsMine(state.packItems, state.myPersonId);
   const { done, total } = packProgress(items);
 
   const tabs = TABS.filter((t) => t.id === 'alles' || itemsFor(items, t.id).length);
   if (!tabs.some((t) => t.id === tab)) tab = 'alles';
 
-  const overview = tab === 'uebersicht' ? packOverview(items, overviewBag) : null;
+  const overview = !needsPerson && tab === 'uebersicht' ? packOverview(items, overviewBag) : null;
   const shown = itemsFor(items, tab);
   const byStatus = tab === 'todo';
   const groups = byStatus ? packItemsByStatus(shown) : packItemsByCategory(shown);
 
   return h('div.view',
-    total
-      ? summary(overview, done, total)
-      : h('div.hero.hero--muted',
-          h('p.hero__title', 'Die Liste ist noch leer'),
-          h('p.hero__sub', 'Erst alles aufschreiben, was mit muss — sortieren, abhaken und aufs Gepäck verteilen könnt ihr danach.'),
-        ),
-    tabs.length > 1 ? tabStrip(tabs, actions) : null,
-    ...(overview
-      ? [bagSwitch(overview.bag, actions), tally(overview)]
-      : [
-          quickAdd(actions),
-          groups.length
-            ? h('div.packgroups', ...groups.map((g) => group(g, byStatus, actions)))
-            : emptyState(total ? 'Hier steht noch nichts.' : 'Noch nichts auf der Liste.'),
-        ]),
+    scopeSwitch(actions),
+    needsPerson
+      ? whoAmICallout(state.trip, actions)
+      : total
+        ? summary(overview, done, total)
+        : h('div.hero.hero--muted',
+            h('p.hero__title', 'Die Liste ist noch leer'),
+            h('p.hero__sub', 'Erst alles aufschreiben, was mit muss — sortieren, abhaken und aufs Gepäck verteilen könnt ihr danach.'),
+          ),
+    needsPerson ? null : tabs.length > 1 ? tabStrip(tabs, actions) : null,
+    ...(needsPerson
+      ? []
+      : overview
+        ? [bagSwitch(overview.bag, actions), tally(overview)]
+        : [
+            quickAdd(actions),
+            groups.length
+              ? h('div.packgroups', ...groups.map((g) => group(g, byStatus, actions)))
+              : emptyState(total ? 'Hier steht noch nichts.' : 'Noch nichts auf der Liste.'),
+          ]),
+  );
+}
+
+/**
+ * Der Umschalter zwischen der eigenen und der gemeinsamen Liste — die erste
+ * Entscheidung auf diesem Bildschirm, vor allem anderen: sie bestimmt, was
+ * hier überhaupt zu sehen ist.
+ */
+function scopeSwitch(actions) {
+  return h('div.chips', { role: 'group', 'aria-label': 'Wessen Liste' },
+    ...PACK_SCOPES.map((s) =>
+      h('button.chip', {
+        type: 'button',
+        class: s.id === scope ? 'is-active' : '',
+        'aria-pressed': s.id === scope ? 'true' : 'false',
+        onclick: () => { scope = s.id; tab = 'alles'; actions.rerender(); },
+      }, icon(s.icon, 16), s.label),
+    ),
   );
 }
 
@@ -282,6 +328,9 @@ function buildQuickAdd() {
       category: quickCategory,
       sub: quickSub,
       bag: tab === 'hand' || tab === 'hold' ? tab : 'none',
+      // Landet in der Liste, die gerade offen ist — wie das Gepäck oben schon
+      // vom Reiter übernimmt.
+      shared: scope === 'shared',
     });
   };
 

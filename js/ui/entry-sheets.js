@@ -4,8 +4,8 @@ import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
 import {
   CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson,
-  PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX,
-  packCategory, packStatus, packBag, packSub, packSubs, packQty,
+  PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX, PACK_SCOPES,
+  packCategory, packStatus, packBag, packSub, packSubs, packQty, packItemShared,
 } from '../calc.js';
 import { money, dayLabel, fullDate } from '../format.js';
 
@@ -579,6 +579,7 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
   let qty = packItem ? packQty(packItem) : 1;
   let status = packItem ? packStatus(packItem) : defaults.status || 'open';
   let bag = packItem ? packBag(packItem) : defaults.bag || 'none';
+  let shared = packItem ? packItemShared(packItem) : defaults.shared === true;
   const title = h('input.field__input', { type: 'text', value: packItem?.title || '', placeholder: 'z. B. Reisepass', maxlength: 120, enterkeyhint: 'next' });
   const note = h('input.field__input', { type: 'text', value: packItem?.note || '', placeholder: 'Marke, Farbe, wo es liegt', maxlength: 120, enterkeyhint: 'done' });
 
@@ -597,7 +598,7 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
           return;
         }
         titleError.textContent = '';
-        close({ action: 'save', values: { title: t, category, sub, qty, status, bag, note: note.value } });
+        close({ action: 'save', values: { title: t, category, sub, qty, status, bag, note: note.value, shared } });
       };
 
       // Die Sorten hängen an der Kategorie und werden deshalb neu gesetzt,
@@ -616,6 +617,10 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
 
       return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label.field', h('span.field__label', 'Was ist es?'), title, titleError),
+        // Wessen Liste, vor allem anderen: davon hängt ab, wer den Eintrag
+        // danach überhaupt zu Gesicht bekommt — Kategorie und Stand lassen
+        // sich jederzeit an der Zeile nachziehen, das hier nicht.
+        field('Wessen Liste?', categoryGrid(shared ? 'shared' : 'mine', (id) => { shared = id === 'shared'; }, PACK_SCOPES)),
         field('Wie viele?', qtyStepper(qty, (n) => { qty = n; })),
         field('Wohin gehört es?', categoryGrid(category, (id) => { category = id; sub = ''; renderSubs(); }, PACK_CATEGORIES)),
         subField,

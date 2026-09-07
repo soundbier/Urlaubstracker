@@ -102,17 +102,22 @@ export function averageShare(people = []) {
 }
 
 /**
- * Woran hängt eine Person Geld? Genau das steht dem Entfernen im Weg: eine
- * Einzahlung ohne Einzahler, eine privat bezahlte Ausgabe ohne Zahler oder
- * eine Bargeld-Auszahlung ohne Empfänger würde die Abrechnung still
- * verfälschen.
+ * Woran hängt eine Person Geld — oder eine Liste, die sonst niemand mehr zu
+ * sehen bekäme? Genau das steht dem Entfernen im Weg: eine Einzahlung ohne
+ * Einzahler, eine privat bezahlte Ausgabe ohne Zahler oder eine
+ * Bargeld-Auszahlung ohne Empfänger würde die Abrechnung still verfälschen —
+ * und ein Eintrag der privaten Packliste ohne die Person, der er gehört,
+ * wäre für niemanden mehr auffindbar (siehe `packItemsMine`). Die gemeinsame
+ * Packliste zählt hier nicht mit: die gehört nach dem Entfernen weiter allen
+ * übrigen.
  */
-export function personEntryCount(personId, { contributions = [], expenses = [], cashOuts = [], planItems = [] } = {}) {
+export function personEntryCount(personId, { contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] } = {}) {
   return (
     contributions.filter((c) => c.personId === personId).length +
     expenses.filter((e) => e.payer === personId || cashPayerPerson(e.payer) === personId).length +
     cashOuts.filter((c) => c.personId === personId).length +
-    planItems.filter((p) => p.payer === personId).length
+    planItems.filter((p) => p.payer === personId).length +
+    packItems.filter((p) => p.createdBy === personId && p.shared === false).length
   );
 }
 
@@ -531,6 +536,42 @@ export const packCategory = (item) => (PACK_CATEGORY_BY_ID[item?.category] ? ite
 export const packStatus = (item) => (PACK_STATUS_BY_ID[item?.status] ? item.status : 'open');
 export const packBag = (item) => (PACK_BAG_BY_ID[item?.bag] ? item.bag : 'none');
 export const packItemPacked = (item) => packStatus(item) === 'packed';
+
+/**
+ * Wessen Liste: die eigene, private — oder die gemeinsame, die alle sehen und
+ * abhaken dürfen.
+ *
+ * Vorher gehörte jeder Eintrag automatisch allen: wer der Kasse beitrat, sah
+ * sofort die ganze Packliste eines anderen. Das passt für das, was wirklich
+ * alle angeht (die gemeinsame Erste-Hilfe-Tasche, das Zelt), aber nicht für
+ * „meine Unterwäsche“ — deshalb jetzt zwei Listen statt einer.
+ *
+ * Ein Eintrag ohne das Feld stammt aus der Zeit vor dieser Unterscheidung und
+ * war damals für alle sichtbar; er bleibt es, sonst verschwände er beim
+ * nächsten Update kommentarlos aus jeder Liste. Neu angelegte Einträge tragen
+ * das Feld immer ausdrücklich (siehe `store.js`).
+ */
+export const packItemShared = (item) => item?.shared !== false;
+
+export const PACK_SCOPES = [
+  { id: 'mine', label: 'Meine Liste', icon: 'person' },
+  { id: 'shared', label: 'Gemeinsame Liste', icon: 'people' },
+];
+
+/**
+ * Die eigene, private Liste — ohne gewählte Person gibt es die gar nicht:
+ * sonst landeten die privaten Einträge mehrerer Geräte ohne Person in einem
+ * Topf, nur weil an keinem von ihnen `createdBy` gesetzt ist.
+ */
+export function packItemsMine(items, myPersonId) {
+  if (!myPersonId) return [];
+  return items.filter((i) => !packItemShared(i) && i.createdBy === myPersonId);
+}
+
+/** Die gemeinsame Liste — für alle Mitglieder der Kasse gleich. */
+export function packItemsShared(items) {
+  return items.filter(packItemShared);
+}
 
 /** Die Sorten, die zu einer Kategorie gehören — leer, wo es keine gibt. */
 export const packSubs = (categoryId) => PACK_SUBCATEGORIES[categoryId] || [];
