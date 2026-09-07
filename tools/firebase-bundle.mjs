@@ -31,7 +31,7 @@ export {
   onSnapshot, query, where, orderBy, serverTimestamp, arrayUnion, arrayRemove,
   writeBatch, Timestamp, enableNetwork, disableNetwork
 } from 'firebase/firestore';
-export { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
+export { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 `;
 
 export const sha256 = (data) => createHash('sha256').update(data).digest('hex');

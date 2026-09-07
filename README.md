@@ -83,14 +83,18 @@ Bremse — für den eigenen Familien- und Freundeskreis mag das reichen. Für
 jede Auslieferung, die öffentlich erreichbar ist, sind aber **beide**
 Schritte unten nötig; der erste allein bremst noch nichts:
 
-1. **Nachweis einrichten** (in der Web-App: aktuell von Firebase empfohlen
-   ist reCAPTCHA Enterprise, siehe [Firebase-Dokumentation, „App Check mit
-   reCAPTCHA Enterprise“](https://firebase.google.com/docs/app-check/web/recaptcha-enterprise-provider)):
-   - In der Google Cloud Console (dasselbe Projekt wie Firebase):
-     **reCAPTCHA Enterprise API** aktivieren und einen **Website-Schlüssel**
-     (Score-basiert, „Checkbox“ *aus*) anlegen.
-   - In der Firebase-Konsole unter **App Check** die Web-App registrieren
-     und denselben Schlüssel eintragen.
+1. **Nachweis einrichten** (in der Web-App: reCAPTCHA v3, siehe
+   [Firebase-Dokumentation, „App Check mit reCAPTCHA
+   v3“](https://firebase.google.com/docs/app-check/web/recaptcha-provider) —
+   Firebase empfiehlt für neue Einrichtungen inzwischen reCAPTCHA
+   Enterprise; wer schon einen v3-Schlüssel hat oder den einfacheren Weg
+   ohne eigenes Google-Cloud-Setup will, bleibt bei v3):
+   - Unter [g.co/recaptcha/admin/create](https://www.google.com/recaptcha/admin/create)
+     einen Schlüssel vom Typ **reCAPTCHA v3** anlegen, die eigene(n)
+     Domain(s) eintragen. Der **Site Key** aus diesem Schritt ist
+     `appCheckSiteKey`.
+   - In der Firebase-Konsole unter **App Check** die Web-App registrieren,
+     Provider **reCAPTCHA v3** wählen und denselben Site Key eintragen.
    - Den Schlüssel als `appCheckSiteKey` in `firebase-config.json`
      eintragen (siehe [`firebase-config.example.json`](firebase-config.example.json))
      oder bei Cloudflare Pages als `FIREBASE_APPCHECK_SITE_KEY` setzen
