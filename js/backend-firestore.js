@@ -112,6 +112,17 @@ export class FirestoreBackend {
 
   async _connect() {
     const existing = fb.getApps().find((a) => a.name === APP_NAME);
+    // Schon verbunden, und niemand hat der App inzwischen den Platz unter
+    // demselben Namen weggenommen (siehe `afterFailedAttempt`)? Dann bleibt
+    // die bestehende Verbindung stehen. Ohne diese Prüfung meldet sich dieses
+    // Gerät beim Anlegen einer Kasse zweimal hintereinander an — einmal für
+    // die Vorabprüfung (`isMine`/`createTrip`), einmal noch für `start()`,
+    // das `createTrip` in store.js danach aufruft —, jedes Mal erneut bei
+    // Firebase Auth und, ist App Check eingerichtet, auch dort noch einmal.
+    // Scheitert der Nachweis gerade (falscher Schlüssel, reCAPTCHA down),
+    // landet die Fehlermeldung dadurch doppelt in der Konsole, obwohl nur
+    // eine einzige Verbindung zustande kommt.
+    if (this.db && existing === this.app) return this.uid;
     if (existing) await fb.deleteApp(existing);
 
     this.app = fb.initializeApp(this.config, APP_NAME);
