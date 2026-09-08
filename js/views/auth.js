@@ -109,32 +109,43 @@ function signInScreen(state, actions, go) {
   const error = h('p.field__error');
   const button = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Anmelden');
 
+  const title = h('h1.welcome__title', 'Anmelden');
+  const form = h('form.authscreen__form', { onsubmit: submit, oninput: () => { error.textContent = ''; } },
+    field('E-Mail', email),
+    field('Passwort', maskedField(password)),
+    error,
+    button,
+  );
+  const forgot = h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => go('reset') }, 'Passwort vergessen');
+  const back = h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => go('choose') }, icon('back', 16), 'Zurück');
+  // Der Netzweg zu Firebase braucht spürbar länger als ein Tipp aufs Auge —
+  // ein gesperrter Knopf allein sagt in den 2-3 Sekunden dazwischen nichts.
+  // Statt dessen tritt an dieselbe Stelle im Formular ein Ladezustand.
+  const busy = busyPanel('Meldet dich an …');
+
+  function setBusy(on) {
+    for (const el of [title, form, forgot, back]) el.hidden = on;
+    busy.hidden = !on;
+  }
+
   async function submit(e) {
     e.preventDefault();
     error.textContent = '';
     button.disabled = true;
+    setBusy(true);
     try {
       await store.signIn({ email: email.value, password: password.value });
       toast('Angemeldet.', { type: 'success' });
       mode = 'choose';
       actions.rerender();
     } catch (err) {
-      error.textContent = err?.message || String(err);
+      setBusy(false);
       button.disabled = false;
+      error.textContent = err?.message || String(err);
     }
   }
 
-  return shell(
-    h('h1.welcome__title', 'Anmelden'),
-    h('form.authscreen__form', { onsubmit: submit, oninput: () => { error.textContent = ''; } },
-      field('E-Mail', email),
-      field('Passwort', maskedField(password)),
-      error,
-      button,
-    ),
-    h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => go('reset') }, 'Passwort vergessen'),
-    h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => go('choose') }, icon('back', 16), 'Zurück'),
-  );
+  return shell(title, form, forgot, back, busy);
 }
 
 // ------------------------------------------------------------------ Registrieren
@@ -160,6 +171,29 @@ function signUpScreen(state, actions, go) {
     },
   }, icon('repeat', 16), 'Vorschlag');
 
+  const title = h('h1.welcome__title', 'Konto erstellen');
+  const intro = h('p.welcome__text.small', 'Wir schicken dir eine E-Mail zum Bestätigen. Erst danach lassen sich Kassen anlegen oder teilen.');
+  // Sobald jemand etwas ändert, ist die alte Meldung überholt: sie beschriebe
+  // einen Zustand, den es nicht mehr gibt. Das gilt auch für den
+  // Vorschlag-Knopf, der das Passwortfeld von außen füllt.
+  const form = h('form.authscreen__form', { onsubmit: submit, oninput: () => { error.textContent = ''; } },
+    field('E-Mail', email),
+    field('Anzeigename', name, 'Steht an deinen Einträgen — ein Spitzname reicht.'),
+    field('Passwort', h('div.authscreen__pwrow', maskedField(password), suggest)),
+    error,
+    button,
+  );
+  const back = h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => go('choose') }, icon('back', 16), 'Zurück');
+  const privacy = h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => privacySheet({ mode: 'cloud' }) }, 'Datenschutz');
+  // Derselbe Ladezustand wie beim Anmelden — Konto anlegen geht über denselben
+  // Netzweg und dauert genauso spürbar.
+  const busy = busyPanel('Konto wird erstellt …');
+
+  function setBusy(on) {
+    for (const el of [title, intro, form, back, privacy]) el.hidden = on;
+    busy.hidden = !on;
+  }
+
   async function submit(e) {
     e.preventDefault();
     error.textContent = '';
@@ -169,31 +203,18 @@ function signUpScreen(state, actions, go) {
       if (problem) { error.textContent = problem; return; }
     }
     button.disabled = true;
+    setBusy(true);
     try {
       await store.signUp({ email: email.value, password: password.value, displayName: name.value });
       actions.rerender();
     } catch (err) {
+      setBusy(false);
       error.textContent = err?.message || String(err);
       button.disabled = false;
     }
   }
 
-  return shell(
-    h('h1.welcome__title', 'Konto erstellen'),
-    h('p.welcome__text.small', 'Wir schicken dir eine E-Mail zum Bestätigen. Erst danach lassen sich Kassen anlegen oder teilen.'),
-    // Sobald jemand etwas ändert, ist die alte Meldung überholt: sie beschriebe
-    // einen Zustand, den es nicht mehr gibt. Das gilt auch für den
-    // Vorschlag-Knopf, der das Passwortfeld von außen füllt.
-    h('form.authscreen__form', { onsubmit: submit, oninput: () => { error.textContent = ''; } },
-      field('E-Mail', email),
-      field('Anzeigename', name, 'Steht an deinen Einträgen — ein Spitzname reicht.'),
-      field('Passwort', h('div.authscreen__pwrow', maskedField(password), suggest)),
-      error,
-      button,
-    ),
-    h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => go('choose') }, icon('back', 16), 'Zurück'),
-    h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => privacySheet({ mode: 'cloud' }) }, 'Datenschutz'),
-  );
+  return shell(title, intro, form, back, privacy, busy);
 }
 
 // ------------------------------------------------------------------ Bestätigen
@@ -306,6 +327,19 @@ function shell(...children) {
       h('div.welcome__mark', '€'),
       ...children,
     ),
+  );
+}
+
+/**
+ * Der Ladezustand während des Netzwegs zu Firebase — tritt an dieselbe Stelle
+ * wie das Formular, statt als eigener Bildschirm darüber zu blenden: die
+ * Karte drum herum (das €-Zeichen, der Rahmen) bleibt stehen, nur der Inhalt
+ * wechselt für die paar Sekunden.
+ */
+function busyPanel(message) {
+  return h('div.authscreen__busy', { role: 'status', 'aria-live': 'polite', hidden: true },
+    h('div.spinner', { 'aria-label': 'Lädt' }),
+    h('p.welcome__text', message),
   );
 }
 
