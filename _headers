@@ -42,6 +42,14 @@
 #                index.html (per Hash — ändert sich der Text dort, muss der
 #                Hash neu gerechnet werden, sonst startet die App nicht mehr),
 #                und reCAPTCHA für App Check (siehe README, „App Check“).
+#                reCAPTCHA Enterprise lädt sein eigenes Skript zwar von
+#                https://www.google.com, schiebt danach aber selbst noch ein
+#                kurzes Inline-Skript nach — auch das braucht einen Hash, sonst
+#                blockt der Browser es mit „Executing inline script violates
+#                ...“ in der Konsole (App Check funktioniert trotzdem, das
+#                Skript ist nur fürs Badge). Ändert Google den Text dieses
+#                Skripts, taucht die Meldung mit einem neuen Hash wieder auf —
+#                dann den aus der Konsole hier ergänzen.
 #   style-src    'unsafe-inline' ist hier bewusst dabei: die App setzt Farben
 #                (Personen, Diagramme) über style-Objekte in js/dom.js, nicht
 #                über feste Klassen. Reines CSS-Risiko ohne Codeausführung,
@@ -52,7 +60,7 @@
 # Firebase/Firestore läuft immer über *.googleapis.com, unabhängig vom
 # eigenen Projekt — deshalb reicht die eine Zeile für jede Einrichtung.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-VcwLFoAlojYNATs6Q4NYMLTSfWWwzZ/Ufq8DnAR7xqo=' https://www.gstatic.com https://www.google.com; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://*.googleapis.com https://www.google.com; frame-src https://www.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-VcwLFoAlojYNATs6Q4NYMLTSfWWwzZ/Ufq8DnAR7xqo=' 'sha256-p65p9tNzxsio9scHyvD4HTSCHXOAM6WmPic/doAHdgk=' https://www.gstatic.com https://www.google.com; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://*.googleapis.com https://www.google.com; frame-src https://www.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
