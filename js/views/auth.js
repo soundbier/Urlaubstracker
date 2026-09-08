@@ -56,8 +56,28 @@ export function renderAuth(state, actions) {
 // --------------------------------------------------------------------- Auswahl
 
 function chooseScreen(state, actions, go) {
+  // Eine gespeicherte Anmeldung wurde beim Start versucht und ist nicht
+  // zurückgekommen — kein echtes Abmelden, sondern ein Fehlschlag beim
+  // Wiederherstellen (Netz noch nicht da, App Check hakt kurz, …). Ohne
+  // diesen Hinweis sähe das genau wie ein Ausloggen aus, und niemand wüsste,
+  // dass ein erneuter Versuch reichen könnte.
+  const restoreError = state.accountRestoreError;
+
   return shell(
     h('h1.welcome__title', 'Willkommen'),
+    restoreError
+      ? h('div.status.status--warn',
+          icon('cloudOff', 22),
+          h('div',
+            h('p.status__title', 'Anmeldung nicht wiederhergestellt'),
+            h('p.status__text', restoreError),
+            h('button.btn.btn--ghost.btn--small', {
+              type: 'button',
+              onclick: async () => { await store.retryAccountRestore(); actions.rerender(); },
+            }, icon('repeat', 16), 'Noch einmal versuchen'),
+          ),
+        )
+      : null,
     h('p.welcome__text', 'Mit einem Konto siehst du alle Kassen, in denen du mitfährst — auf jedem Gerät, mit dem du dich anmeldest.'),
     h('button.btn.btn--primary.btn--wide', { type: 'button', onclick: () => go('signUp') }, 'Konto erstellen'),
     h('button.btn.btn--wide', { type: 'button', onclick: () => go('signIn') }, 'Ich habe schon ein Konto'),

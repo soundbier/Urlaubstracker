@@ -34,6 +34,12 @@ let state = {
   // hier 'unknown', und Firebase ist ungeladen. 'localOnly' ist der Zustand
   // nach „Nur auf diesem Gerät“: bewusst kein Konto, keine Frage mehr offen.
   account: { status: 'unknown', uid: null, email: '', displayName: '', emailVerified: false },
+  // Ist beim Start eine gespeicherte Anmeldung nicht zurückzuholen (kein Netz
+  // im Moment des Kaltstarts, App Check hakt kurz, …), landet der Grund hier —
+  // sichtbar auf dem Anmeldebildschirm selbst. Ohne das sähe ein bloßer
+  // Verbindungsfehler beim Wiederherstellen exakt so aus wie ein echtes
+  // Abmelden, und niemand wüsste den Unterschied.
+  accountRestoreError: null,
   // Die Übersicht aller Kassen dieses Kontos — nur gefüllt, solange sie
   // gebraucht wird (siehe `loadMyTrips`).
   myTrips: [],
@@ -313,7 +319,7 @@ export async function init() {
   // Firebase ungeladen: die Anmeldemaske selbst braucht es nicht, erst der
   // Griff zu „Anmelden“ oder „Konto erstellen“ tut es.
   if (getPrefs().accountChoice === 'account' && cloudConfig()) {
-    await startAccount().catch((err) => setSync({ error: err?.message || String(err) }));
+    await restoreAccount();
   }
 
   await useBackend(new LocalBackend());
@@ -345,6 +351,32 @@ async function startAccount() {
 }
 
 /**
+ * Beim Start (oder erneut auf Wunsch) eine gespeicherte Anmeldung zurückholen.
+ * Scheitert das, bleibt der Grund in `accountRestoreError` stehen — sichtbar
+ * auf dem Anmeldebildschirm, statt nur in `sync.error` zu versacken, wo ihn
+ * niemand im Zusammenhang mit „bin ich noch angemeldet“ suchen würde.
+ */
+async function restoreAccount() {
+  try {
+    await startAccount();
+    set({ accountRestoreError: null });
+  } catch (err) {
+    const message = err?.message || String(err);
+    setSync({ error: message });
+    set({ accountRestoreError: message });
+  }
+}
+
+/**
+ * Noch einmal versuchen, ohne die Seite neu zu laden — der Knopf auf dem
+ * Anmeldebildschirm, wenn dort ein Fehlschlag steht.
+ */
+export async function retryAccountRestore() {
+  if (getPrefs().accountChoice !== 'account' || !cloudConfig()) return;
+  await restoreAccount();
+}
+
+/**
  * „Nur auf diesem Gerät“ — die dritte Antwort auf der Anmeldemaske, und eine
  * vollwertige: ohne Konto bleibt alles im Speicher dieses Browsers. Die Wahl
  * wird gemerkt, damit die Maske nicht bei jedem Start wieder dasteht; über
@@ -360,7 +392,7 @@ export async function signUp({ email, password, displayName }) {
   await startAccount();
   const account = await mod.signUp({ email, password, displayName });
   setPrefs({ accountChoice: 'account' });
-  set({ account, myTrips: [], tripsLoaded: false });
+  set({ account, myTrips: [], tripsLoaded: false, accountRestoreError: null });
   return account;
 }
 
@@ -372,7 +404,7 @@ export async function signIn({ email, password }) {
   // Angemeldet — falls die Maske aus den Einstellungen kam, ist ihre Frage
   // damit beantwortet und der Weg zurück zur Kasse frei. Und die Übersicht
   // gehört diesem Konto neu geladen, nicht dem, das davor angemeldet war.
-  set({ account, accountScreen: false, myTrips: [], tripsLoaded: false });
+  set({ account, accountScreen: false, myTrips: [], tripsLoaded: false, accountRestoreError: null });
   return account;
 }
 
