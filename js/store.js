@@ -30,6 +30,18 @@ let state = {
   // `handleChange`. Nur relevant, solange kein Trip offen ist; dort lohnt
   // sich das Nachsehen in `trash.js` nicht bei jeder Änderung.
   lastDeletedSummary: null,
+  // Der Kontozustand aus `auth.js` — solange niemand ihn gebraucht hat, steht
+  // hier 'unknown', und Firebase ist ungeladen. 'localOnly' ist der Zustand
+  // nach „Nur auf diesem Gerät“: bewusst kein Konto, keine Frage mehr offen.
+  account: { status: 'unknown', uid: null, email: '', displayName: '', emailVerified: false },
+  // Die Übersicht aller Kassen dieses Kontos — nur gefüllt, solange sie
+  // gebraucht wird (siehe `loadMyTrips`).
+  myTrips: [],
+  tripsLoading: false,
+  showTripList: false,
+  // Ausdrücklich aufgerufene Anmeldemaske (Einstellungen → Konto), auch wenn
+  // schon eine Kasse offen ist.
+  accountScreen: false,
   sync: {
     mode: 'local',
     ready: false,
@@ -207,6 +219,34 @@ export function cloudReady() {
 }
 
 /**
+ * Gehört jetzt die Anmeldemaske auf den Schirm?
+ *
+ * Vier Bedingungen, und jede davon ist eine bewusste Zurückhaltung:
+ *
+ *   - Ohne Firebase-Konfiguration gibt es gar keine Konten — dann wäre die
+ *     Maske eine Frage ohne mögliche Antwort.
+ *   - Wer schon eine Kasse führt, wird nicht ausgesperrt. Bestehende Geräte
+ *     laufen weiter wie bisher; das Konto holen sie sich über die
+ *     Einstellungen, wenn sie es brauchen.
+ *   - Eine offene Einladung hat Vorrang: sie wurde gerade angetippt.
+ *   - Und wer sich schon entschieden hat ('local' oder angemeldet), wird
+ *     nicht noch einmal gefragt.
+ */
+export function needsAccountScreen() {
+  const { account, trip, invite } = state;
+  if (!cloudReady()) return false;
+  // Ausdrücklich aufgerufen (Einstellungen → Konto): dann auch mit offener
+  // Kasse, und mit einem Rückweg dorthin.
+  if (state.accountScreen) return account.status !== 'ready';
+  if (trip || invite) return false;
+  if (getPrefs().accountChoice === 'local') return false;
+  return account.status === 'unknown'
+      || account.status === 'signedOut'
+      || account.status === 'anonymous'
+      || account.status === 'unverified';
+}
+
+/**
  * Nimmt eine Einladung aus der Adresszeile entgegen.
  *
  * Das passiert nicht nur beim Start: tippt jemand auf den Link, während die App
@@ -253,8 +293,242 @@ export async function init() {
   // schon jemand tippt — und das Getippte wäre weg.
   if (!prefs.firebaseConfig) await loadAmbientConfig();
 
+  // Eine gespeicherte Anmeldung zurückholen — aber nur dort, wo sich schon
+  // jemand angemeldet hat. Bei 'local' und bei „noch nicht gefragt“ bleibt
+  // Firebase ungeladen: die Anmeldemaske selbst braucht es nicht, erst der
+  // Griff zu „Anmelden“ oder „Konto erstellen“ tut es.
+  if (getPrefs().accountChoice === 'account' && cloudConfig()) {
+    await startAccount().catch((err) => setSync({ error: err?.message || String(err) }));
+  }
+
   await useBackend(new LocalBackend());
   if (cloudProblem) setSync({ error: cloudProblem });
+}
+
+// ---------------------------------------------------------------------- Konto
+
+/**
+ * Das Kontomodul, erst bei Bedarf geladen — wie das Firestore-Backend. Wer
+ * „Nur auf diesem Gerät“ gewählt hat, kommt hier nie vorbei, und damit bleibt
+ * es dabei, dass der lokale Modus kein einziges Byte Firebase lädt.
+ */
+let auth = null;
+
+async function loadAuth() {
+  if (!auth) auth = await import('./auth.js');
+  return auth;
+}
+
+/** Verbindet das Kontomodul und meldet jede Änderung in den Zustand. */
+async function startAccount() {
+  const config = cloudConfig();
+  if (!config) throw new Error('Diesem Gerät fehlt noch die Firebase-Konfiguration der Gruppe.');
+  const mod = await loadAuth();
+  mod.subscribe((account) => set({ account }));
+  await mod.start(config);
+  return getState().account;
+}
+
+/**
+ * „Nur auf diesem Gerät“ — die dritte Antwort auf der Anmeldemaske, und eine
+ * vollwertige: ohne Konto bleibt alles im Speicher dieses Browsers. Die Wahl
+ * wird gemerkt, damit die Maske nicht bei jedem Start wieder dasteht; über
+ * die Einstellungen lässt sie sich später umstimmen.
+ */
+export async function chooseLocalOnly() {
+  setPrefs({ accountChoice: 'local' });
+  set({ account: { ...getState().account, status: 'localOnly' } });
+}
+
+export async function signUp({ email, password, displayName }) {
+  const mod = await loadAuth();
+  await startAccount();
+  const account = await mod.signUp({ email, password, displayName });
+  setPrefs({ accountChoice: 'account' });
+  set({ account });
+  return account;
+}
+
+export async function signIn({ email, password }) {
+  const mod = await loadAuth();
+  await startAccount();
+  const account = await mod.signIn({ email, password });
+  setPrefs({ accountChoice: 'account' });
+  // Angemeldet — falls die Maske aus den Einstellungen kam, ist ihre Frage
+  // damit beantwortet und der Weg zurück zur Kasse frei.
+  set({ account, accountScreen: false });
+  return account;
+}
+
+export async function signOutAccount() {
+  const mod = await loadAuth();
+  await mod.signOutAccount();
+  // Die Wahl fällt zurück auf „noch nicht gefragt“: nach dem Abmelden steht
+  // wieder dieselbe Auswahl da wie beim ersten Start.
+  setPrefs({ accountChoice: null });
+  set({ account: mod.getAuthState() });
+}
+
+export async function resendVerification() {
+  return (await loadAuth()).resendVerification();
+}
+
+export async function changeDisplayName(name) {
+  const mod = await loadAuth();
+  await mod.changeDisplayName(name);
+  set({ account: mod.getAuthState() });
+}
+
+/**
+ * Die Anmeldemaske aufrufen, obwohl schon eine Kasse offen ist — der Weg aus
+ * den Einstellungen heraus für alle, die bisher ohne Konto unterwegs sind.
+ *
+ * Bewusst über ein eigenes Kennzeichen und nicht dadurch, dass die offene
+ * Kasse aus dem Zustand fällt: sie soll dastehen bleiben, und der Rückweg
+ * („Zurück zur Kasse“) soll nichts wiederherstellen müssen.
+ */
+export function showAccountScreen() {
+  set({ accountScreen: true, showTripList: false });
+}
+
+/** Die Maske wieder schließen, ohne etwas entschieden zu haben. */
+export function hideAccountScreen() {
+  set({ accountScreen: false });
+}
+
+export async function refreshVerification() {
+  const account = await (await loadAuth()).refreshVerification();
+  set({ account, accountScreen: account?.status === 'ready' ? false : state.accountScreen });
+  return account;
+}
+
+export async function resetPassword(email) {
+  const mod = await loadAuth();
+  await startAccount();
+  return mod.resetPassword(email);
+}
+
+// ------------------------------------------------------------- Meine Kassen
+
+/**
+ * Die Übersicht aller Kassen dieses Kontos.
+ *
+ * Der Store bleibt dabei, was er war: er hält *eine* offene Kasse. Die
+ * Übersicht ist keine zweite Welt, sondern ein Umschalter davor — die ganze
+ * App darunter (Budget, Ausgaben, Abrechnung) rechnet weiter mit genau einer.
+ * `tripRef.tripId` war schon immer der Zeiger darauf; neu ist nur, dass ihn
+ * jemand anderes als der Zufall des ersten Starts setzen kann.
+ */
+export async function loadMyTrips() {
+  const config = cloudConfig();
+  const uid = state.account?.uid;
+  if (!config || !uid) return [];
+  set({ tripsLoading: true });
+  try {
+    const { listTripsForUid } = await import('./backend-firestore.js');
+    const trips = await withTimeout(listTripsForUid(config, uid), 15000, NO_CONNECTION);
+    // Der nächste Urlaub zuerst, Vergangenes hinten — wonach man sucht, steht
+    // oben.
+    trips.sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)));
+    set({ myTrips: trips, tripsLoading: false });
+    return trips;
+  } catch (err) {
+    set({ tripsLoading: false });
+    throw err;
+  }
+}
+
+/** Eine Kasse aus der Übersicht öffnen. */
+export async function openTrip({ tripId, inviteCode, joinName = '' }) {
+  const config = cloudConfig();
+  if (!config) throw new Error('Diesem Gerät fehlt die Firebase-Konfiguration der Gruppe.');
+  set({ phase: 'loading', showTripList: false });
+  const cloud = await makeCloudBackend({ config, tripId, inviteCode });
+  try {
+    await useBackend(cloud);
+  } catch (err) {
+    await afterFailedAttempt(cloud);
+    set({ showTripList: true });
+    throw err;
+  }
+  // Das Passwort steht hier bewusst nicht: wer schon Mitglied ist, kommt über
+  // `inviteCode` aus dem Dokument herein und braucht es nicht. Was in `prefs`
+  // an Passwort steht, gehört zu der Kasse, die dort vorher stand — es hier
+  // stehen zu lassen, hieße es der falschen zuzuordnen.
+  setPrefs({ tripRef: { mode: 'cloud', tripId, inviteCode, joinName, joinPassword: '' } });
+}
+
+/** Zurück zur Übersicht, ohne die offene Kasse anzurühren. */
+export function showTrips() {
+  set({ showTripList: true });
+}
+
+/** Von der Übersicht zum Anlegen einer neuen Kasse. */
+export function startNewTrip() {
+  set({ showTripList: false, phase: 'onboarding' });
+}
+
+/**
+ * Konto löschen — mit allem, was daran hängt (Art. 17 DSGVO).
+ *
+ * Die Reihenfolge ist der ganze Punkt: erst austragen, dann löschen. Nach dem
+ * Löschen des Kontos gibt es niemanden mehr, der sich aus einer Kasse
+ * austragen dürfte — die Kennung stünde für immer in `memberUids`, und in
+ * einer Kasse mit acht Plätzen wäre einer davon dauerhaft von einem Konto
+ * belegt, das es nicht mehr gibt.
+ *
+ * Wo dieses Konto das letzte Mitglied war, geht die Kasse mit: sonst bliebe
+ * ein Dokument liegen, das niemand mehr öffnen kann und das trotzdem Namen
+ * und Beträge enthält. Gelöscht soll gelöscht heißen.
+ *
+ * Was das *nicht* leistet: Kassen, in denen noch andere sind, bleiben stehen —
+ * sie gehören auch den anderen. Dort verschwindet nur die eigene Kennung; die
+ * bereits eingetragenen Ausgaben bleiben als Teil der gemeinsamen Abrechnung
+ * bestehen, sonst ginge die Rechnung der Gruppe nicht mehr auf.
+ */
+export async function deleteAccountEverywhere(password) {
+  const mod = await loadAuth();
+  const config = cloudConfig();
+  const uid = state.account?.uid;
+  if (!uid) throw new Error('Dafür musst du angemeldet sein.');
+
+  const failed = [];
+  if (config) {
+    const trips = await loadMyTrips().catch(() => []);
+    for (const trip of trips) {
+      try {
+        const cloud = await makeCloudBackend({ config, tripId: trip.tripId, inviteCode: trip.inviteCode });
+        await cloud._connect();
+        if (trip.memberCount <= 1) await cloud.deleteTrip();
+        else await cloud.leave();
+        await cloud.stop().catch(() => {});
+      } catch {
+        failed.push(trip.name);
+      }
+    }
+  }
+  // Erst wenn das Austragen durch ist — und nur dann. Bleibt eine Kasse
+  // hängen, wäre das Konto danach weg und die Kennung nicht mehr zu
+  // entfernen; lieber ehrlich abbrechen und es noch einmal versuchen lassen.
+  if (failed.length) {
+    throw new Error(`Aus diesen Kassen konntest du nicht ausgetragen werden: ${failed.join(', ')}. Das Konto bleibt bestehen — versuch es noch einmal, wenn wieder Empfang da ist.`);
+  }
+
+  await mod.deleteAccount(password);
+  setPrefs({ accountChoice: null, tripRef: null, myPersonId: null });
+  set({ account: mod.getAuthState(), myTrips: [], showTripList: false });
+  await useBackend(new LocalBackend());
+}
+
+/**
+ * Gehört die Übersicht auf den Schirm? Immer dann, wenn jemand angemeldet ist
+ * und gerade keine Kasse offen hat — und immer dann, wenn jemand sie
+ * ausdrücklich aufgerufen hat.
+ */
+export function needsTripList() {
+  if (state.account?.status !== 'ready') return false;
+  if (state.invite) return false; // eine angetippte Einladung geht vor
+  return state.showTripList || (!state.trip && state.phase !== 'onboarding');
 }
 
 // -------------------------------------------------------------------- Aktionen
@@ -281,7 +555,11 @@ export async function createTrip({ name, startDate, endDate, currency, budgetMod
   const passwordProblem = checkNewPassword(password);
   if (passwordProblem) throw new Error(passwordProblem);
 
-  const config = firebaseConfig || cloudConfig();
+  // Ohne Konto bleibt eine neue Kasse auf diesem Gerät — auch dann, wenn eine
+  // Firebase-Konfiguration bereitläge. Vorher ging jede neue Kasse in die
+  // Cloud, sobald es eine Konfiguration gab; mit der Wahl „Nur auf diesem
+  // Gerät“ wäre das eine Übergehung genau dieser Wahl.
+  const config = (firebaseConfig || cloudConfig()) && canCreateInCloud() ? (firebaseConfig || cloudConfig()) : null;
   let warning = null;
   if (config) {
     const problem = validateFirebaseConfig(config);
@@ -329,6 +607,42 @@ export async function createTrip({ name, startDate, endDate, currency, budgetMod
   return { mode: 'local', warning };
 }
 
+/**
+ * Der Türsteher vor allem, was in der Cloud *neu* entsteht: eine Kasse
+ * anlegen oder einer beitreten.
+ *
+ * Warum das hier steht und nicht erst der Server antwortet: der Server sagt
+ * bei einer abgelehnten Anfrage nur „kein Zugriff“ und nie, warum — er
+ * verrät ja bewusst nichts über fremde Kassen. `createTrip` deutet dieses
+ * „kein Zugriff“ deshalb als „Name schon vergeben“, und `join` als „Name oder
+ * Passwort stimmt nicht“. Beides wäre hier grundfalsch: es liegt weder am
+ * Namen noch am Passwort, sondern am fehlenden Konto. Also fragen wir vorher.
+ *
+ * Bestehende Kassen rührt das nicht an — dort hängt der Zugriff weiter an der
+ * Mitgliedschaft, nicht am Konto (siehe `firestore.rules`).
+ */
+function ensureAccountForNewCloudTrip() {
+  const status = state.account?.status;
+  if (status === 'ready') return;
+  if (status === 'unverified') {
+    throw new Error('Bestätige zuerst deine E-Mail-Adresse — den Link haben wir dir geschickt. Danach geht das hier.');
+  }
+  throw new Error('Dafür braucht es ein Konto: eine geteilte Kasse hängt an einer Person, nicht an diesem Browser. Unter „Mehr → Konto“ ist es in einer Minute angelegt.');
+}
+
+/**
+ * Darf eine *neue* Kasse gleich in die Cloud, oder bleibt sie auf dem Gerät?
+ *
+ * Beim Beitreten ist ein fehlendes Konto ein Fehler — eine geteilte Kasse
+ * lässt sich nun einmal nicht lokal betreten. Beim Anlegen wäre derselbe
+ * Fehler falsch: wer „Nur auf diesem Gerät“ gewählt hat, will genau das, und
+ * eine Absage wäre die Antwort auf eine Frage, die niemand gestellt hat. Also
+ * legt die App sie dort an, wo sie hingehört, und sagt es dazu.
+ */
+function canCreateInCloud() {
+  return state.account?.status === 'ready';
+}
+
 /** Ein Cloud-Backend für die Kasse mit diesem Namen und Passwort. */
 async function openCloudTrip(config, joinName, password) {
   const { tripId, proof } = await joinKeysFor(joinName, password);
@@ -338,10 +652,12 @@ async function openCloudTrip(config, joinName, password) {
 /**
  * Aufräumen, wenn ein Verbindungsversuch schiefgegangen ist.
  *
- * Alle Cloud-Backends teilen sich dieselbe Firebase-App; der Versuch hat die
- * bestehende beim Verbinden abgeräumt. Läuft gerade eine geteilte Kasse, wäre
- * sie danach stumm — sie zeigte weiter den letzten Stand, ohne noch etwas zu
- * hören. Deshalb fährt sie hier wieder hoch.
+ * Der gescheiterte Versuch hat seine Zuhörer registriert und muss sie wieder
+ * loswerden, sonst spricht ein Backend weiter, das niemand mehr benutzt. Die
+ * Firebase-App selbst bleibt davon unberührt — sie gehört seit `firebase-app.js`
+ * dem Gerät, nicht dem einzelnen Verbindungsversuch. Läuft daneben eine
+ * geteilte Kasse, fährt sie hier trotzdem wieder hoch: ihre Zuhörer hingen an
+ * demselben `stop()`-Zyklus.
  */
 async function afterFailedAttempt(attempt) {
   await attempt.stop().catch(() => {});
@@ -363,6 +679,7 @@ export async function joinTripByName({ name, password, config = null }) {
       'Diesem Gerät fehlt noch die Firebase-Konfiguration der Gruppe. Öffne einen Einladungslink oder füge sie unten ein.',
     );
   }
+  ensureAccountForNewCloudTrip();
 
   const cloud = await openCloudTrip(cfg, name, password);
   try {

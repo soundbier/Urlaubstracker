@@ -143,6 +143,7 @@ export function renderSettings(state, actions) {
     tripGroup(state),
     peopleGroup(state, actions),
     deviceGroup(actions),
+    accountGroup(state, actions),
     syncGroup(state),
     dataGroup(state),
     privacyGroup(state),
@@ -153,6 +154,141 @@ export function renderSettings(state, actions) {
         icon('trash', 18), 'Urlaubskasse löschen'),
     ),
   );
+}
+
+// ------------------------------------------------------------------- Konto
+
+/**
+ * Das Konto — und für alle ohne eines der ehrliche Grund, eins anzulegen.
+ *
+ * Der Grund ist nicht „damit wir wissen, wer du bist“, sondern ein handfester:
+ * ohne Konto hängt die Mitgliedschaft an einer anonymen Kennung, und die lebt
+ * nur im Speicher genau dieses Browsers. Wer ihn leert, das Gerät wechselt
+ * oder die App neu installiert, ist aus seiner eigenen Kasse draußen — und
+ * kommt seit den neuen Regeln nur mit einem Konto wieder hinein, weil
+ * Beitreten eines verlangt.
+ *
+ * Bestehende Kassen laufen unverändert weiter (siehe `firestore.rules`);
+ * hier steht deshalb ein Angebot, keine Sperre.
+ */
+function accountGroup(state, actions) {
+  const account = state.account || {};
+
+  if (account.status === 'ready') {
+    return group('Konto', { note: 'Kontodaten liegen bei Firebase Authentication in den USA — siehe Datenschutz.' },
+      navRow('Angemeldet als', {
+        value: account.displayName || '—',
+        sub: account.email,
+        onClick: () => displayNameSheet(account, actions),
+      }),
+      actionRow('cloudOff', 'Abmelden', async () => {
+        await store.signOutAccount();
+        actions.rerender();
+      }, { sub: 'Die Kassen bleiben, du kommst mit denselben Daten wieder herein.' }),
+      actionRow('trash', 'Konto löschen', () => deleteAccountSheet(actions), {
+        danger: true,
+        sub: 'Trägt dich aus allen Kassen aus und löscht das Konto endgültig.',
+      }),
+    );
+  }
+
+  if (account.status === 'unverified') {
+    return group('Konto', {},
+      h('div.status.status--warn',
+        icon('info', 22),
+        h('div',
+          h('p.status__title', 'E-Mail noch nicht bestätigt'),
+          h('p.status__text', `An ${account.email || 'deine Adresse'} ist ein Link unterwegs. Erst danach lassen sich Kassen anlegen oder teilen.`),
+        ),
+      ),
+      actionRow('repeat', 'Bestätigungsmail noch einmal schicken', async () => {
+        try {
+          await store.resendVerification();
+          toast('Noch einmal verschickt.', { type: 'success' });
+        } catch (err) {
+          toast(err?.message || 'Ging nicht.', { type: 'error' });
+        }
+      }),
+    );
+  }
+
+  // Ohne Konto — und ohne Cloud gibt es gar keins, dann bleibt der Abschnitt weg.
+  if (!store.cloudReady()) return null;
+
+  return group('Konto', {},
+    h('div.status.status--muted',
+      icon('person', 22),
+      h('div',
+        h('p.status__title', 'Kein Konto'),
+        h('p.status__text', state.sync?.mode === 'cloud'
+          ? 'Diese Kasse hängt an einer Kennung, die nur in diesem Browser lebt. Wird er geleert oder das Gerät gewechselt, kommst du ohne Konto nicht mehr hinein. Ein Konto behält die Mitgliedschaft — die bestehende Kennung wird dabei übernommen, nichts geht verloren.'
+          : 'Für eine geteilte Kasse braucht es eins. Ohne bleibt alles auf diesem Gerät, verschlüsselt und auf keinem Server.'),
+      ),
+    ),
+    actionRow('person', 'Konto erstellen oder anmelden', () => { store.showAccountScreen(); }),
+  );
+}
+
+function displayNameSheet(account, actions) {
+  return openSheet({
+    title: 'Anzeigename',
+    subtitle: 'Steht an deinen Einträgen.',
+    build: (close) => {
+      const input = h('input.field__input', { value: account.displayName || '', maxlength: 40, enterkeyhint: 'done' });
+      const error = h('p.field__error');
+      const save = async () => {
+        try {
+          await store.changeDisplayName(input.value);
+          actions.rerender();
+          close();
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+        }
+      };
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        h('label.field', h('span.field__label', 'Name'), input, error),
+        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Speichern'),
+      );
+    },
+  });
+}
+
+/**
+ * Konto löschen — mit Passwort, weil Firebase eine frische Anmeldung verlangt,
+ * und mit der Ansage, was dabei passiert: das Austragen aus den Kassen ist der
+ * Teil, den man hinterher nicht mehr nachholen könnte.
+ */
+function deleteAccountSheet(actions) {
+  return openSheet({
+    title: 'Konto löschen',
+    subtitle: 'Endgültig — und vorher wirst du aus allen Kassen ausgetragen.',
+    build: (close) => {
+      const password = maskedInput({ autocomplete: 'current-password', placeholder: 'Dein Passwort' });
+      const error = h('p.field__error');
+      const button = h('button.btn.btn--primary.btn--danger.btn--wide', { type: 'submit' }, 'Konto endgültig löschen');
+
+      const submit = async (e) => {
+        e.preventDefault();
+        error.textContent = '';
+        button.disabled = true;
+        try {
+          await store.deleteAccountEverywhere(password.value);
+          toast('Konto gelöscht.', { type: 'success' });
+          actions.rerender();
+          close();
+        } catch (err) {
+          error.textContent = err?.message || String(err);
+          button.disabled = false;
+        }
+      };
+
+      return h('form.stack', { onsubmit: submit },
+        h('p.field__note', 'Kassen, in denen noch andere sind, bleiben bestehen — dort verschwindet nur deine Kennung. Kassen, in denen du allein warst, werden mitgelöscht. Deine bereits eingetragenen Ausgaben bleiben Teil der gemeinsamen Abrechnung, sonst ginge die Rechnung der Gruppe nicht mehr auf.'),
+        h('label.field', h('span.field__label', 'Passwort'), maskedField(password), error),
+        button,
+      );
+    },
+  });
 }
 
 // ------------------------------------------------------------------ Kasse
@@ -699,6 +835,14 @@ function syncGroup(state) {
       : null,
     cloud
       ? h('div.rows',
+          // Der Weg zurück zur Übersicht — nur mit Konto, weil es ohne eines
+          // gar keine zweite Kasse zu wechseln gäbe.
+          state.account?.status === 'ready'
+            ? navRow('Meine Kassen', {
+                sub: 'Zwischen den Kassen wechseln, in denen du mitfährst.',
+                onClick: () => { store.showTrips(); },
+              })
+            : null,
           (() => {
             const devices = store.getDevices();
             if (!devices.length) return null;

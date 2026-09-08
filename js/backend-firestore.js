@@ -20,10 +20,13 @@
  * → APIs → Firestore und Authentication → „Erzwingen“) — ohne das lässt
  * Firebase Anfragen ohne gültigen Nachweis weiterhin durch. Siehe README,
  * Abschnitt „App Check“.
+ *
+ * Die Firebase-App, die Anmeldung und App Check gehören diesem Backend nicht:
+ * die liegen in `firebase-app.js`, einmal pro Gerät und unabhängig davon,
+ * welche Kasse offen ist. Hier steht nur, was mit *dieser* Kasse zu tun hat.
  */
 import * as fb from '../vendor/firebase.js';
-
-const APP_NAME = 'urlaubstracker';
+import { connectFirebase, currentUser } from './firebase-app.js';
 
 /** Felder des Trips, die der App gehören — Sync-Felder rühren wir nicht an. */
 // `dataRegion` gehört dazu: wo die Kasse liegt, muss jedes Gerät sehen können —
@@ -37,14 +40,43 @@ function pickTripFields(trip) {
 }
 
 /**
- * Läuft das hier auf einem Entwicklungsgerät (lokaler Server, kein echtes
- * Deployment)? Nur dort darf ein Debug-Token für App Check überhaupt wirken —
- * kopiert sich `firebase-config.json` versehentlich mit einem Debug-Token in
- * eine echte Auslieferung, greift die Prüfung hier trotzdem nicht.
+ * Alle Kassen, in denen dieses Konto Mitglied ist — für die Übersicht nach dem
+ * Anmelden.
+ *
+ * Die Abfrage *muss* nach `memberUids` filtern: die Sicherheitsregeln halten
+ * jedes einzelne Dokument gegen `isMember()`, und eine Abfrage, die auch nur
+ * eine fremde Kasse zurückgäbe, scheitert deshalb vollständig. Das ist keine
+ * Höflichkeit gegenüber dem Server, sondern die Bedingung dafür, dass hier
+ * überhaupt etwas ankommt.
+ *
+ * Zurück kommt nur, was die Liste zeigt — und `inviteCode`, weil sich damit
+ * eine Kasse öffnen lässt, ohne noch einmal nach dem Passwort zu fragen: wer
+ * schon Mitglied ist, darf den Code lesen, und mehr braucht das Verbinden
+ * nicht.
  */
-function isLocalDevHost() {
-  const host = typeof location !== 'undefined' ? location.hostname : '';
-  return host === 'localhost' || host === '127.0.0.1' || host === '[::1]' || host === '';
+export async function listTripsForUid(config, uid) {
+  const { db, ready } = connectFirebase(config);
+  await ready;
+  const snap = await fb.getDocs(
+    fb.query(fb.collection(db, 'trips'), fb.where('memberUids', 'array-contains', uid)),
+  );
+  return snap.docs.map((d) => {
+    const data = d.data() || {};
+    return {
+      tripId: d.id,
+      name: data.name || 'Urlaubskasse',
+      joinName: data.joinName || data.name || '',
+      startDate: data.startDate || '',
+      endDate: data.endDate || '',
+      currency: data.currency || 'EUR',
+      inviteCode: data.inviteCode || null,
+      memberCount: Array.isArray(data.memberUids) ? data.memberUids.length : 0,
+      people: Array.isArray(data.people) ? data.people : [],
+      // Ein laufender Löschauftrag gehört in die Übersicht: er ist der eine
+      // Zustand, in dem Nichtstun etwas kostet.
+      deleteRequestedAt: data.deleteRequestedAt?.toMillis?.() || null,
+    };
+  });
 }
 
 /**
@@ -96,7 +128,6 @@ export class FirestoreBackend {
     this.tripId = tripId;
     this.inviteCode = inviteCode || null;
 
-    this.app = null;
     this.db = null;
     this.uid = null;
 
@@ -110,115 +141,30 @@ export class FirestoreBackend {
 
   // ---------------------------------------------------------------- Verbindung
 
+  /**
+   * Verbinden und wissen, wer man ist.
+   *
+   * Die Firebase-App selbst gehört diesem Backend nicht mehr, sondern
+   * `firebase-app.js` — genau einmal pro Seitenaufruf, unabhängig davon,
+   * welche Kasse gerade offen ist. Vorher legte jeder Verbindungsaufbau sie
+   * neu an und löschte die alte; eine Anmeldung, die das überleben soll (ein
+   * Konto), konnte darin nicht wohnen.
+   *
+   * Angemeldet wird, wer schon da ist: eine wiedergekommene Konto-Sitzung
+   * oder eine anonyme Anmeldung. Anonym bleibt der Weg für alles, was ohne
+   * Konto geht — und für Geräte aus der Zeit davor, deren Kassen an genau
+   * dieser Kennung hängen.
+   */
   async _connect() {
-    const existing = fb.getApps().find((a) => a.name === APP_NAME);
-    // Schon verbunden, und niemand hat der App inzwischen den Platz unter
-    // demselben Namen weggenommen (siehe `afterFailedAttempt`)? Dann bleibt
-    // die bestehende Verbindung stehen. Ohne diese Prüfung meldet sich dieses
-    // Gerät beim Anlegen einer Kasse zweimal hintereinander an — einmal für
-    // die Vorabprüfung (`isMine`/`createTrip`), einmal noch für `start()`,
-    // das `createTrip` in store.js danach aufruft —, jedes Mal erneut bei
-    // Firebase Auth und, ist App Check eingerichtet, auch dort noch einmal.
-    // Scheitert der Nachweis gerade (falscher Schlüssel, reCAPTCHA down),
-    // landet die Fehlermeldung dadurch doppelt in der Konsole, obwohl nur
-    // eine einzige Verbindung zustande kommt.
-    if (this.db && existing === this.app) return this.uid;
-    if (existing) await fb.deleteApp(existing);
+    const { db, auth, ready } = connectFirebase(this.config);
+    await ready;
+    this.db = db;
 
-    this.app = fb.initializeApp(this.config, APP_NAME);
-    this._startAppCheck();
-    // `persistentLocalCache` legt Firestore selbst eine eigene, unverschlüsselte
-    // Ablage in IndexedDB an — außerhalb dessen, was `secure-storage.js`
-    // verschlüsselt, und außerhalb dessen, was diese App beeinflussen kann. Der
-    // Preis für Offline-Betrieb bei verbundener Kasse; siehe `privacy.js`, wo
-    // das entsprechend steht.
-    this.db = fb.initializeFirestore(this.app, {
-      localCache: fb.persistentLocalCache({ tabManager: fb.persistentMultipleTabManager() }),
-    });
+    const existing = await currentUser(auth);
+    this.uid = existing ? existing.uid : (await fb.signInAnonymously(auth)).user.uid;
 
-    // Dasselbe gilt für die Anmeldung selbst: Firebase legt ihre eigene
-    // Sitzung (anonyme Kennung, Erneuerungs-Merkmal) in ihrer eigenen Ablage
-    // ab, ebenfalls unverschlüsselt und ebenfalls außerhalb dieser Datei.
-    const auth = fb.getAuth(this.app);
-    await fb.setPersistence(auth, fb.browserLocalPersistence);
-    this.uid = await new Promise((resolve, reject) => {
-      const off = fb.onAuthStateChanged(
-        auth,
-        (user) => {
-          if (user) {
-            off();
-            resolve(user.uid);
-          }
-        },
-        (err) => {
-          off();
-          reject(err);
-        },
-      );
-      fb.signInAnonymously(auth).catch((err) => {
-        off();
-        reject(err);
-      });
-    });
     this._setStatus({ uid: this.uid });
     return this.uid;
-  }
-
-  /**
-   * App Check anmelden, falls die Gruppe es eingerichtet hat.
-   *
-   * Ohne `appCheckSiteKey` in der Konfiguration passiert hier nichts — die
-   * Kasse läuft dann wie bisher, nur eben ohne diese zusätzliche Bremse. Das
-   * ist auf einem echten Gerät (kein `localhost`) kein Normalfall, sondern
-   * eine unvollständige Einrichtung — deshalb landet dazu eine Warnung in der
-   * Konsole, statt es kommentarlos durchzuwinken.
-   *
-   * Scheitert die Anmeldung (kein Empfang, falscher Schlüssel), darf das den
-   * Verbindungsaufbau nicht verhindern — sonst wäre ein Tippfehler im
-   * Schlüssel gleichbedeutend mit „Kasse offline“, obwohl `firestore.rules`
-   * den Zugriff weiterhin regelt. Ob mit „Erzwingen“ in der Firebase-Konsole
-   * scharfgestellt oder nicht: ohne gültigen Nachweis meldet sich Firestore
-   * im ersten Fall selbst mit „Kein Zugriff“ — das fängt `describeError`
-   * schon ab. Sichtbar wird der Fehlschlag trotzdem, in der Konsole, damit er
-   * nicht als „läuft“ missverstanden wird.
-   */
-  _startAppCheck() {
-    const siteKey = this.config?.appCheckSiteKey;
-    if (!siteKey) {
-      if (!isLocalDevHost()) {
-        console.warn(
-          'Firebase App Check ist nicht eingerichtet (appCheckSiteKey fehlt) — diese Kasse läuft ohne diese ' +
-          'zusätzliche Bremse gegen automatisiertes Durchprobieren. Siehe README, Abschnitt „App Check“.',
-        );
-      }
-      return;
-    }
-    try {
-      // Debug-Token nur auf einem lokalen Entwicklungsgerät: die Prüfung
-      // steht hier im Code, nicht nur in der Dokumentation, damit ein
-      // versehentlich mitgegebener Debug-Token eine echte Auslieferung nicht
-      // schwächt — auf einem echten Host greift dieser Zweig gar nicht erst.
-      if (isLocalDevHost() && this.config?.appCheckDebugToken) {
-        self.FIREBASE_APPCHECK_DEBUG_TOKEN = this.config.appCheckDebugToken;
-      }
-      // `_connect()` löscht und legt die Firebase-App bei jedem Verbindungs-
-      // aufbau unter demselben Namen neu an (siehe store.js, `afterFailedAttempt`) —
-      // App Check bekommt das nicht mit: es hängt beim ersten Mal ein
-      // unsichtbares `<div id="fire_app_check_…">` an `document.body` und
-      // rendert das reCAPTCHA-Badge hinein, räumt das beim Löschen der App
-      // aber nicht wieder ab. Ohne dieses Aufräumen fände reCAPTCHA beim
-      // zweiten Verbindungsaufbau zuerst das alte, schon gerenderte Element
-      // und würfe „reCAPTCHA has already been rendered in this element“.
-      if (typeof document !== 'undefined') {
-        document.getElementById(`fire_app_check_${this.app.name}`)?.remove();
-      }
-      fb.initializeAppCheck(this.app, {
-        provider: new fb.ReCaptchaEnterpriseProvider(siteKey),
-        isTokenAutoRefreshEnabled: true,
-      });
-    } catch (err) {
-      console.error('Firebase App Check konnte nicht gestartet werden — die Kasse läuft ohne diese Bremse weiter.', err);
-    }
   }
 
   _setStatus(patch) {
@@ -318,14 +264,10 @@ export class FirestoreBackend {
     this._unsubs = [];
     this.onChange = null;
     this.onStatus = null;
-    if (this.app) {
-      try {
-        await fb.deleteApp(this.app);
-      } catch {
-        /* egal */
-      }
-      this.app = null;
-    }
+    // Die Firebase-App bleibt stehen: sie gehört nicht dieser Kasse, sondern
+    // dem Gerät (siehe `firebase-app.js`). Sie hier abzuräumen hieße, die
+    // Anmeldung mit abzuräumen — und beim Wechsel von einer Kasse zur
+    // nächsten wäre man jedes Mal abgemeldet.
   }
 
   // ------------------------------------------------------------------ Schreiben

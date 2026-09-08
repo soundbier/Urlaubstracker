@@ -23,7 +23,10 @@ export const ENTRY = `
 export { initializeApp, getApps, deleteApp } from 'firebase/app';
 export {
   getAuth, signInAnonymously, onAuthStateChanged, setPersistence,
-  browserLocalPersistence, signOut
+  browserLocalPersistence, signOut,
+  createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  sendEmailVerification, sendPasswordResetEmail, updateProfile,
+  EmailAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser
 } from 'firebase/auth';
 export {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,

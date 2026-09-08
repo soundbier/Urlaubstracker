@@ -2,19 +2,26 @@ rules_version = '2';
 
 // Sicherheitsregeln für den Urlaubstracker.
 //
-// Grundgedanke: ein Trip gehört den Geräten, die in `memberUids` stehen. Wer
+// Grundgedanke: ein Trip gehört den Konten, die in `memberUids` stehen. Wer
 // den Einladungscode kennt, darf sich selbst dazu eintragen — den Code kann
 // ein fremdes Gerät nicht lesen, deshalb schickt es ihn beim Beitreten als
 // `joinProof` mit, und der Vergleich passiert hier auf dem Server. Mehr als
-// acht Geräte kommen nicht an einen Trip; ebenso viele Personen führt die App.
+// acht Mitglieder kommen nicht an einen Trip; ebenso viele Personen führt die App.
+//
+// Wer hier hereindarf — die Linie der App: allein auf einem Gerät rechnen
+// braucht kein Konto und rührt Firestore gar nicht erst an. Sobald eine Kasse
+// geteilt wird, braucht es eines, und zwar eines mit *bestätigter* Adresse,
+// die nicht aus einem Wegwerf-Postfach stammt (`accountOk`). Das lässt sich
+// nur hier durchsetzen: eine Prüfung in der Oberfläche umgeht, wer die
+// Oberfläche weglässt.
 //
 // Zwei Dinge regeln die Regeln, die die App allein nicht könnte:
 //
-//   Aussperren — ein verlorenes Handy bleibt sonst für immer drin. Mitglieder
+//   Aussperren — ein verlorener Zugang bleibt sonst für immer drin. Mitglieder
 //   dürfen deshalb fremde Kennungen entfernen (aber weiterhin keine
 //   hinzufügen). Der Preis: wer in der Gruppe ist, kann auch andere
 //   hinauswerfen. Bei acht Leuten, die zusammen in den Urlaub fahren, ist das
-//   die kleinere Sorge als ein Gerät, das man nicht mehr loswird. Die App
+//   die kleinere Sorge als ein Zugang, den man nicht mehr loswird. Die App
 //   wechselt beim Aussperren zusätzlich das Passwort — sonst käme das Gerät
 //   mit dem Nachweis, den es noch hat, sofort wieder herein.
 //
@@ -32,15 +39,71 @@ rules_version = '2';
 // Regeln bleiben unabhängig davon die einzige Instanz, die entscheidet, *wer*
 // auf welchen Trip zugreifen darf; App Check ersetzt sie nicht.
 //
+// Was das für bestehende, anonym angemeldete Geräte heißt — die Frage, an der
+// sich entscheidet, ob diese Regeln jemandem den Boden wegziehen:
+//
+//   Nichts von dem, was sie heute tun, hängt an `accountOk()`. Lesen,
+//   auflisten, den Trip pflegen, Geräte aussperren, löschen und jede Ausgabe
+//   in den Unterordnern hängen weiter an `isMember()`. Eine bestehende
+//   geteilte Kasse läuft also unverändert weiter.
+//
+//   Ein Konto braucht nur, wer *hinzukommt*: eine neue Kasse anlegen
+//   (`create`) oder einer weiteren beitreten (der zweite Zweig von `update`).
+//   Das ist die Tür, nicht der Rauswurf — und genau dort sitzt auch das
+//   Durchprobieren von Passwörtern, gegen das die Prüfung gedacht ist.
+//
+// Eines bleibt trotzdem zu bedenken: eine anonyme Kennung lebt nur im Speicher
+// genau dieses Browsers. Wer ihn leert oder das Gerät wechselt, ist aus seiner
+// eigenen Kasse draußen — und kommt ab jetzt nur mit einem Konto wieder
+// hinein, weil Beitreten eines verlangt. Die App weist darauf hin
+// (`views/settings.js`, Abschnitt „Konto“) und bietet an, die bestehende
+// anonyme Kennung anzuheben, statt eine neue anzulegen (`auth.js`, `signUp`
+// über `linkWithCredential`) — dabei bleiben alle Mitgliedschaften erhalten.
+//
 // Veröffentlichen:  firebase deploy --only firestore:rules
 // (oder in der Firebase-Konsole unter Firestore Database → Regeln einfügen)
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Die Sperrliste für Wegwerf-Adressen. Öffentlich lesbar, damit das
+    // Registrierungsformular *vor* dem Anlegen eines Kontos sagen kann, dass
+    // diese Adresse nicht geht — dieselbe Liste, die unten `accountOk` prüft.
+    // Ein Geheimnis ist sie nicht; gepflegt wird sie ausschließlich mit
+    // Administratorrechten (siehe `tools/seed-blocklist.mjs`), nie aus der App.
+    // `list` bleibt zu: einzeln nachschlagen ja, die ganze Liste abziehen nein.
+    match /blockedEmailDomains/{domain} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
     match /trips/{tripId} {
       function signedIn() {
         return request.auth != null;
+      }
+
+      // Der Teil hinter dem @, kleingeschrieben. `split` liefert eine Liste;
+      // ohne Adresse im Token gibt es nichts zu zerlegen, deshalb steht die
+      // Prüfung darauf in `accountOk` davor.
+      function emailDomain() {
+        return request.auth.token.email.lower().split('@')[1];
+      }
+
+      /**
+       * Ein Konto, das eine Kasse anlegen oder ihr beitreten darf: angemeldet,
+       * nicht anonym, mit bestätigter Adresse, und die Domain steht nicht auf
+       * der Sperrliste.
+       *
+       * Geprüft wird das an den beiden Toren (Anlegen, Beitreten), nicht bei
+       * jeder einzelnen Ausgabe: wer erst einmal drin ist, ist Mitglied — und
+       * ein `exists()` bei jedem Schreibvorgang wäre ein zusätzlicher
+       * Lesezugriff für eine Frage, die längst beantwortet ist.
+       */
+      function accountOk() {
+        return signedIn()
+               && request.auth.token.email is string
+               && request.auth.token.email_verified == true
+               && !exists(/databases/$(database)/documents/blockedEmailDomains/$(emailDomain()));
       }
 
       function members() {
@@ -76,22 +139,31 @@ service cloud.firestore {
                && request.time > resource.data.deleteRequestedAt + duration.value(24, 'h');
       }
 
-      // Anlegen darf jedes angemeldete Gerät — aber nur mit sich selbst als
+      // Anlegen darf jedes taugliche Konto — aber nur mit sich selbst als
       // einzigem Mitglied und einem ausreichend langen Einladungscode.
-      allow create: if signedIn()
+      allow create: if accountOk()
                     && request.resource.data.memberUids == [request.auth.uid]
                     && request.resource.data.inviteCode is string
                     && request.resource.data.inviteCode.size() >= 8;
 
       allow get: if isMember();
-      allow list: if false; // Trips lassen sich nicht durchsuchen, nur gezielt öffnen.
+
+      // Die eigenen Kassen auflisten — für den Bildschirm, der nach dem
+      // Anmelden alle zeigt, in denen man Mitglied ist.
+      //
+      // Sicher ist das, weil Firestore bei einer Abfrage *jedes* Dokument
+      // gegen diese Regel hält: eine Abfrage, die auch nur eine fremde Kasse
+      // zurückgäbe, scheitert vollständig. Die App muss deshalb mit
+      // `where('memberUids', 'array-contains', uid)` fragen — jede breitere
+      // Abfrage bekommt gar nichts, statt zu viel.
+      allow list: if isMember();
 
       allow update: if
         // Mitglieder pflegen den Trip. `hasOnly` sorgt dafür, dass niemand
         // *hinzugefügt* werden kann: sonst holte ein Mitglied ein fremdes
-        // Gerät ganz ohne Einladungscode in die Kasse. Entfernen ist erlaubt —
-        // sich selbst (verlassen) und, solange man selbst drinbleibt, ein
-        // verlorenes Gerät. Wer geht, nimmt niemanden mit.
+        // Konto ganz ohne Einladungscode in die Kasse. Entfernen ist erlaubt —
+        // sich selbst (verlassen) und, solange man selbst drinbleibt, einen
+        // verlorenen Zugang. Wer geht, nimmt niemanden mit.
         (isMember()
          && afterMembers().hasOnly(members())
          && (request.auth.uid in afterMembers()
@@ -100,7 +172,7 @@ service cloud.firestore {
         ||
         // Beitreten: nur mit dem richtigen Code, nur sich selbst hinzufügen,
         // und ohne den Code dabei auszutauschen.
-        (signedIn()
+        (accountOk()
          && !(request.auth.uid in members())
          && request.resource.data.joinProof == resource.data.inviteCode
          && request.resource.data.inviteCode == resource.data.inviteCode
@@ -110,7 +182,7 @@ service cloud.firestore {
          && honestDeleteRequest());
 
       // Endgültig weg ist die Kasse erst nach der Bedenkzeit — oder sofort,
-      // wenn nur noch ein Gerät daran hängt.
+      // wenn nur noch ein Zugang daran hängt.
       allow delete: if isMember() && (members().size() == 1 || graceOver());
 
       // Einzahlungen und Ausgaben: für Mitglieder offen, für alle anderen zu.
