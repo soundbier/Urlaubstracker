@@ -1578,7 +1578,32 @@ select.field__input { background-image: none; }
   line-height: 1.2;
 }
 .welcome__text { font-size: var(--fs-md); color: var(--text-muted); max-width: 38ch; }
+.welcome__text.small { font-size: var(--fs-sm); }
 .welcome .btn { width: 100%; }
+
+/*
+ * Die Anmeldemaske. Die Felder stehen wie überall sonst untereinander; das
+ * Einzige, was sie zusätzlich braucht, ist die Trennlinie vor dem dritten Weg
+ * („Nur auf diesem Gerät“) — ohne sie sähe er wie eine dritte Anmeldeart aus,
+ * statt wie die Antwort, die er ist.
+ */
+.authscreen__form { display: flex; flex-direction: column; gap: var(--sp-3); width: 100%; }
+.authscreen__or {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  margin: var(--sp-2) 0;
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+.authscreen__or::before,
+.authscreen__or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+/* Passwortfeld und Vorschlag nebeneinander: der Vorschlag gehört zum Feld,
+   nicht in die Reihe der Knöpfe darunter. */
+.authscreen__pwrow { display: flex; align-items: center; gap: var(--sp-2); }
+.authscreen__pwrow > .field__reveal { flex: 1; min-width: 0; }
+.authscreen__pwrow > .btn { width: auto; flex: none; }
 /* Der zweite Weg unter dem Formular: beitreten statt anlegen. Abgesetzt durch
    eine Linie, damit er nicht wie der nächste Schritt des Formulars aussieht. */
 .welcome__foot {

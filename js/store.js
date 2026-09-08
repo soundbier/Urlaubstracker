@@ -30,6 +30,10 @@ let state = {
   // `handleChange`. Nur relevant, solange kein Trip offen ist; dort lohnt
   // sich das Nachsehen in `trash.js` nicht bei jeder Änderung.
   lastDeletedSummary: null,
+  // Der Kontozustand aus `auth.js` — solange niemand ihn gebraucht hat, steht
+  // hier 'unknown', und Firebase ist ungeladen. 'localOnly' ist der Zustand
+  // nach „Nur auf diesem Gerät“: bewusst kein Konto, keine Frage mehr offen.
+  account: { status: 'unknown', uid: null, email: '', displayName: '', emailVerified: false },
   sync: {
     mode: 'local',
     ready: false,
@@ -207,6 +211,30 @@ export function cloudReady() {
 }
 
 /**
+ * Gehört jetzt die Anmeldemaske auf den Schirm?
+ *
+ * Vier Bedingungen, und jede davon ist eine bewusste Zurückhaltung:
+ *
+ *   - Ohne Firebase-Konfiguration gibt es gar keine Konten — dann wäre die
+ *     Maske eine Frage ohne mögliche Antwort.
+ *   - Wer schon eine Kasse führt, wird nicht ausgesperrt. Bestehende Geräte
+ *     laufen weiter wie bisher; das Konto holen sie sich über die
+ *     Einstellungen, wenn sie es brauchen.
+ *   - Eine offene Einladung hat Vorrang: sie wurde gerade angetippt.
+ *   - Und wer sich schon entschieden hat ('local' oder angemeldet), wird
+ *     nicht noch einmal gefragt.
+ */
+export function needsAccountScreen() {
+  const { account, trip, invite } = state;
+  if (!cloudReady() || trip || invite) return false;
+  if (getPrefs().accountChoice === 'local') return false;
+  return account.status === 'unknown'
+      || account.status === 'signedOut'
+      || account.status === 'anonymous'
+      || account.status === 'unverified';
+}
+
+/**
  * Nimmt eine Einladung aus der Adresszeile entgegen.
  *
  * Das passiert nicht nur beim Start: tippt jemand auf den Link, während die App
@@ -253,8 +281,94 @@ export async function init() {
   // schon jemand tippt — und das Getippte wäre weg.
   if (!prefs.firebaseConfig) await loadAmbientConfig();
 
+  // Eine gespeicherte Anmeldung zurückholen — aber nur dort, wo sich schon
+  // jemand angemeldet hat. Bei 'local' und bei „noch nicht gefragt“ bleibt
+  // Firebase ungeladen: die Anmeldemaske selbst braucht es nicht, erst der
+  // Griff zu „Anmelden“ oder „Konto erstellen“ tut es.
+  if (getPrefs().accountChoice === 'account' && cloudConfig()) {
+    await startAccount().catch((err) => setSync({ error: err?.message || String(err) }));
+  }
+
   await useBackend(new LocalBackend());
   if (cloudProblem) setSync({ error: cloudProblem });
+}
+
+// ---------------------------------------------------------------------- Konto
+
+/**
+ * Das Kontomodul, erst bei Bedarf geladen — wie das Firestore-Backend. Wer
+ * „Nur auf diesem Gerät“ gewählt hat, kommt hier nie vorbei, und damit bleibt
+ * es dabei, dass der lokale Modus kein einziges Byte Firebase lädt.
+ */
+let auth = null;
+
+async function loadAuth() {
+  if (!auth) auth = await import('./auth.js');
+  return auth;
+}
+
+/** Verbindet das Kontomodul und meldet jede Änderung in den Zustand. */
+async function startAccount() {
+  const config = cloudConfig();
+  if (!config) throw new Error('Diesem Gerät fehlt noch die Firebase-Konfiguration der Gruppe.');
+  const mod = await loadAuth();
+  mod.subscribe((account) => set({ account }));
+  await mod.start(config);
+  return getState().account;
+}
+
+/**
+ * „Nur auf diesem Gerät“ — die dritte Antwort auf der Anmeldemaske, und eine
+ * vollwertige: ohne Konto bleibt alles im Speicher dieses Browsers. Die Wahl
+ * wird gemerkt, damit die Maske nicht bei jedem Start wieder dasteht; über
+ * die Einstellungen lässt sie sich später umstimmen.
+ */
+export async function chooseLocalOnly() {
+  setPrefs({ accountChoice: 'local' });
+  set({ account: { ...getState().account, status: 'localOnly' } });
+}
+
+export async function signUp({ email, password, displayName }) {
+  const mod = await loadAuth();
+  await startAccount();
+  const account = await mod.signUp({ email, password, displayName });
+  setPrefs({ accountChoice: 'account' });
+  set({ account });
+  return account;
+}
+
+export async function signIn({ email, password }) {
+  const mod = await loadAuth();
+  await startAccount();
+  const account = await mod.signIn({ email, password });
+  setPrefs({ accountChoice: 'account' });
+  set({ account });
+  return account;
+}
+
+export async function signOutAccount() {
+  const mod = await loadAuth();
+  await mod.signOutAccount();
+  // Die Wahl fällt zurück auf „noch nicht gefragt“: nach dem Abmelden steht
+  // wieder dieselbe Auswahl da wie beim ersten Start.
+  setPrefs({ accountChoice: null });
+  set({ account: mod.getAuthState() });
+}
+
+export async function resendVerification() {
+  return (await loadAuth()).resendVerification();
+}
+
+export async function refreshVerification() {
+  const account = await (await loadAuth()).refreshVerification();
+  set({ account });
+  return account;
+}
+
+export async function resetPassword(email) {
+  const mod = await loadAuth();
+  await startAccount();
+  return mod.resetPassword(email);
 }
 
 // -------------------------------------------------------------------- Aktionen

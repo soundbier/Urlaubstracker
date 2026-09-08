@@ -31,6 +31,15 @@ const DEFAULTS = {
   tripRef: null,
   myPersonId: null,     // wer sitzt an diesem Gerät
   theme: 'auto',        // auto | light | dark
+  // Was auf diesem Gerät zum Konto entschieden wurde: `null` heißt „noch
+  // nicht gefragt“ (dann kommt die Anmeldemaske), 'local' heißt „nur auf
+  // diesem Gerät, kein Konto“, 'account' heißt „hier meldet sich jemand an“.
+  //
+  // Der Unterschied zählt beim Start: nur bei 'account' lädt die App Firebase
+  // von sich aus, um eine gespeicherte Anmeldung zurückzuholen. Bei 'local'
+  // bleibt es beim Versprechen, dass im lokalen Modus kein einziges Byte
+  // Firebase geladen wird (siehe `store.js`, `boot`).
+  accountChoice: null,  // null | 'local' | 'account'
 };
 
 function writeThemeMirror(theme) {

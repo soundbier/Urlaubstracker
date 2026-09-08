@@ -13,6 +13,7 @@ import { renderToday } from './views/today.js';
 import { renderFinances, financePane, setFinancePane } from './views/finances.js';
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
+import { renderAuth } from './views/auth.js';
 import { renderPlanning, planningPane } from './views/planning.js';
 import { packingScope } from './views/packing.js';
 
@@ -403,6 +404,15 @@ function render() {
 
   if (state.phase === 'loading') {
     replace(app, h('div.view.view--center', h('div.spinner', { 'aria-label': 'Lädt' })));
+    return;
+  }
+
+  // Vor allem anderen: solange auf diesem Gerät noch nicht entschieden ist, ob
+  // hier jemand mit Konto oder allein rechnet, steht diese Frage im Weg — mit
+  // „Nur auf diesem Gerät“ als vollwertiger dritter Antwort.
+  if (store.needsAccountScreen()) {
+    document.body.classList.add('is-onboarding');
+    replace(app, renderAuth(state, actions));
     return;
   }
 
