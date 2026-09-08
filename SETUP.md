@@ -1,66 +1,51 @@
 # Setup
 
+## Deutsch
+
 Diese Anleitung beschreibt die Einrichtung des Urlaubstrackers mit Firebase und Cloudflare Pages.
 
-## 1. Firebase-Projekt erstellen
+### 1. Firebase-Projekt erstellen
 
 In der [Firebase Console](https://console.firebase.google.com/) ein neues Projekt erstellen.
 
 Anschließend:
 
-### Authentication
+**Authentication → Sign-in method**
 
-Unter **Build → Authentication → Sign-in method**:
+* Anonymous Authentication aktivieren
 
-* **Anonymous** aktivieren
-
-### Firestore
-
-Unter **Build → Firestore Database**:
+**Firestore Database**
 
 * Datenbank erstellen
-* **Produktionsmodus** auswählen
-* möglichst eine **EU-Region** verwenden
+* Produktionsmodus verwenden
+* möglichst eine EU-Region auswählen
 
-## 2. Firestore-Regeln veröffentlichen
+### 2. Firestore-Regeln veröffentlichen
 
-Firebase CLI installieren bzw. verwenden:
+Firebase CLI:
 
 ```bash
 npx firebase-tools login
-```
-
-Danach im Repository:
-
-```bash
 npx firebase-tools deploy --only firestore:rules
 ```
 
-Die verwendeten Regeln befinden sich in:
+Die Regeln befinden sich in:
 
 ```text
 firestore.rules
 ```
 
-Die Regeln sind weiterhin die eigentliche Zugriffskontrolle. App Check ersetzt sie nicht.
+Die Firestore Rules bleiben die zentrale Zugriffskontrolle. App Check ersetzt sie nicht.
 
-## 3. Firebase Web-App
+### 3. Firebase Web-App
 
-In Firebase unter:
+Unter:
 
-**Project settings → Your apps → Web-App hinzufügen**
+**Project settings → Your apps → Web-App**
 
-Die angezeigte Firebase-Konfiguration wird benötigt.
+eine Web-App registrieren.
 
-Für lokale Entwicklung kann eine Datei
-
-```text
-firebase-config.json
-```
-
-neben `index.html` angelegt werden.
-
-Als Vorlage dient:
+Für die lokale Entwicklung kann `firebase-config.json` verwendet werden. Vorlage:
 
 ```text
 firebase-config.example.json
@@ -77,74 +62,43 @@ Beispiel:
 }
 ```
 
-Die Datei mit echten Zugangsdaten gehört **nicht ins Repository**.
+Die Datei mit produktiven Werten darf nicht in Git eingecheckt werden.
 
-## 4. App Check einrichten
+### 4. Firebase App Check
 
-Für eine öffentlich erreichbare Installation sollte Firebase App Check aktiviert werden.
+Für eine öffentliche Installation sollte Firebase App Check aktiviert werden.
 
-Der Urlaubstracker verwendet dafür **reCAPTCHA Enterprise**.
+Der Urlaubstracker verwendet **reCAPTCHA Enterprise**.
 
-### Websiteschlüssel erstellen
-
-In der Google-Cloud-Konsole unter **reCAPTCHA Enterprise** einen Websiteschlüssel für die verwendeten Domains erstellen.
-
-Der Schlüssel wird als:
-
-```text
-appCheckSiteKey
-```
-
-verwendet.
-
-### In Firebase registrieren
+In Google Cloud einen reCAPTCHA-Enterprise-Websiteschlüssel für die verwendeten Domains erstellen.
 
 In Firebase:
 
 **App Check → Apps → Web-App**
 
-Als Anbieter **reCAPTCHA Enterprise** auswählen und denselben Websiteschlüssel hinterlegen.
+als Anbieter **reCAPTCHA Enterprise** auswählen.
 
-### Schlüssel in der App
+Der Websiteschlüssel wird verwendet als:
 
-Lokal:
-
-```json
-{
-  "appCheckSiteKey": "YOUR_RECAPTCHA_ENTERPRISE_SITE_KEY"
-}
+```text
+appCheckSiteKey
 ```
 
-Bei Cloudflare Pages wird stattdessen die Environment Variable verwendet:
+Für Cloudflare Pages:
 
 ```text
 FIREBASE_APPCHECK_SITE_KEY
 ```
 
-### Enforcement aktivieren
-
-Erst nachdem echte Geräte erfolgreich validiert wurden:
-
-**Firebase → App Check → APIs**
-
-für folgende Dienste **Erzwingen** aktivieren:
+Nach erfolgreicher Prüfung die Durchsetzung unter **App Check → APIs** für folgende Dienste aktivieren:
 
 * Cloud Firestore
 * Authentication
 
-App Check verhindert nicht den Zugriff durch einen berechtigten Nutzer. Es erschwert insbesondere automatisierte Anfragen und Missbrauch der öffentlichen Firebase-Endpunkte.
-
-## 5. Lokale Entwicklung
-
-Tests:
+### 5. Lokale Entwicklung
 
 ```bash
 npm test
-```
-
-Lokaler Server:
-
-```bash
 npm start
 ```
 
@@ -154,32 +108,29 @@ Danach:
 http://localhost:8080
 ```
 
-Für die lokale Entwicklung kann ein App-Check-Debug-Token verwendet werden.
+Für lokale Tests kann ein App-Check-Debug-Token verwendet werden.
 
-Das Feld
+Ein Debug-Token darf niemals in die produktive Anwendung übernommen werden.
 
-```text
-appCheckDebugToken
-```
-
-darf **nur in der lokalen Konfiguration** verwendet werden und niemals mit der produktiven App ausgeliefert werden.
-
-## 6. Cloudflare Pages
+### 6. Cloudflare Pages
 
 Repository mit Cloudflare Pages verbinden.
 
-### Build-Konfiguration
+**Build command**
 
 ```text
-Build command: npm run build
-Build output directory: /
+npm run build
 ```
 
-Die Veröffentlichung erfolgt anschließend automatisch über den jeweiligen Git-Branch.
+**Build output directory**
+
+```text
+/
+```
 
 ### Environment Variables
 
-Firebase-Werte können in Cloudflare Pages als Environment Variables hinterlegt werden, beispielsweise:
+Firebase-Konfiguration und App Check können als Cloudflare Environment Variables hinterlegt werden:
 
 ```text
 FIREBASE_API_KEY
@@ -189,48 +140,214 @@ FIREBASE_APP_ID
 FIREBASE_APPCHECK_SITE_KEY
 ```
 
-Der Build erzeugt daraus automatisch die benötigte:
+Produktive Werte gehören ausschließlich in die Cloudflare-Konfiguration und nicht in Git.
+
+Der Firebase Web API Key ist grundsätzlich kein Secret. Die Sicherheit wird durch korrekte Firebase Rules, Authentication und App Check gewährleistet.
+
+### 7. Sicherheitscheck
+
+Vor der Veröffentlichung:
 
 ```text
-firebase-config.json
-```
-
-### Wichtig
-
-**Environment Variables mit Secrets gehören ausschließlich in die Cloudflare-Konfiguration und nicht in Git.**
-
-Der Firebase Web API Key ist dabei kein klassisches Geheimnis. Entscheidend sind korrekte Firebase-Sicherheitsregeln, Authentication-Konfiguration und App Check.
-
-## 7. Sicherheitscheck vor Veröffentlichung
-
-Vor dem ersten öffentlichen Deployment prüfen:
-
-```text
-[ ] firebase-config.json nicht im Git-Repository
+[ ] firebase-config.json nicht im Repository
 [ ] keine Secrets im Quellcode
-[ ] Firestore-Regeln veröffentlicht
+[ ] Firestore Rules veröffentlicht
 [ ] Anonymous Authentication aktiviert
 [ ] App Check eingerichtet
 [ ] App Check für Firestore aktiviert
 [ ] App Check für Authentication aktiviert
-[ ] Produktionsdomain bei reCAPTCHA eingetragen
-[ ] lokaler Debug-Token nicht produktiv ausgeliefert
+[ ] Produktionsdomain bei reCAPTCHA registriert
+[ ] kein Debug-Token in Production
 ```
 
-## 8. Aktualisierung
-
-Nach Änderungen am Projekt:
-
-```bash
-npm test
-```
-
-Bei Änderungen am Firebase-SDK:
+### 8. Aktualisierung
 
 ```bash
 npm ci
-npm run build:firebase
 npm test
+npm run build
 ```
 
-Bei einer neuen App-Version müssen `APP_VERSION` im Service Worker sowie die entsprechenden Versionsangaben in `index.html` und `package.json` aktualisiert werden.
+Bei Änderungen an den Firestore Rules:
+
+```bash
+npx firebase-tools deploy --only firestore:rules
+```
+
+---
+
+# Setup
+
+## English
+
+This guide describes how to configure the Urlaubstracker with Firebase and Cloudflare Pages.
+
+### 1. Create a Firebase project
+
+Create a new project in the [Firebase Console](https://console.firebase.google.com/).
+
+Then configure:
+
+**Authentication → Sign-in method**
+
+* Enable Anonymous Authentication
+
+**Firestore Database**
+
+* Create a database
+* Use production mode
+* Prefer an EU region
+
+### 2. Deploy Firestore Rules
+
+Using the Firebase CLI:
+
+```bash
+npx firebase-tools login
+npx firebase-tools deploy --only firestore:rules
+```
+
+The rules are located in:
+
+```text
+firestore.rules
+```
+
+Firestore Rules remain the primary access-control mechanism. App Check does not replace them.
+
+### 3. Firebase Web App
+
+Go to:
+
+**Project settings → Your apps → Web-App**
+
+and register a web app.
+
+For local development, `firebase-config.json` can be used. Template:
+
+```text
+firebase-config.example.json
+```
+
+Example:
+
+```json
+{
+  "apiKey": "YOUR_API_KEY",
+  "authDomain": "YOUR_PROJECT.firebaseapp.com",
+  "projectId": "YOUR_PROJECT_ID",
+  "appId": "YOUR_APP_ID"
+}
+```
+
+Do not commit a configuration file containing production values to Git.
+
+### 4. Firebase App Check
+
+For a public deployment, Firebase App Check should be enabled.
+
+Urlaubstracker uses **reCAPTCHA Enterprise**.
+
+Create a reCAPTCHA Enterprise website key in Google Cloud for the domains used by the application.
+
+In Firebase:
+
+**App Check → Apps → Web-App**
+
+select **reCAPTCHA Enterprise** as the provider.
+
+The site key is used as:
+
+```text
+appCheckSiteKey
+```
+
+For Cloudflare Pages:
+
+```text
+FIREBASE_APPCHECK_SITE_KEY
+```
+
+After successful testing, enable enforcement under **App Check → APIs** for:
+
+* Cloud Firestore
+* Authentication
+
+### 5. Local development
+
+```bash
+npm test
+npm start
+```
+
+Then open:
+
+```text
+http://localhost:8080
+```
+
+An App Check debug token may be used for local development.
+
+Never ship a debug token with the production application.
+
+### 6. Cloudflare Pages
+
+Connect the repository to Cloudflare Pages.
+
+**Build command**
+
+```text
+npm run build
+```
+
+**Build output directory**
+
+```text
+/
+```
+
+### Environment Variables
+
+Firebase configuration and App Check can be stored as Cloudflare Environment Variables:
+
+```text
+FIREBASE_API_KEY
+FIREBASE_AUTH_DOMAIN
+FIREBASE_PROJECT_ID
+FIREBASE_APP_ID
+FIREBASE_APPCHECK_SITE_KEY
+```
+
+Production values should only exist in the Cloudflare configuration and must not be committed to Git.
+
+The Firebase Web API key is not considered a secret by itself. Security relies on properly configured Firebase Rules, Authentication and App Check.
+
+### 7. Security checklist
+
+Before deploying:
+
+```text
+[ ] firebase-config.json is not committed
+[ ] no secrets are present in source code
+[ ] Firestore Rules are deployed
+[ ] Anonymous Authentication is enabled
+[ ] App Check is configured
+[ ] App Check enforcement is enabled for Firestore
+[ ] App Check enforcement is enabled for Authentication
+[ ] production domains are registered with reCAPTCHA
+[ ] no debug token is included in production
+```
+
+### 8. Updating
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
+When Firestore Rules change:
+
+```bash
+npx firebase-tools deploy --only firestore:rules
+```
