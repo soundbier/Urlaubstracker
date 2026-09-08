@@ -116,11 +116,20 @@ export function connectFirebase(config) {
 
   // Dasselbe gilt für die Anmeldung: Firebase legt ihre eigene Sitzung
   // (Kennung, Erneuerungs-Merkmal) in ihrer eigenen Ablage ab, ebenfalls
-  // unverschlüsselt und ebenfalls außerhalb dieser Datei. `browserLocalPersistence`
-  // ist das, was eine Anmeldung über das Schließen des Tabs hinweg überhaupt
-  // bestehen lässt — ohne das müsste sich jede Person bei jedem Start neu anmelden.
+  // unverschlüsselt und ebenfalls außerhalb dieser Datei. Ohne eine explizit
+  // dauerhafte Persistenz müsste sich jede Person bei jedem Schließen der App
+  // neu anmelden — und schlimmer noch: `_connect()` in `backend-firestore.js`
+  // meldet ein Gerät ohne wiederhergestellte Sitzung nicht etwa ab, sondern
+  // still ein zweites Mal an, anonym, mit einer neuen Kennung. Diese neue
+  // Kennung steht in keiner bestehenden Kasse — Lesen und Schreiben schlägt
+  // dann fehl, ohne dass „ausgeloggt“ irgendwo auf dem Schirm stünde.
+  //
+  // `indexedDBLocalPersistence` statt des älteren `browserLocalPersistence`:
+  // Firebases eigene Empfehlung für Seiten mit Service Worker, und robuster
+  // gegen Browser, die localStorage und IndexedDB unterschiedlich behandeln —
+  // genau die Art Unterschied, die eine Sitzung unbemerkt verschwinden lässt.
   const auth = fb.getAuth(app);
-  const ready = fb.setPersistence(auth, fb.browserLocalPersistence).catch(() => {
+  const ready = fb.setPersistence(auth, fb.indexedDBLocalPersistence).catch(() => {
     // Privates Fenster ohne Speicherzugriff: die Anmeldung gilt dann nur für
     // diese Sitzung. Besser als gar keine Anmeldung.
   });
