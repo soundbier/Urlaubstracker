@@ -37,9 +37,16 @@ export function renderTrips(state, actions) {
   }
 
   // Beim ersten Aufbau laden; danach nur noch auf Wunsch, damit nicht jedes
-  // Neuzeichnen eine Abfrage auslöst.
+  // Neuzeichnen eine Abfrage auslöst. `loadMyTrips` setzt selbst
+  // `tripsLoading`, und das löst über `store.subscribe` ein volles
+  // Neuzeichnen der App aus — landen wir also während eines laufenden Ladens
+  // hier erneut, darf das kein zweites `reload()` anstoßen: sonst jagt sich
+  // das für immer selbst (Laden → Neuzeichnen → Laden → …) und der Kreis
+  // dreht sich, ohne je anzukommen.
   if (state.myTrips.length) {
     replace(list, h('div.list', ...state.myTrips.map((t) => tripRow(t, actions, message))));
+  } else if (state.tripsLoading) {
+    replace(list, h('div.view--center', h('div.spinner', { 'aria-label': 'Lädt' })));
   } else {
     reload();
   }
