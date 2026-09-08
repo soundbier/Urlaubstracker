@@ -167,8 +167,20 @@ export async function signUp({ email, password, displayName }) {
 
 export async function signIn({ email, password }) {
   const { auth } = requireConnection();
+  const address = normalizeEmail(email);
+  // Vor dem Netzweg prüfen, was sich hier prüfen lässt — nicht, um ein
+  // schwaches Passwort abzulehnen (das entscheidet, wer sich damals
+  // registriert hat, nicht diese Prüfung hier), sondern damit ein leeres
+  // Formular nie beim Server landet. Ohne das ging ein Klick auf „Anmelden“
+  // ohne jede Eingabe erst auf die Reise zu Firebase — und traf dort auf
+  // `requireConnection()`/`startAccount()`, die nebenbei eine gespeicherte
+  // Sitzung zurückholen: der leere Versuch scheiterte zwar, aber wer nicht
+  // genau hinsah, sah nur, dass die Maske plötzlich einer alten Anmeldung
+  // wich, und hielt das für ein Anmelden ganz ohne Daten.
+  const problem = checkEmail(address) || (String(password || '').trim() ? null : 'Bitte ein Passwort eintragen.');
+  if (problem) throw new Error(problem);
   try {
-    const result = await fb.signInWithEmailAndPassword(auth, normalizeEmail(email), password);
+    const result = await fb.signInWithEmailAndPassword(auth, address, password);
     emit(describe(result.user));
     return state;
   } catch (err) {

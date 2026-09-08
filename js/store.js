@@ -295,6 +295,15 @@ export async function init() {
 
   let cloudProblem = null;
   if (prefs.tripRef?.mode === 'cloud' && prefs.firebaseConfig) {
+    // Auch hier zuerst die Kontositzung zurückholen, aus demselben Grund wie
+    // unten im Weg ohne offene Kasse: sonst blieb `state.account` bei
+    // „unknown“ hängen, obwohl im Hintergrund über dieselbe Firebase-App
+    // (siehe `firebase-app.js`) längst die richtige Anmeldung lief. Sichtbar
+    // wurde das doppelt — „Mehr“ zeigte „Kein Konto“, obwohl Schreibvorgänge
+    // unter der wiederhergestellten Anmeldung längst durchgingen, und der
+    // nächste Griff zu „Anmelden“ holte die Sitzung bloß nach: aussehend wie
+    // ein Einloggen ganz ohne eingegebene Daten.
+    if (prefs.accountChoice === 'account') await restoreAccount();
     try {
       await useBackend(
         await makeCloudBackend({
