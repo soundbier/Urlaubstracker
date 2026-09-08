@@ -39,6 +39,9 @@ let state = {
   myTrips: [],
   tripsLoading: false,
   showTripList: false,
+  // Ausdrücklich aufgerufene Anmeldemaske (Einstellungen → Konto), auch wenn
+  // schon eine Kasse offen ist.
+  accountScreen: false,
   sync: {
     mode: 'local',
     ready: false,
@@ -231,7 +234,11 @@ export function cloudReady() {
  */
 export function needsAccountScreen() {
   const { account, trip, invite } = state;
-  if (!cloudReady() || trip || invite) return false;
+  if (!cloudReady()) return false;
+  // Ausdrücklich aufgerufen (Einstellungen → Konto): dann auch mit offener
+  // Kasse, und mit einem Rückweg dorthin.
+  if (state.accountScreen) return account.status !== 'ready';
+  if (trip || invite) return false;
   if (getPrefs().accountChoice === 'local') return false;
   return account.status === 'unknown'
       || account.status === 'signedOut'
@@ -347,7 +354,9 @@ export async function signIn({ email, password }) {
   await startAccount();
   const account = await mod.signIn({ email, password });
   setPrefs({ accountChoice: 'account' });
-  set({ account });
+  // Angemeldet — falls die Maske aus den Einstellungen kam, ist ihre Frage
+  // damit beantwortet und der Weg zurück zur Kasse frei.
+  set({ account, accountScreen: false });
   return account;
 }
 
@@ -364,9 +373,32 @@ export async function resendVerification() {
   return (await loadAuth()).resendVerification();
 }
 
+export async function changeDisplayName(name) {
+  const mod = await loadAuth();
+  await mod.changeDisplayName(name);
+  set({ account: mod.getAuthState() });
+}
+
+/**
+ * Die Anmeldemaske aufrufen, obwohl schon eine Kasse offen ist — der Weg aus
+ * den Einstellungen heraus für alle, die bisher ohne Konto unterwegs sind.
+ *
+ * Bewusst über ein eigenes Kennzeichen und nicht dadurch, dass die offene
+ * Kasse aus dem Zustand fällt: sie soll dastehen bleiben, und der Rückweg
+ * („Zurück zur Kasse“) soll nichts wiederherstellen müssen.
+ */
+export function showAccountScreen() {
+  set({ accountScreen: true, showTripList: false });
+}
+
+/** Die Maske wieder schließen, ohne etwas entschieden zu haben. */
+export function hideAccountScreen() {
+  set({ accountScreen: false });
+}
+
 export async function refreshVerification() {
   const account = await (await loadAuth()).refreshVerification();
-  set({ account });
+  set({ account, accountScreen: account?.status === 'ready' ? false : state.accountScreen });
   return account;
 }
 
@@ -437,6 +469,58 @@ export function startNewTrip() {
 }
 
 /**
+ * Konto löschen — mit allem, was daran hängt (Art. 17 DSGVO).
+ *
+ * Die Reihenfolge ist der ganze Punkt: erst austragen, dann löschen. Nach dem
+ * Löschen des Kontos gibt es niemanden mehr, der sich aus einer Kasse
+ * austragen dürfte — die Kennung stünde für immer in `memberUids`, und in
+ * einer Kasse mit acht Plätzen wäre einer davon dauerhaft von einem Konto
+ * belegt, das es nicht mehr gibt.
+ *
+ * Wo dieses Konto das letzte Mitglied war, geht die Kasse mit: sonst bliebe
+ * ein Dokument liegen, das niemand mehr öffnen kann und das trotzdem Namen
+ * und Beträge enthält. Gelöscht soll gelöscht heißen.
+ *
+ * Was das *nicht* leistet: Kassen, in denen noch andere sind, bleiben stehen —
+ * sie gehören auch den anderen. Dort verschwindet nur die eigene Kennung; die
+ * bereits eingetragenen Ausgaben bleiben als Teil der gemeinsamen Abrechnung
+ * bestehen, sonst ginge die Rechnung der Gruppe nicht mehr auf.
+ */
+export async function deleteAccountEverywhere(password) {
+  const mod = await loadAuth();
+  const config = cloudConfig();
+  const uid = state.account?.uid;
+  if (!uid) throw new Error('Dafür musst du angemeldet sein.');
+
+  const failed = [];
+  if (config) {
+    const trips = await loadMyTrips().catch(() => []);
+    for (const trip of trips) {
+      try {
+        const cloud = await makeCloudBackend({ config, tripId: trip.tripId, inviteCode: trip.inviteCode });
+        await cloud._connect();
+        if (trip.memberCount <= 1) await cloud.deleteTrip();
+        else await cloud.leave();
+        await cloud.stop().catch(() => {});
+      } catch {
+        failed.push(trip.name);
+      }
+    }
+  }
+  // Erst wenn das Austragen durch ist — und nur dann. Bleibt eine Kasse
+  // hängen, wäre das Konto danach weg und die Kennung nicht mehr zu
+  // entfernen; lieber ehrlich abbrechen und es noch einmal versuchen lassen.
+  if (failed.length) {
+    throw new Error(`Aus diesen Kassen konntest du nicht ausgetragen werden: ${failed.join(', ')}. Das Konto bleibt bestehen — versuch es noch einmal, wenn wieder Empfang da ist.`);
+  }
+
+  await mod.deleteAccount(password);
+  setPrefs({ accountChoice: null, tripRef: null, myPersonId: null });
+  set({ account: mod.getAuthState(), myTrips: [], showTripList: false });
+  await useBackend(new LocalBackend());
+}
+
+/**
  * Gehört die Übersicht auf den Schirm? Immer dann, wenn jemand angemeldet ist
  * und gerade keine Kasse offen hat — und immer dann, wenn jemand sie
  * ausdrücklich aufgerufen hat.
@@ -471,7 +555,11 @@ export async function createTrip({ name, startDate, endDate, currency, budgetMod
   const passwordProblem = checkNewPassword(password);
   if (passwordProblem) throw new Error(passwordProblem);
 
-  const config = firebaseConfig || cloudConfig();
+  // Ohne Konto bleibt eine neue Kasse auf diesem Gerät — auch dann, wenn eine
+  // Firebase-Konfiguration bereitläge. Vorher ging jede neue Kasse in die
+  // Cloud, sobald es eine Konfiguration gab; mit der Wahl „Nur auf diesem
+  // Gerät“ wäre das eine Übergehung genau dieser Wahl.
+  const config = (firebaseConfig || cloudConfig()) && canCreateInCloud() ? (firebaseConfig || cloudConfig()) : null;
   let warning = null;
   if (config) {
     const problem = validateFirebaseConfig(config);
@@ -519,6 +607,42 @@ export async function createTrip({ name, startDate, endDate, currency, budgetMod
   return { mode: 'local', warning };
 }
 
+/**
+ * Der Türsteher vor allem, was in der Cloud *neu* entsteht: eine Kasse
+ * anlegen oder einer beitreten.
+ *
+ * Warum das hier steht und nicht erst der Server antwortet: der Server sagt
+ * bei einer abgelehnten Anfrage nur „kein Zugriff“ und nie, warum — er
+ * verrät ja bewusst nichts über fremde Kassen. `createTrip` deutet dieses
+ * „kein Zugriff“ deshalb als „Name schon vergeben“, und `join` als „Name oder
+ * Passwort stimmt nicht“. Beides wäre hier grundfalsch: es liegt weder am
+ * Namen noch am Passwort, sondern am fehlenden Konto. Also fragen wir vorher.
+ *
+ * Bestehende Kassen rührt das nicht an — dort hängt der Zugriff weiter an der
+ * Mitgliedschaft, nicht am Konto (siehe `firestore.rules`).
+ */
+function ensureAccountForNewCloudTrip() {
+  const status = state.account?.status;
+  if (status === 'ready') return;
+  if (status === 'unverified') {
+    throw new Error('Bestätige zuerst deine E-Mail-Adresse — den Link haben wir dir geschickt. Danach geht das hier.');
+  }
+  throw new Error('Dafür braucht es ein Konto: eine geteilte Kasse hängt an einer Person, nicht an diesem Browser. Unter „Mehr → Konto“ ist es in einer Minute angelegt.');
+}
+
+/**
+ * Darf eine *neue* Kasse gleich in die Cloud, oder bleibt sie auf dem Gerät?
+ *
+ * Beim Beitreten ist ein fehlendes Konto ein Fehler — eine geteilte Kasse
+ * lässt sich nun einmal nicht lokal betreten. Beim Anlegen wäre derselbe
+ * Fehler falsch: wer „Nur auf diesem Gerät“ gewählt hat, will genau das, und
+ * eine Absage wäre die Antwort auf eine Frage, die niemand gestellt hat. Also
+ * legt die App sie dort an, wo sie hingehört, und sagt es dazu.
+ */
+function canCreateInCloud() {
+  return state.account?.status === 'ready';
+}
+
 /** Ein Cloud-Backend für die Kasse mit diesem Namen und Passwort. */
 async function openCloudTrip(config, joinName, password) {
   const { tripId, proof } = await joinKeysFor(joinName, password);
@@ -555,6 +679,7 @@ export async function joinTripByName({ name, password, config = null }) {
       'Diesem Gerät fehlt noch die Firebase-Konfiguration der Gruppe. Öffne einen Einladungslink oder füge sie unten ein.',
     );
   }
+  ensureAccountForNewCloudTrip();
 
   const cloud = await openCloudTrip(cfg, name, password);
   try {

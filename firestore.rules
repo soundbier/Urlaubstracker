@@ -39,12 +39,26 @@ rules_version = '2';
 // Regeln bleiben unabhängig davon die einzige Instanz, die entscheidet, *wer*
 // auf welchen Trip zugreifen darf; App Check ersetzt sie nicht.
 //
-// ACHTUNG BEIM VERÖFFENTLICHEN: Diese Fassung verlangt für Kassen ein Konto
-// mit bestätigter Adresse. Geräte mit einer *anonymen* Anmeldung — der Stand
-// vor den Konten — verlieren damit den Zugriff, bis sie ein Konto anlegen
-// (`auth.js`, `signUp`, hebt die bestehende anonyme Kennung an und behält die
-// Mitgliedschaften). Deshalb erst veröffentlichen, wenn die App-Fassung
-// draußen ist, die diesen Fall erkennt und dazu auffordert.
+// Was das für bestehende, anonym angemeldete Geräte heißt — die Frage, an der
+// sich entscheidet, ob diese Regeln jemandem den Boden wegziehen:
+//
+//   Nichts von dem, was sie heute tun, hängt an `accountOk()`. Lesen,
+//   auflisten, den Trip pflegen, Geräte aussperren, löschen und jede Ausgabe
+//   in den Unterordnern hängen weiter an `isMember()`. Eine bestehende
+//   geteilte Kasse läuft also unverändert weiter.
+//
+//   Ein Konto braucht nur, wer *hinzukommt*: eine neue Kasse anlegen
+//   (`create`) oder einer weiteren beitreten (der zweite Zweig von `update`).
+//   Das ist die Tür, nicht der Rauswurf — und genau dort sitzt auch das
+//   Durchprobieren von Passwörtern, gegen das die Prüfung gedacht ist.
+//
+// Eines bleibt trotzdem zu bedenken: eine anonyme Kennung lebt nur im Speicher
+// genau dieses Browsers. Wer ihn leert oder das Gerät wechselt, ist aus seiner
+// eigenen Kasse draußen — und kommt ab jetzt nur mit einem Konto wieder
+// hinein, weil Beitreten eines verlangt. Die App weist darauf hin
+// (`views/settings.js`, Abschnitt „Konto“) und bietet an, die bestehende
+// anonyme Kennung anzuheben, statt eine neue anzulegen (`auth.js`, `signUp`
+// über `linkWithCredential`) — dabei bleiben alle Mitgliedschaften erhalten.
 //
 // Veröffentlichen:  firebase deploy --only firestore:rules
 // (oder in der Firebase-Konsole unter Firestore Database → Regeln einfügen)

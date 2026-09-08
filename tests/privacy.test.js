@@ -48,3 +48,34 @@ test('die Erklärung benennt Verantwortlichen, Auftragsverarbeiter und Speichero
   assert.ok(localText.includes('verlässt kein Eintrag dieses Gerät'), 'ohne Cloud wird nichts übertragen');
   assert.ok(localText.includes('privacyContact'), 'fehlt der Verantwortliche, sagt die App das');
 });
+
+test('ohne Konto steht nichts über ein Konto in der Erklärung', () => {
+  // Eine Erklärung, die eine Verarbeitung beschreibt, die gar nicht
+  // stattfindet, ist keine bessere Erklärung — sie ist eine falsche.
+  const sections = privacySections({ mode: 'local', account: false });
+  assert.equal(sections.find((s) => s.title === 'Das Konto'), undefined);
+  const text = sections.map((s) => s.text).join(' ');
+  assert.doesNotMatch(text, /E-Mail-Adresse/, 'ohne Konto wird keine Adresse verarbeitet');
+});
+
+test('mit Konto steht die Übermittlung in die USA ausdrücklich da', () => {
+  // Der Punkt, an dem sich die App sonst selbst widerspräche: die Kasse liegt
+  // in der EU, das Konto nicht. Wer nur „Daten bleiben in der EU“ liest,
+  // bekäme eine Zusicherung, die für die Anmeldedaten nicht gilt.
+  const sections = privacySections({ mode: 'cloud', region: 'eur3', account: true });
+  const konto = sections.find((s) => s.title === 'Das Konto');
+  assert.ok(konto, 'es gibt einen Abschnitt zum Konto');
+  assert.match(konto.text, /USA/);
+  assert.match(konto.text, /Art\. 6 Abs\. 1 lit\. b/, 'Rechtsgrundlage steht dabei');
+  assert.match(konto.text, /löschen/i, 'und der Weg zur Löschung');
+
+  const ort = sections.find((s) => s.title === 'Wo die Daten liegen');
+  assert.match(ort.text, /USA/, 'auch dort, wo sonst „bleibt in der EU“ steht');
+});
+
+test('das Löschrecht nennt das Konto nur, wenn es eins gibt', () => {
+  const withAccount = privacySections({ mode: 'cloud', account: true }).find((s) => s.title === 'Eure Rechte');
+  const without = privacySections({ mode: 'cloud', account: false }).find((s) => s.title === 'Eure Rechte');
+  assert.match(withAccount.text, /Konto löschen/);
+  assert.doesNotMatch(without.text, /Konto löschen/);
+});

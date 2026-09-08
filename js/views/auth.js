@@ -70,6 +70,14 @@ function chooseScreen(state, actions, go) {
       onclick: async () => { await store.chooseLocalOnly(); actions.rerender(); },
     }, 'Nur auf diesem Gerät rechnen'),
     h('p.field__note', 'Ohne Konto bleibt alles im Speicher dieses Browsers — verschlüsselt und auf keinem Server. Teilen geht später jederzeit, dann braucht es eins.'),
+    // Aus den Einstellungen heraus aufgerufen, während eine Kasse offen ist:
+    // dann muss es auch ohne Entscheidung wieder zurückgehen.
+    state.accountScreen && state.trip
+      ? h('button.btn.btn--ghost.btn--small', {
+          type: 'button',
+          onclick: () => { store.hideAccountScreen(); actions.rerender(); },
+        }, icon('back', 16), `Zurück zu „${state.trip.name}“`)
+      : null,
   );
 }
 

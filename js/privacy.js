@@ -130,11 +130,21 @@ export function retentionOverdue(endDate, today = new Date()) {
  * noch auszufüllen ist, statt eine Erklärung vorzutäuschen, die niemanden
  * benennt.
  */
-export function privacySections({ contact = '', region = null, mode = 'local' } = {}) {
+export function privacySections({ contact = '', region = null, mode = 'local', account = false } = {}) {
   const cloud = mode === 'cloud';
   const advice = regionAdvice(region);
 
   return [
+    // Der Abschnitt steht bewusst vorn und nur dann, wenn es ein Konto
+    // wirklich gibt: er ist der einzige Ort, an dem diese App eine Angabe
+    // verarbeitet, die eine Person eindeutig benennt. Alles andere hier lässt
+    // sich mit einem Spitznamen führen.
+    account
+      ? {
+          title: 'Das Konto',
+          text: 'Für eine geteilte Kasse braucht es ein Konto: E-Mail-Adresse, ein Passwort (das nur als Prüfwert gespeichert wird, nie im Klartext) und ein frei gewählter Anzeigename. Dazu führt Firebase Authentication technisch bedingt Protokoll über Anmeldungen, einschließlich IP-Adresse und Zeitpunkt. Grundlage ist Art. 6 Abs. 1 lit. b DSGVO — ohne Konto lässt sich eine gemeinsame Kasse nicht führen. Wichtig zu wissen: Firebase Authentication kennt, anders als die Datenbank selbst, keine Wahl der Region — die Kontodaten liegen bei Google in den USA. Für diese Übermittlung stützt sich Google auf den Angemessenheitsbeschluss zum EU-US Data Privacy Framework und ergänzende Standardvertragsklauseln. Wer das nicht möchte, führt die Kasse ohne Konto weiter: allein auf dem Gerät, ohne dass irgendetwas übertragen wird. Löschen lässt sich das Konto jederzeit unter „Mehr → Konto → Konto löschen“; dabei wird die Person zuerst aus allen Kassen ausgetragen.',
+        }
+      : null,
     {
       title: 'Verantwortlich',
       text: contact
@@ -164,7 +174,11 @@ export function privacySections({ contact = '', region = null, mode = 'local' } 
     {
       title: 'Wo die Daten liegen',
       text: cloud
-        ? `${advice.title}: ${advice.text} Auf jedem verbundenen Gerät liegt zusätzlich eine vollständige Kopie im Speicher des Browsers, verschlüsselt (AES-256-GCM, Schlüssel getrennt auf demselben Gerät), damit die App offline weiterläuft. Das schützt den Speicher selbst — eine Datensicherung, ein synchronisierter Profilordner —, nicht die App auf einem entsperrten Gerät; davor schützt „Dieses Gerät → App-Sperre“. Eine zweite, technisch bedingte Kopie hält außerdem die Firestore-Bibliothek selbst für ihren eigenen Offline-Betrieb vor, unverschlüsselt und außerhalb des Einflusses dieser App.`
+        ? `${advice.title}: ${advice.text}${
+            account
+              ? ' Das gilt für die Kasse selbst; die Kontodaten (E-Mail, Anmeldeprotokolle) liegen unabhängig davon in den USA — siehe „Das Konto“ oben.'
+              : ''
+          } Auf jedem verbundenen Gerät liegt zusätzlich eine vollständige Kopie im Speicher des Browsers, verschlüsselt (AES-256-GCM, Schlüssel getrennt auf demselben Gerät), damit die App offline weiterläuft. Das schützt den Speicher selbst — eine Datensicherung, ein synchronisierter Profilordner —, nicht die App auf einem entsperrten Gerät; davor schützt „Dieses Gerät → App-Sperre“. Eine zweite, technisch bedingte Kopie hält außerdem die Firestore-Bibliothek selbst für ihren eigenen Offline-Betrieb vor, unverschlüsselt und außerhalb des Einflusses dieser App.`
         : 'Im Speicher dieses Browsers, verschlüsselt (AES-256-GCM, Schlüssel getrennt auf demselben Gerät). Auf keinem Server. Das schützt den Speicher selbst — eine Datensicherung, ein synchronisierter Profilordner —, nicht die App auf einem entsperrten Gerät; davor schützt die App-Sperre unter „Dieses Gerät“.',
     },
     {
@@ -177,7 +191,9 @@ export function privacySections({ contact = '', region = null, mode = 'local' } 
     },
     {
       title: 'Eure Rechte',
-      text: 'Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO) sowie Beschwerde bei einer Aufsichtsbehörde. Auskunft und Übertragbarkeit deckt „Als CSV“ bzw. „Sicherungskopie speichern“ ab, Berichtigung jede Bearbeitung eines Eintrags, Löschung „Urlaubskasse löschen“.',
+      text: `Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO) sowie Beschwerde bei einer Aufsichtsbehörde. Auskunft und Übertragbarkeit deckt „Als CSV“ bzw. „Sicherungskopie speichern“ ab, Berichtigung jede Bearbeitung eines Eintrags, Löschung „Urlaubskasse löschen“${
+        account ? ' — und für das Konto selbst „Mehr → Konto → Konto löschen“' : ''
+      }.`,
     },
-  ];
+  ].filter(Boolean);
 }

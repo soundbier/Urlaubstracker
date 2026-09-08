@@ -357,11 +357,15 @@ export function bufferLabel(buffer, currency) {
  * Bildschirm erreichbar sein müssen: Wer noch gar keine Kasse hat, soll vor
  * dem Eintippen des ersten Namens nachlesen können, was damit passiert.
  */
-export function privacySheet({ region = null, mode = 'local' } = {}) {
+export function privacySheet({ region = null, mode = 'local', account = null } = {}) {
   const sections = privacySections({
     contact: store.cloudConfig()?.privacyContact || '',
     region,
     mode,
+    // Der Abschnitt zum Konto steht nur da, wo es eines gibt — sonst erklärte
+    // die Erklärung eine Verarbeitung, die gar nicht stattfindet. Ohne
+    // ausdrückliche Angabe entscheidet der laufende Anmeldezustand.
+    account: account ?? ['ready', 'unverified'].includes(store.getState().account?.status),
   });
 
   return openSheet({
