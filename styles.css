@@ -1613,6 +1613,17 @@ select.field__input { background-image: none; }
 .authscreen__pwrow { display: flex; align-items: center; gap: var(--sp-2); }
 .authscreen__pwrow > .field__reveal { flex: 1; min-width: 0; }
 .authscreen__pwrow > .btn { width: auto; flex: none; }
+/* Der Ladezustand während des Netzwegs zu Firebase (Anmelden, Konto anlegen) —
+   ersetzt das Formular an derselben Stelle, statt nur den Knopf zu sperren:
+   sonst starrt man 2-3 Sekunden auf eine Maske, die sich nicht rührt. */
+.authscreen__busy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: var(--sp-6) 0;
+}
 
 /*
  * „Deine Kassen“. Kein Kopfbalken wie in der Kasse selbst — hier ist noch
