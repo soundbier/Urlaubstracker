@@ -38,6 +38,11 @@ let state = {
   // gebraucht wird (siehe `loadMyTrips`).
   myTrips: [],
   tripsLoading: false,
+  // Wurde für dieses Konto schon einmal geladen? Ohne dieses Flag lässt sich
+  // „noch nicht geladen“ nicht von „geladen, aber keine Kasse gefunden“
+  // unterscheiden — und genau das führte dazu, dass ein Konto ganz ohne
+  // gemeinsame Kasse für immer im Ladekreis hing (siehe `renderTrips`).
+  tripsLoaded: false,
   showTripList: false,
   // Ausdrücklich aufgerufene Anmeldemaske (Einstellungen → Konto), auch wenn
   // schon eine Kasse offen ist.
@@ -355,7 +360,7 @@ export async function signUp({ email, password, displayName }) {
   await startAccount();
   const account = await mod.signUp({ email, password, displayName });
   setPrefs({ accountChoice: 'account' });
-  set({ account });
+  set({ account, myTrips: [], tripsLoaded: false });
   return account;
 }
 
@@ -365,8 +370,9 @@ export async function signIn({ email, password }) {
   const account = await mod.signIn({ email, password });
   setPrefs({ accountChoice: 'account' });
   // Angemeldet — falls die Maske aus den Einstellungen kam, ist ihre Frage
-  // damit beantwortet und der Weg zurück zur Kasse frei.
-  set({ account, accountScreen: false });
+  // damit beantwortet und der Weg zurück zur Kasse frei. Und die Übersicht
+  // gehört diesem Konto neu geladen, nicht dem, das davor angemeldet war.
+  set({ account, accountScreen: false, myTrips: [], tripsLoaded: false });
   return account;
 }
 
@@ -376,7 +382,7 @@ export async function signOutAccount() {
   // Die Wahl fällt zurück auf „noch nicht gefragt“: nach dem Abmelden steht
   // wieder dieselbe Auswahl da wie beim ersten Start.
   setPrefs({ accountChoice: null });
-  set({ account: mod.getAuthState() });
+  set({ account: mod.getAuthState(), myTrips: [], tripsLoaded: false });
 }
 
 export async function resendVerification() {
@@ -440,10 +446,10 @@ export async function loadMyTrips() {
     // Der nächste Urlaub zuerst, Vergangenes hinten — wonach man sucht, steht
     // oben.
     trips.sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)));
-    set({ myTrips: trips, tripsLoading: false });
+    set({ myTrips: trips, tripsLoading: false, tripsLoaded: true });
     return trips;
   } catch (err) {
-    set({ tripsLoading: false });
+    set({ tripsLoading: false, tripsLoaded: true });
     throw err;
   }
 }
@@ -526,7 +532,7 @@ export async function deleteAccountEverywhere(password) {
 
   await mod.deleteAccount(password);
   setPrefs({ accountChoice: null, tripRef: null, myPersonId: null });
-  set({ account: mod.getAuthState(), myTrips: [], showTripList: false });
+  set({ account: mod.getAuthState(), myTrips: [], tripsLoaded: false, showTripList: false });
   await useBackend(new LocalBackend());
 }
 
