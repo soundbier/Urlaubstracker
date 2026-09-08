@@ -124,6 +124,40 @@ davor nicht von sich aus, die App aber schon: fehlt der Schlüssel auf einem
 Gerät, das nicht `localhost` ist, steht eine Warnung in der
 Browser-Konsole.
 
+### Konten und Wegwerf-Adressen
+
+Eine Kasse allein auf einem Gerät braucht kein Konto — dort verlässt kein
+Eintrag den Browser. Sobald eine Kasse geteilt wird, braucht es eines, mit
+bestätigter E-Mail-Adresse. Nur so lässt sich beides durchsetzen, was die
+Kasse vor automatisiertem Durchprobieren schützt; eine Prüfung in der
+Oberfläche umgeht, wer die Oberfläche weglässt.
+
+Damit die Sperre gegen Wegwerf-Postfächer greift, muss die Domainliste
+**einmal nach Firestore geschrieben werden**. Ohne diesen Schritt ist sie
+verdrahtet, aber wirkungslos: `exists()` findet nichts, also gilt jede
+Adresse als in Ordnung (die E-Mail-Bestätigung wirkt unabhängig davon).
+
+Die Liste liegt als [`tools/disposable-email-blocklist.conf`](tools/disposable-email-blocklist.conf)
+im Repo — aus [disposable-email-domains](https://github.com/disposable-email-domains/disposable-email-domains)
+(CC0). Ausgeliefert wird sie nicht; sie ist Werkzeug, kein Teil der App.
+Gelesen wird zur Laufzeit Firestore, von beiden Seiten: vom
+Registrierungsformular für die sofortige Rückmeldung und von den
+Sicherheitsregeln für die tatsächliche Durchsetzung. Zwei getrennte Listen
+wären früher oder später zwei verschiedene.
+
+In der [Google Cloud Shell](https://console.cloud.google.com/) — dort ist die
+Anmeldung schon da, es braucht keinen Dienstkonto-Schlüssel:
+
+```sh
+npm i --no-save firebase-admin    # nicht Teil der App
+node tools/seed-blocklist.mjs
+```
+
+Rund 8.700 Dokumente in Stapeln zu 500. Der Lauf ist wiederholbar; `--prune`
+räumt zusätzlich weg, was aus der Quelle verschwunden ist. Auf einem eigenen
+Rechner braucht es Zugangsdaten eines Dienstkontos mit Firestore-Schreibrecht
+(`GOOGLE_APPLICATION_CREDENTIALS`) und `--project=…`.
+
 **Entwicklung:** App Check lässt sich auf `localhost`/`127.0.0.1` mit einem
 Debug-Token statt einem echten reCAPTCHA-Nachweis testen. Dazu in der
 Firebase-Konsole unter App Check → App Check-Debug-Tokens einen Token
