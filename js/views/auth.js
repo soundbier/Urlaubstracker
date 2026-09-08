@@ -131,6 +131,14 @@ function signInScreen(state, actions, go) {
   async function submit(e) {
     e.preventDefault();
     error.textContent = '';
+    // Vor dem Netzweg prüfen, was sich hier prüfen lässt, genau wie bei
+    // „Konto erstellen“ — und hier zählt das doppelt: `store.signIn()` holt
+    // nebenbei über `startAccount()` eine gespeicherte Sitzung zurück, bevor
+    // die eingegebenen Daten überhaupt geprüft werden. Ein leeres Formular
+    // hätte diesen Rückweg trotzdem ausgelöst, und wer dann eine alte
+    // Anmeldung wiederkommen sah, hielt das für ein Anmelden ganz ohne Daten.
+    const problem = checkEmail(email.value) || (password.value.trim() ? null : 'Bitte ein Passwort eintragen.');
+    if (problem) { error.textContent = problem; return; }
     button.disabled = true;
     setBusy(true);
     try {
