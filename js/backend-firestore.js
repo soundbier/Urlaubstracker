@@ -104,7 +104,7 @@ export const NAME_TAKEN =
 export function describeError(err) {
   const code = err?.code || '';
   if (code.includes('permission-denied')) {
-    return 'Kein Zugriff auf diese Kasse. Wurde dieses Gerät ausgesperrt oder das Passwort gewechselt, kommt es mit den neuen Beitrittsdaten wieder herein. (Ist das Firebase-Projekt frisch: sind die Regeln aus firestore.rules veröffentlicht?)';
+    return 'Kein Zugriff auf diese Kasse. Meist reicht eine erneute Anmeldung (Mehr → Konto) — die gespeicherte Sitzung konnte gerade nicht wiederhergestellt werden. Möglich sind auch: dieses Gerät wurde ausgesperrt, das Passwort wurde gewechselt, oder — bei einem frischen Firebase-Projekt — die Regeln aus firestore.rules sind noch nicht veröffentlicht.';
   }
   if (code.includes('unavailable') || code.includes('network')) {
     return 'Keine Verbindung. Deine Eingaben werden gespeichert und später übertragen.';

@@ -23,7 +23,7 @@ export const ENTRY = `
 export { initializeApp, getApps, deleteApp } from 'firebase/app';
 export {
   getAuth, signInAnonymously, onAuthStateChanged, setPersistence,
-  browserLocalPersistence, signOut,
+  indexedDBLocalPersistence, signOut,
   createUserWithEmailAndPassword, signInWithEmailAndPassword,
   sendEmailVerification, sendPasswordResetEmail, updateProfile,
   EmailAuthProvider, linkWithCredential, reauthenticateWithCredential, deleteUser
