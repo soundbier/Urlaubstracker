@@ -57,6 +57,16 @@ export function getState() {
   return state;
 }
 
+/**
+ * Nur für Tests: den Zustand direkt setzen, ohne den Weg über Backend oder
+ * Konto zu nehmen — für Übergänge wie „Konto gerade angemeldet, lokales
+ * Backend noch im leeren Anfangszustand“, die sich sonst nur mit einem
+ * echten Firebase-Projekt nachstellen ließen.
+ */
+export function _setStateForTests(patch) {
+  state = { ...state, ...patch };
+}
+
 export function subscribe(fn) {
   listeners.add(fn);
   fn(state);
@@ -528,7 +538,14 @@ export async function deleteAccountEverywhere(password) {
 export function needsTripList() {
   if (state.account?.status !== 'ready') return false;
   if (state.invite) return false; // eine angetippte Einladung geht vor
-  return state.showTripList || (!state.trip && state.phase !== 'onboarding');
+  // `state.phase` beschreibt nur die Buchhaltung des lokalen Backends — bei
+  // einem frischen Gerät ohne lokale Kasse steht dort 'onboarding', auch
+  // direkt nach einer erfolgreichen Anmeldung. Das hier fragt etwas anderes:
+  // ist gerade *keine* Kasse offen? Dann gehört die Übersicht auf den Schirm,
+  // nicht der „Kasse anlegen“-Bildschirm — sonst müsste sich jemand, der sich
+  // gerade zum ersten Mal auf einem neuen Gerät angemeldet hat, Name und
+  // Passwort seiner Kasse erst wieder heraussuchen, obwohl die Liste bereithält.
+  return state.showTripList || !state.trip;
 }
 
 // -------------------------------------------------------------------- Aktionen
