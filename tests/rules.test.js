@@ -6,11 +6,15 @@
  * Zusicherungen fest, die die Regeln geben, damit keine spätere Vereinfachung
  * sie unbemerkt wieder herausnimmt.
  *
- *   1. Niemand fügt fremde Geräte ohne Passwort hinzu.
- *   2. Ein verlorenes Gerät lässt sich entfernen — aber wer geht, nimmt
+ *   1. Niemand fügt fremde Zugänge ohne Passwort hinzu.
+ *   2. Ein verlorener Zugang lässt sich entfernen — aber wer geht, nimmt
  *      niemanden mit.
- *   3. Die ganze Kasse ist nicht mit einem Tipp weg, sobald mehrere Geräte
+ *   3. Die ganze Kasse ist nicht mit einem Tipp weg, sobald mehrere Zugänge
  *      dranhängen; und die Bedenkzeit misst der Server, nicht das Gerät.
+ *   4. Eine Kasse anlegen oder ihr beitreten braucht ein Konto mit bestätigter
+ *      Adresse, die nicht aus einem Wegwerf-Postfach stammt — die Prüfung in
+ *      der Oberfläche umgeht, wer die Oberfläche weglässt.
+ *   5. Die eigenen Kassen auflisten ja, fremde durchsuchen nein.
  *
  * Veröffentlicht werden die Regeln von Hand (`firebase deploy --only
  * firestore:rules`) — was hier steht, gilt also erst, wenn das jemand tut.
@@ -31,8 +35,34 @@ function allowRule(name) {
   return m[1].replace(/\/\/[^\n]*/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-test('Trips lassen sich nicht durchsuchen', () => {
-  assert.match(allowRule('list'), /^if false$/);
+test('durchsuchen geht nur nach den eigenen Kassen', () => {
+  // Vorher stand hier `if false`: es gab keinen Bildschirm, der mehrere Kassen
+  // zeigt. Jetzt gibt es ihn — und `isMember()` ist das, was ihn trägt, ohne
+  // ihn zu öffnen: Firestore hält *jedes* Dokument einer Abfrage gegen diese
+  // Regel, eine Abfrage über fremde Kassen scheitert also vollständig, statt
+  // sie zurückzugeben.
+  assert.match(allowRule('list'), /^if isMember\(\)$/);
+});
+
+test('eine Kasse anlegen oder ihr beitreten braucht ein bestätigtes Konto', () => {
+  // Die Prüfung steht an beiden Toren — sonst bliebe eines davon offen.
+  assert.match(allowRule('create'), /accountOk\(\)/);
+  assert.match(allowRule('update'), /accountOk\(\)/);
+
+  const account = /function accountOk\(\) \{([\s\S]*?)\n      \}/.exec(rules)?.[1] || '';
+  assert.match(account, /email_verified == true/, 'eine unbestätigte Adresse zählt nicht');
+  assert.match(account, /email is string/, 'anonym angemeldet ist kein Konto');
+  assert.match(account, /!exists\(/, 'Wegwerf-Domains sind ausgeschlossen');
+  assert.match(account, /blockedEmailDomains/);
+});
+
+test('die Sperrliste lässt sich nachschlagen, aber nicht abziehen oder ändern', () => {
+  // Nachschlagen muss das Registrierungsformular können, bevor es überhaupt
+  // ein Konto gibt — deshalb offen. Die ganze Liste abziehen oder daran
+  // schrauben darf niemand aus der App heraus.
+  const block = /match \/blockedEmailDomains\/\{domain\} \{([\s\S]*?)\n    \}/.exec(rules)?.[1] || '';
+  assert.match(block, /allow get: if true/);
+  assert.match(block, /allow list, write: if false/);
 });
 
 test('beitreten geht nur mit dem Nachweis aus Name und Passwort', () => {

@@ -338,10 +338,12 @@ async function openCloudTrip(config, joinName, password) {
 /**
  * Aufräumen, wenn ein Verbindungsversuch schiefgegangen ist.
  *
- * Alle Cloud-Backends teilen sich dieselbe Firebase-App; der Versuch hat die
- * bestehende beim Verbinden abgeräumt. Läuft gerade eine geteilte Kasse, wäre
- * sie danach stumm — sie zeigte weiter den letzten Stand, ohne noch etwas zu
- * hören. Deshalb fährt sie hier wieder hoch.
+ * Der gescheiterte Versuch hat seine Zuhörer registriert und muss sie wieder
+ * loswerden, sonst spricht ein Backend weiter, das niemand mehr benutzt. Die
+ * Firebase-App selbst bleibt davon unberührt — sie gehört seit `firebase-app.js`
+ * dem Gerät, nicht dem einzelnen Verbindungsversuch. Läuft daneben eine
+ * geteilte Kasse, fährt sie hier trotzdem wieder hoch: ihre Zuhörer hingen an
+ * demselben `stop()`-Zyklus.
  */
 async function afterFailedAttempt(attempt) {
   await attempt.stop().catch(() => {});
