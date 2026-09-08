@@ -658,6 +658,15 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+/* „läuft“ in der Kassenübersicht: dieselbe gesperrte Versalienzeile, in der
+   Akzentfarbe. Ein laufender Urlaub ist die eine Kasse, die man sucht. */
+.tag--now {
+  font-size: var(--fs-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
 
 .empty { padding: var(--sp-4) 0 var(--sp-5); }
 .empty__text { font-size: var(--fs-sm); color: var(--text-faint); }
@@ -1604,6 +1613,25 @@ select.field__input { background-image: none; }
 .authscreen__pwrow { display: flex; align-items: center; gap: var(--sp-2); }
 .authscreen__pwrow > .field__reveal { flex: 1; min-width: 0; }
 .authscreen__pwrow > .btn { width: auto; flex: none; }
+
+/*
+ * „Deine Kassen“. Kein Kopfbalken wie in der Kasse selbst — hier ist noch
+ * keine offen, also gäbe es dort nichts zu zeigen außer dem eigenen Namen.
+ */
+.trips { display: flex; flex-direction: column; gap: var(--sp-4); }
+.trips__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-3); }
+.trips__title { font-family: var(--font-display, inherit); font-size: var(--fs-xl); font-weight: 600; letter-spacing: -0.01em; }
+.trips__sub { font-size: var(--fs-xs); color: var(--text-faint); margin-top: 2px; }
+/* Die beiden Wege zu einer weiteren Kasse stehen unten und abgesetzt, damit
+   sie nicht wie ein weiterer Eintrag der Liste darüber wirken. */
+.trips__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
 /* Der zweite Weg unter dem Formular: beitreten statt anlegen. Abgesetzt durch
    eine Linie, damit er nicht wie der nächste Schritt des Formulars aussieht. */
 .welcome__foot {

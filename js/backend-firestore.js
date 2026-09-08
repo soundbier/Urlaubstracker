@@ -40,6 +40,46 @@ function pickTripFields(trip) {
 }
 
 /**
+ * Alle Kassen, in denen dieses Konto Mitglied ist — für die Übersicht nach dem
+ * Anmelden.
+ *
+ * Die Abfrage *muss* nach `memberUids` filtern: die Sicherheitsregeln halten
+ * jedes einzelne Dokument gegen `isMember()`, und eine Abfrage, die auch nur
+ * eine fremde Kasse zurückgäbe, scheitert deshalb vollständig. Das ist keine
+ * Höflichkeit gegenüber dem Server, sondern die Bedingung dafür, dass hier
+ * überhaupt etwas ankommt.
+ *
+ * Zurück kommt nur, was die Liste zeigt — und `inviteCode`, weil sich damit
+ * eine Kasse öffnen lässt, ohne noch einmal nach dem Passwort zu fragen: wer
+ * schon Mitglied ist, darf den Code lesen, und mehr braucht das Verbinden
+ * nicht.
+ */
+export async function listTripsForUid(config, uid) {
+  const { db, ready } = connectFirebase(config);
+  await ready;
+  const snap = await fb.getDocs(
+    fb.query(fb.collection(db, 'trips'), fb.where('memberUids', 'array-contains', uid)),
+  );
+  return snap.docs.map((d) => {
+    const data = d.data() || {};
+    return {
+      tripId: d.id,
+      name: data.name || 'Urlaubskasse',
+      joinName: data.joinName || data.name || '',
+      startDate: data.startDate || '',
+      endDate: data.endDate || '',
+      currency: data.currency || 'EUR',
+      inviteCode: data.inviteCode || null,
+      memberCount: Array.isArray(data.memberUids) ? data.memberUids.length : 0,
+      people: Array.isArray(data.people) ? data.people : [],
+      // Ein laufender Löschauftrag gehört in die Übersicht: er ist der eine
+      // Zustand, in dem Nichtstun etwas kostet.
+      deleteRequestedAt: data.deleteRequestedAt?.toMillis?.() || null,
+    };
+  });
+}
+
+/**
  * Der Löschauftrag kommt als Firestore-`Timestamp` herein; im Rest der App
  * sind Zeitpunkte Millisekunden. Umgerechnet wird hier, einmal, beim Lesen —
  * geschrieben wird er nie von hier aus (siehe `requestDelete`), sondern immer

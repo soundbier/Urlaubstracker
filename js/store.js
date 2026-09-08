@@ -34,6 +34,11 @@ let state = {
   // hier 'unknown', und Firebase ist ungeladen. 'localOnly' ist der Zustand
   // nach „Nur auf diesem Gerät“: bewusst kein Konto, keine Frage mehr offen.
   account: { status: 'unknown', uid: null, email: '', displayName: '', emailVerified: false },
+  // Die Übersicht aller Kassen dieses Kontos — nur gefüllt, solange sie
+  // gebraucht wird (siehe `loadMyTrips`).
+  myTrips: [],
+  tripsLoading: false,
+  showTripList: false,
   sync: {
     mode: 'local',
     ready: false,
@@ -369,6 +374,77 @@ export async function resetPassword(email) {
   const mod = await loadAuth();
   await startAccount();
   return mod.resetPassword(email);
+}
+
+// ------------------------------------------------------------- Meine Kassen
+
+/**
+ * Die Übersicht aller Kassen dieses Kontos.
+ *
+ * Der Store bleibt dabei, was er war: er hält *eine* offene Kasse. Die
+ * Übersicht ist keine zweite Welt, sondern ein Umschalter davor — die ganze
+ * App darunter (Budget, Ausgaben, Abrechnung) rechnet weiter mit genau einer.
+ * `tripRef.tripId` war schon immer der Zeiger darauf; neu ist nur, dass ihn
+ * jemand anderes als der Zufall des ersten Starts setzen kann.
+ */
+export async function loadMyTrips() {
+  const config = cloudConfig();
+  const uid = state.account?.uid;
+  if (!config || !uid) return [];
+  set({ tripsLoading: true });
+  try {
+    const { listTripsForUid } = await import('./backend-firestore.js');
+    const trips = await withTimeout(listTripsForUid(config, uid), 15000, NO_CONNECTION);
+    // Der nächste Urlaub zuerst, Vergangenes hinten — wonach man sucht, steht
+    // oben.
+    trips.sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)));
+    set({ myTrips: trips, tripsLoading: false });
+    return trips;
+  } catch (err) {
+    set({ tripsLoading: false });
+    throw err;
+  }
+}
+
+/** Eine Kasse aus der Übersicht öffnen. */
+export async function openTrip({ tripId, inviteCode, joinName = '' }) {
+  const config = cloudConfig();
+  if (!config) throw new Error('Diesem Gerät fehlt die Firebase-Konfiguration der Gruppe.');
+  set({ phase: 'loading', showTripList: false });
+  const cloud = await makeCloudBackend({ config, tripId, inviteCode });
+  try {
+    await useBackend(cloud);
+  } catch (err) {
+    await afterFailedAttempt(cloud);
+    set({ showTripList: true });
+    throw err;
+  }
+  // Das Passwort steht hier bewusst nicht: wer schon Mitglied ist, kommt über
+  // `inviteCode` aus dem Dokument herein und braucht es nicht. Was in `prefs`
+  // an Passwort steht, gehört zu der Kasse, die dort vorher stand — es hier
+  // stehen zu lassen, hieße es der falschen zuzuordnen.
+  setPrefs({ tripRef: { mode: 'cloud', tripId, inviteCode, joinName, joinPassword: '' } });
+}
+
+/** Zurück zur Übersicht, ohne die offene Kasse anzurühren. */
+export function showTrips() {
+  set({ showTripList: true });
+}
+
+/** Von der Übersicht zum Anlegen einer neuen Kasse. */
+export function startNewTrip() {
+  set({ showTripList: false, phase: 'onboarding' });
+}
+
+/**
+ * Gehört die Übersicht auf den Schirm? Immer dann, wenn jemand angemeldet ist
+ * und gerade keine Kasse offen hat — und immer dann, wenn jemand sie
+ * ausdrücklich aufgerufen hat.
+ */
+export function needsTripList() {
+  if (state.account?.status !== 'ready') return false;
+  if (state.invite) return false; // eine angetippte Einladung geht vor
+  return state.showTripList || (!state.trip && state.phase !== 'onboarding');
 }
 
 // -------------------------------------------------------------------- Aktionen

@@ -699,6 +699,14 @@ function syncGroup(state) {
       : null,
     cloud
       ? h('div.rows',
+          // Der Weg zurück zur Übersicht — nur mit Konto, weil es ohne eines
+          // gar keine zweite Kasse zu wechseln gäbe.
+          state.account?.status === 'ready'
+            ? navRow('Meine Kassen', {
+                sub: 'Zwischen den Kassen wechseln, in denen du mitfährst.',
+                onClick: () => { store.showTrips(); },
+              })
+            : null,
           (() => {
             const devices = store.getDevices();
             if (!devices.length) return null;

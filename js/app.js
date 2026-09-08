@@ -14,6 +14,7 @@ import { renderFinances, financePane, setFinancePane } from './views/finances.js
 import { renderSettings } from './views/settings.js';
 import { renderOnboarding } from './views/onboarding.js';
 import { renderAuth } from './views/auth.js';
+import { renderTrips } from './views/trips.js';
 import { renderPlanning, planningPane } from './views/planning.js';
 import { packingScope } from './views/packing.js';
 
@@ -413,6 +414,14 @@ function render() {
   if (store.needsAccountScreen()) {
     document.body.classList.add('is-onboarding');
     replace(app, renderAuth(state, actions));
+    return;
+  }
+
+  // Angemeldet, aber keine Kasse offen (oder ausdrücklich hierher zurück):
+  // die Übersicht aller Kassen dieses Kontos.
+  if (store.needsTripList()) {
+    document.body.classList.add('is-onboarding');
+    replace(app, renderTrips(state, actions));
     return;
   }
 
