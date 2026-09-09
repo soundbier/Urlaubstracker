@@ -408,6 +408,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .hero__sub { font-size: var(--fs-sm); color: var(--text-muted); }
 .hero--over .hero__label { color: var(--over); }
 .hero--warn .hero__label { color: var(--warn); }
+/* „Losgeht's in …“ hat noch keine Kasse zum Auflisten, nur den Countdown —
+   der steht darum mittig statt wie die übrigen Stände linksbündig. */
+.hero--soon { align-items: center; text-align: center; }
 /* Ohne Zahl trägt die Zeile den Titel — dann ist sie die Überschrift der Seite. */
 .hero__title {
   font-family: var(--font-display);
