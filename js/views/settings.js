@@ -1280,6 +1280,16 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, ask
 
 // -------------------------------------------------------------------- Daten
 
+// Die `accept`-Angabe am Eingabefeld unten ist nur ein Vorschlag fürs
+// Dateiauswahlfenster — sie hält niemanden davon ab, „Alle Dateien“ zu wählen
+// oder eine beliebige Datei einfach auf `.json` umzubenennen. Name und Größe
+// werden deshalb hier noch einmal geprüft, bevor überhaupt ein Byte der
+// Datei gelesen wird. Die Obergrenze steht bewusst nirgends in der
+// Fehlermeldung: eine echte Sicherung liegt himmelweit darunter, nur eine
+// untergeschobene oder kaputte Datei stößt je daran — und wer für beides
+// dieselbe Meldung sieht, kann sich die Grenze nicht heranprobieren.
+const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
+
 function dataGroup(state) {
   const { trip, contributions, expenses, cashOuts, planItems, packItems } = state;
   const slug = slugFor(trip);
@@ -1288,6 +1298,10 @@ function dataGroup(state) {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
+    if (!/\.json$/i.test(file.name) || file.size > MAX_IMPORT_FILE_BYTES) {
+      toast('Diese Datei ist keine Sicherung des Urlaubstrackers.', { type: 'error' });
+      return;
+    }
     try {
       const payload = parseImport(await file.text());
       const ok = await confirmSheet({

@@ -7,10 +7,17 @@
  * Fragment der URL — das schickt der Browser nie an einen Server.
  */
 import {
-  CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson,
+  CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson, MAX_PEOPLE,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packSub, packSubLabel, packQty,
   PLAN_CATEGORY_BY_ID, planSub, planSubLabel,
 } from './calc.js';
+
+// Wie viele Zeilen eine Sicherung je Liste höchstens mitbringen darf. Eine
+// echte Kasse (höchstens MAX_PEOPLE Personen, ein einzelner Urlaub) kommt
+// darunter nie in die Nähe — die Grenze fängt nur ab, was eine verunstaltete
+// oder mutwillig aufgeblähte Datei sonst an Rechenzeit kostet und was den
+// Firestore-Batch beim Einspielen sprengen würde.
+const MAX_IMPORT_ROWS = 2000;
 
 function toBase64Url(str) {
   const bytes = new TextEncoder().encode(str);
@@ -78,6 +85,21 @@ export function parseImport(text) {
   if (data?.format !== 'urlaubstracker' || !data.trip || typeof data.trip !== 'object') {
     throw new Error('Das ist keine Sicherungskopie des Urlaubstrackers.');
   }
+  // Vor jedem Aufbereiten der Listen: eine Datei mit Zehntausenden Zeilen ist
+  // so oder so keine echte Sicherung. Der Test steht vor der ganzen restlichen
+  // Prüfung, damit so eine Datei nicht erst noch durch alle `map()`/`filter()`
+  // unten läuft.
+  for (const [list, label] of [
+    [data.contributions, 'Einzahlungen'],
+    [data.expenses, 'Ausgaben'],
+    [data.cashOuts, 'Auszahlungen'],
+    [data.planItems, 'Programmpunkte'],
+    [data.packItems, 'Packlisten-Einträge'],
+  ]) {
+    if (Array.isArray(list) && list.length > MAX_IMPORT_ROWS) {
+      throw new Error(`Die Datei enthält zu viele ${label} für eine Sicherung.`);
+    }
+  }
 
   const t = data.trip;
   if (!isValidDate(t.startDate) || !isValidDate(t.endDate) || t.endDate < t.startDate) {
@@ -88,6 +110,10 @@ export function parseImport(text) {
     .filter((p) => p && typeof p.id === 'string' && p.id)
     .map((p, i) => ({ ...p, name: String(p.name || '').trim() || `Person ${i + 1}` }));
   if (!people.length) throw new Error('In der Datei steht keine einzige Person.');
+  // Dieselbe Grenze wie beim Anlegen und beim Einladen (siehe `store.js`) —
+  // eine Sicherung darf keinen Trip durchlassen, den die App selbst nie
+  // hätte anlegen können.
+  if (people.length > MAX_PEOPLE) throw new Error(`Mehr als ${MAX_PEOPLE} Personen kann eine Kasse nicht führen.`);
 
   const knownPerson = new Set(people.map((p) => p.id));
   // Ein Bargeld-Zahler ohne bekannte Person dahinter ist so unbrauchbar wie
