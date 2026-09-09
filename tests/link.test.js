@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildCsv, parseImport, buildExport } from '../js/link.js';
-import { POT } from '../js/calc.js';
+import { POT, MAX_PEOPLE } from '../js/calc.js';
 
 const TRIP = {
   id: 't1',
@@ -53,6 +53,24 @@ test('Import weist Dateien ab, an denen die App danach scheitern würde', () => 
   assert.throws(() => parseImport(backup({ trip: { ...TRIP, startDate: undefined } })), /Zeitraum/);
   assert.throws(() => parseImport(backup({ trip: { ...TRIP, startDate: '2026-07-20' } })), /Zeitraum/, 'Ende vor Anfang');
   assert.throws(() => parseImport(backup({ trip: { ...TRIP, people: [] } })), /keine einzige Person/);
+});
+
+test('Import weist eine Datei mit mehr Personen ab, als eine Kasse führen kann', () => {
+  const tooManyPeople = Array.from({ length: MAX_PEOPLE + 1 }, (_, i) => ({ id: `p${i}`, name: `Person ${i}`, share: 1 }));
+  assert.throws(
+    () => parseImport(backup({ trip: { ...TRIP, people: tooManyPeople } })),
+    /Mehr als \d+ Personen/,
+    'eine Sicherung darf keinen Trip durchlassen, den die App selbst nie hätte anlegen können',
+  );
+});
+
+test('Import weist eine Datei mit unplausibel vielen Zeilen ab', () => {
+  const expenses = Array.from({ length: 2001 }, (_, i) => ({ id: `e${i}`, date: '2026-07-01', amount: 100, category: 'other', payer: POT }));
+  assert.throws(
+    () => parseImport(backup({ expenses })),
+    /zu viele Ausgaben/,
+    'so viele Zeilen sind so oder so keine echte Sicherung',
+  );
 });
 
 test('Import räumt auf, statt kaputte Zeilen durchzulassen', () => {
