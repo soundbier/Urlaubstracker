@@ -2,7 +2,7 @@
 import { h, s, icon } from '../dom.js';
 import { computeBudget, dailySeries, settleUp, spentByCategory, cashBalances, todayISO } from '../calc.js';
 import { money, moneySigned, days, dayMonthShort } from '../format.js';
-import { stat, sectionTitle, contributionRow, cashOutRow, emptyState, bar, bufferLabel, disclosure } from '../ui/parts.js';
+import { stat, sectionTitle, contributionRow, cashOutRow, emptyState, bar, bufferLabel } from '../ui/parts.js';
 
 export function renderBudget(state, actions) {
   const { trip, expenses, contributions, cashOuts } = state;
@@ -27,7 +27,6 @@ export function renderBudget(state, actions) {
       b.elapsedDays && b.total
         ? h('p.note', `Die Kasse liegt ${bufferLabel(b.buffer, cur)}.`)
         : null,
-      howItWorks(b, trip, cur),
     ),
 
     // „Wer bekommt was, wer zahlt was“ steht jetzt oben statt ganz unten hinter
@@ -85,51 +84,6 @@ function cashSection(trip, cashOuts, expenses, cur, actions) {
         )
       : emptyState('Nehmt ihr Bargeld aus der Kasse für unterwegs mit, steht hier, wer davon noch wie viel hat.', 'Bargeld ausgezahlt', actions.addCashOut),
   );
-}
-
-/**
- * Wie aus der Kasse ein Tagesbudget wird.
- *
- * Steht zugeklappt da, weil es die Frage beantwortet, die man einmal stellt
- * und dann nicht mehr. Offen liegen die Zahlen, offen liegt auch die
- * Erklärung — dann sind es aber elf Zahlen auf einer Karte, und keine davon
- * bleibt hängen.
- */
-function howItWorks(b, trip, cur) {
-  return disclosure('Rechenweg', null,
-    h('div.stack',
-      b.planned
-        ? h('div.stack.stack--tight',
-            h('p.field__note', `${money(b.planned, cur)} von ${money(b.remaining, cur)} in der Kasse sind schon verplant: vergeben, aber noch nicht bezahlt.`),
-            h('p.field__note', `Frei verfügbar sind ${money(b.free, cur)}.`),
-          )
-        : null,
-      trip.budgetMode === 'fixed'
-        ? h('div.stack.stack--tight',
-            h('p.field__note', `${money(b.budgetBase, cur)} ÷ ${days(b.totalDays)} = ${money(b.planPerDay, cur)} pro Tag.`),
-            h('p.field__note', 'Der Betrag bleibt jeden Tag gleich.'),
-          )
-        : h('div.stack.stack--tight',
-            h('p.field__note', `${money(b.budgetBase, cur)} ÷ ${days(b.totalDays)} = ${money(b.planPerDay, cur)} pro Tag im Plan.`),
-            h('p.field__note', 'Jeden Morgen neu: Restgeld ÷ Resttage.'),
-          ),
-      b.reserved
-        ? h('p.field__note', 'Verplantes Geld läuft am Tagesbudget vorbei, auch nachdem es bezahlt ist: sonst spränge das Tagesbudget genau dann nach oben, wenn das Hotel abgebucht wird.')
-        : null,
-      // Aus einem oder zwei Tagen lässt sich nichts hochrechnen — der erste
-      // Tankstopp sagt noch nicht, wie der Urlaub ausgeht.
-      b.phase === 'during' && b.elapsedDays >= 3
-        ? h('p.field__note', projection(b.projectedLeftover, cur))
-        : null,
-    ),
-  );
-}
-
-/** „bleiben −80 € übrig“ ist keine Aussage — bei Unterdeckung fehlt Geld. */
-function projection(leftover, cur) {
-  return leftover < 0
-    ? `Wenn es so weitergeht, fehlen am Ende ${money(-leftover, cur)}.`
-    : `Wenn es so weitergeht, bleiben am Ende ${money(leftover, cur)} übrig.`;
 }
 
 /**
