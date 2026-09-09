@@ -5,7 +5,7 @@
  */
 import { h, icon } from '../dom.js';
 import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO } from '../calc.js';
-import { money, moneySigned, days, compactDate, dayMonth, weekdayShort } from '../format.js';
+import { money, moneySigned, days, dayMonth, weekdayShort } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, whoAmICallout } from '../ui/parts.js';
 import { setFinancePane } from './finances.js';
 
@@ -70,24 +70,19 @@ export function renderToday(state, actions) {
     // Sie braucht keine Überschrift: die Augenbraue in ihr sagt schon, was
     // sie ist.
     hero(b, cur, actions),
-    // Die drei Kennzahlen beantworten, was die große Zahl offenlässt: wie viel
-    // insgesamt noch da ist, wie lange es reichen muss, und ob ihr vor oder
-    // hinter dem Plan liegt. Jede Zahl steht genau einmal auf dieser Seite.
-    h('div.stats',
+    // Die zwei Kennzahlen beantworten, was die große Zahl offenlässt: wie viel
+    // insgesamt noch da ist, und ob ihr vor oder hinter dem Plan liegt. Jede
+    // Zahl steht genau einmal auf dieser Seite.
+    h('div.stats.stats--2',
       // Nach dem Urlaub steht das übrige Geld schon groß oben — dann sagt die
       // Spalte lieber, wofür es weg ist.
       b.phase === 'after'
         ? stat('Ausgegeben', money(b.spent, cur), `über ${days(b.totalDays)}`)
-        // Untertexte bleiben einzeilig, sonst stehen die drei Spalten
+        // Untertexte bleiben einzeilig, sonst stehen die beiden Spalten
         // unterschiedlich hoch nebeneinander. Ist etwas verplant, ist das die
         // Antwort auf „warum ist verfügbar weniger als die Kasse?“ — sonst
         // sagt der Kassenstand mehr.
         : stat('Verfügbar', money(b.free, cur), b.planned ? `${money(b.planned, cur)} verplant` : `von ${money(b.total, cur)}`, { tone: b.free < 0 ? 'over' : '' }),
-      stat(
-        b.phase === 'after' ? 'Urlaub' : 'Noch',
-        b.phase === 'after' ? 'vorbei' : b.phase === 'before' ? days(b.daysUntilStart) : days(b.daysLeft),
-        b.phase === 'before' ? `ab ${compactDate(trip.startDate)}` : `bis ${compactDate(trip.endDate)}`,
-      ),
       stat(
         'Polster',
         b.elapsedDays ? moneySigned(b.buffer, cur) : '—',
