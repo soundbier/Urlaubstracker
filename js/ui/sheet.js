@@ -29,6 +29,15 @@ function focusableIn(root) {
 /**
  * Öffnet ein Sheet von unten. `build(close)` liefert den Inhalt; `close(wert)`
  * schließt es und löst das zurückgegebene Promise mit `wert` auf.
+ *
+ * `build` liefert normalerweise einen einzelnen Knoten für den scrollenden
+ * Bereich. Braucht eine Maske zusätzlich eine Fußzeile, die nie mitscrollt —
+ * die Speichern-Knöpfe einer Eingabemaske zum Beispiel —, gibt sie stattdessen
+ * `{ body, footer }` zurück. Ein `position: sticky`-Fuß *innerhalb* des
+ * scrollenden Bereichs sähe ähnlich aus, deckt aber, sobald der Inhalt auch
+ * nur wenig höher als der sichtbare Ausschnitt ist, die letzte Zeile davor
+ * zu — die Fußzeile hier ist eine echte Nachbarin des scrollenden Bereichs,
+ * kein Teil von ihm, und kann darum nichts verdecken.
  */
 export function openSheet({ title, subtitle, build, fullHeight = false, bodyClass = '' }) {
   return new Promise((resolve) => {
@@ -81,6 +90,12 @@ export function openSheet({ title, subtitle, build, fullHeight = false, bodyClas
       }
     };
 
+    // `{ body, footer }` oder, wie bisher, gleich der Inhalt selbst.
+    const built = build(close);
+    const split = built && typeof built === 'object' && !(built instanceof Node) && ('body' in built || 'footer' in built);
+    const bodyContent = split ? built.body : built;
+    const footerContent = split ? built.footer : null;
+
     const panel = h(
       'div.sheet',
       { role: 'dialog', 'aria-modal': 'true', 'aria-label': title || 'Dialog', class: fullHeight ? 'sheet--tall' : '' },
@@ -89,7 +104,8 @@ export function openSheet({ title, subtitle, build, fullHeight = false, bodyClas
         h('div', h('h2.sheet__title', title || ''), subtitle ? h('p.sheet__sub', subtitle) : null),
         h('button.icon-btn', { type: 'button', 'aria-label': 'Schließen', onclick: () => close(undefined) }, icon('close', 22)),
       ),
-      h('div.sheet__body', { class: bodyClass }, build(close)),
+      h('div.sheet__body', { class: bodyClass }, bodyContent),
+      footerContent ? h('div.sheet__footer', footerContent) : null,
     );
 
     const overlay = h('div.overlay', {

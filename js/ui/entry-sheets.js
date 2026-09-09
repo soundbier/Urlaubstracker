@@ -22,6 +22,17 @@ import { money, dayLabel, fullDate } from '../format.js';
  */
 let lastPayer = POT;
 
+/**
+ * Die Speichern-Zeile einer Eingabemaske steht in einer eigenen Fußzeile,
+ * außerhalb des `<form>`-Elements (siehe `openSheet` in `sheet.js`) — nur so
+ * bleibt sie sichtbar, ohne je den scrollenden Bereich zu verdecken. Den
+ * Absende-Knopf trotzdem zum Formular gehören zu lassen (Enter im Notizfeld
+ * etc.), braucht dafür eine Formular-`id`, auf die der Knopf per
+ * `form`-Attribut zeigt — und die muss je offener Maske einmalig sein.
+ */
+let formSeq = 0;
+const nextFormId = () => `entry-form-${++formSeq}`;
+
 /** `1050` → `"10,50"`, `1000` → `"10"`, `0` → `""` — so, wie man es eintippen würde. */
 function centsToRaw(cents) {
   if (!cents) return '';
@@ -220,10 +231,11 @@ function field(labelText, control) {
  * Gibt `{ action: 'save', values }`, `{ action: 'delete' }` oder `undefined` zurück.
  *
  * Die Reihenfolge folgt der Häufigkeit, nicht der Datenstruktur: Betrag,
- * Kategorie, Datum stehen offen da, alles Übrige liegt hinter „Details“. Damit
- * passt der Normalfall auf einen Handyschirm — vorher lag der Speichern-Knopf
- * gut 350 px unterhalb des Randes, und das für den einen Handgriff, den man
- * mehrmals am Tag macht.
+ * Kategorie, Datum und Zahler stehen offen da, nur Status und Notiz liegen
+ * hinter „Details“. Der Zahler stand früher mit dort drin — aber wer aus
+ * eigener Tasche oder mit schon ausgezahltem Bargeld zahlt statt aus der
+ * Kasse, will das in der Regel bei jedem Eintrag angeben, nicht nur
+ * gelegentlich; hinter einer zugeklappten Zeile war das leicht zu übersehen.
  *
  * Eine Ausgabe kann „schon bezahlt“ oder „verplant“ sein. Verplant heißt: das
  * Geld ist fest eingeplant, aber noch nicht weg — es wird vom Tagesbudget
@@ -254,17 +266,13 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
   // Welcher Chip aktiv ist: Bargeld ist derselbe Chip wie die Person, nur mit
   // dem Umschalter daneben — sonst stünde jede Person doppelt in der Reihe.
   const chipFor = (id) => (id === POT ? POT : cashPayerPerson(id) || id);
-  const payerName = (id) => {
-    if (id === POT) return 'Kasse';
-    const name = payers.find((p) => p.id === chipFor(id))?.label || 'Kasse';
-    return isCashPayer(id) ? `Bargeld · ${name}` : name;
-  };
 
   return openSheet({
     title: editing ? 'Eintrag bearbeiten' : 'Was kostet euch das?',
     fullHeight: true,
-    bodyClass: 'sheet__body--entry',
     build: (close) => {
+      const formId = nextFormId();
+
       const save = () => {
         const cents = amount.getCents();
         if (!(cents > 0)) {
@@ -284,7 +292,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         });
       };
 
-      const submit = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, icon('check', 20));
+      const submit = h('button.btn.btn--primary.btn--wide', { type: 'submit', form: formId }, icon('check', 20));
       const dateLabel = h('span.field__label');
       const payerLabelEl = h('span.field__label');
       const kindNote = h('p.field__note');
@@ -307,10 +315,11 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
 
       // Nur eine Person hat Bargeld, das die Kasse ihr schon ausgezahlt hat —
       // steht „Kasse“, gibt es nichts umzuschalten, deshalb bleibt die Zeile
-      // dann versteckt statt ausgegraut.
+      // dann versteckt statt ausgegraut. Das Geldschein-Symbol daneben macht
+      // aus dem Wort „Bargeld“ ein Bild, das man auch im Vorbeiwischen erkennt.
       const moneyKindButtons = [
         h('button.segmented__btn', { type: 'button', onclick: () => setPayKind('private') }, 'Privat'),
-        h('button.segmented__btn', { type: 'button', onclick: () => setPayKind('cash') }, 'Bargeld'),
+        h('button.segmented__btn', { type: 'button', onclick: () => setPayKind('cash') }, icon('cash', 16), 'Bargeld'),
       ];
       const moneyKind = h('div.segmented', ...moneyKindButtons);
 
@@ -320,10 +329,6 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
           h('div.segmented', ...kindButtons),
           kindNote,
         ),
-        h('label.field', payerLabelEl, chipRow(payers, chipFor(payer), (id) => {
-          payer = id === POT ? POT : (payKind === 'cash' ? cashPayerFor(id) : id);
-          syncKind();
-        }), moneyKind),
         field('Notiz', note),
       );
 
@@ -353,26 +358,34 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         moneyKind.hidden = payer === POT;
         moneyKindButtons[0].classList.toggle('is-active', !isCashPayer(payer));
         moneyKindButtons[1].classList.toggle('is-active', isCashPayer(payer));
-        // Zugeklappt muss ablesbar bleiben, was drinsteht.
-        detailSummary.textContent = planned ? `verplant · ${payerName(payer)}` : payerName(payer);
+        // Zugeklappt muss ablesbar bleiben, was drinsteht — der Zahler steht
+        // jetzt selbst offen da, hier geht es nur noch um Status und Notiz.
+        detailSummary.textContent = [planned ? 'verplant' : '', note.value ? 'Notiz' : ''].filter(Boolean).join(' · ');
         submit.replaceChildren(editing ? 'Speichern' : planned ? 'Vormerken' : 'Eintragen');
       }
       syncKind();
 
       // Aufgeklappt startet die Zeile nur, wenn dort etwas steht, das jemanden
-      // überraschen könnte — ein gemerkter Zahler, eine Vormerkung, eine Notiz.
-      details.open = planned || payer !== POT || Boolean(note.value);
+      // überraschen könnte — eine Vormerkung oder eine Notiz.
+      details.open = planned || Boolean(note.value);
 
-      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+      const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
         field('Wofür?', categoryGrid(category, (id) => { category = id; })),
         h('label.field', dateLabel, when.el),
+        h('label.field', payerLabelEl, chipRow(payers, chipFor(payer), (id) => {
+          payer = id === POT ? POT : (payKind === 'cash' ? cashPayerFor(id) : id);
+          syncKind();
+        }), moneyKind),
         details,
-        h('div.entry__actions',
-          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          submit,
-        ),
       );
+
+      const footer = h('div.entry__actions',
+        editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+        submit,
+      );
+
+      return { body, footer };
     },
   });
 }
@@ -389,8 +402,8 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
     title: editing ? 'Einzahlung bearbeiten' : 'Geld eingezahlt',
     subtitle: 'Was ist auf das gemeinsame Urlaubskonto gegangen?',
     fullHeight: true,
-    bodyClass: 'sheet__body--entry',
     build: (close) => {
+      const formId = nextFormId();
       const save = () => {
         const cents = amount.getCents();
         if (!(cents > 0)) {
@@ -401,16 +414,17 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
         close({ action: 'save', values: { amount: cents, date, personId, note: note.value } });
       };
 
-      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+      const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
         field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
         field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
         field('Notiz', note),
-        h('div.entry__actions',
-          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
-        ),
       );
+      const footer = h('div.entry__actions',
+        editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit', form: formId }, editing ? 'Speichern' : 'Eintragen'),
+      );
+      return { body, footer };
     },
   });
 }
@@ -434,8 +448,8 @@ export function cashOutSheet({ trip, cashOut = null, defaults = {} }) {
     title: editing ? 'Bargeld-Auszahlung bearbeiten' : 'Bargeld ausgezahlt',
     subtitle: 'Wer hat wie viel Bargeld aus der Kasse bekommen?',
     fullHeight: true,
-    bodyClass: 'sheet__body--entry',
     build: (close) => {
+      const formId = nextFormId();
       const save = () => {
         const cents = amount.getCents();
         if (!(cents > 0)) {
@@ -446,16 +460,17 @@ export function cashOutSheet({ trip, cashOut = null, defaults = {} }) {
         close({ action: 'save', values: { amount: cents, date, personId, note: note.value } });
       };
 
-      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+      const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
         field('An wen?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
         field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
         field('Notiz', note),
-        h('div.entry__actions',
-          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
-        ),
       );
+      const footer = h('div.entry__actions',
+        editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit', form: formId }, editing ? 'Speichern' : 'Eintragen'),
+      );
+      return { body, footer };
     },
   });
 }
@@ -491,8 +506,8 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
   return openSheet({
     title: editing ? 'Programmpunkt bearbeiten' : 'Was steht an?',
     fullHeight: true,
-    bodyClass: 'sheet__body--entry',
     build: (close) => {
+      const formId = nextFormId();
       const titleError = h('p.field__error');
 
       const save = () => {
@@ -556,7 +571,7 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
       };
       renderSubs();
 
-      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+      const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label.field', h('span.field__label', 'Titel'), title, titleError),
         field('Wofür?', categoryGrid(category, (id) => { category = id; sub = ''; renderSubs(); }, PLAN_CATEGORIES)),
         subField,
@@ -576,11 +591,12 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
           costNote,
         ),
         field('Notiz', note),
-        h('div.entry__actions',
-          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
-        ),
       );
+      const footer = h('div.entry__actions',
+        editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit', form: formId }, editing ? 'Speichern' : 'Eintragen'),
+      );
+      return { body, footer };
     },
   });
 }
@@ -612,8 +628,8 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
   return openSheet({
     title: editing ? 'Eintrag bearbeiten' : 'Was muss mit?',
     fullHeight: true,
-    bodyClass: 'sheet__body--entry',
     build: (close) => {
+      const formId = nextFormId();
       const titleError = h('p.field__error');
 
       const save = () => {
@@ -641,7 +657,7 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
       };
       renderSubs();
 
-      return h('form.entry', { onsubmit: (e) => { e.preventDefault(); save(); } },
+      const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         h('label.field', h('span.field__label', 'Was ist es?'), title, titleError),
         // Wessen Liste, vor allem anderen: davon hängt ab, wer den Eintrag
         // danach überhaupt zu Gesicht bekommt — Kategorie und Stand lassen
@@ -657,11 +673,12 @@ export function packItemSheet({ packItem = null, defaults = {} } = {}) {
         field('Wie weit ist es?', categoryGrid(status, (id) => { status = id; }, PACK_STATUSES.map(({ id, label }) => ({ id, label })))),
         field('In welches Gepäck?', categoryGrid(bag, (id) => { bag = id; }, PACK_BAGS)),
         field('Notiz', note),
-        h('div.entry__actions',
-          editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
-          h('button.btn.btn--primary.btn--wide', { type: 'submit' }, editing ? 'Speichern' : 'Eintragen'),
-        ),
       );
+      const footer = h('div.entry__actions',
+        editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit', form: formId }, editing ? 'Speichern' : 'Eintragen'),
+      );
+      return { body, footer };
     },
   });
 }

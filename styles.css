@@ -1095,6 +1095,10 @@ select.field__input { background-image: none; }
 .segmented { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
 .segmented--3 { grid-template-columns: repeat(3, 1fr); }
 .segmented__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: var(--tap);
   padding: var(--sp-2) var(--sp-1);
   border: 0;
@@ -1499,23 +1503,38 @@ select.field__input { background-image: none; }
   line-height: 1.2;
 }
 .sheet__sub { font-size: var(--fs-sm); color: var(--text-muted); margin-top: var(--sp-1); }
-.sheet__body { overflow-y: auto; padding: var(--sp-3) var(--gutter) var(--sp-5); -webkit-overflow-scrolling: touch; }
+/* `min-height: 0`, weil ein Flex-Kind sich sonst nie unter seine eigene
+   Inhaltshöhe schrumpfen lässt — genau das muss der scrollende Bereich aber
+   können, eingeklemmt zwischen Kopf- und (bei Eingabemasken) Fußzeile. */
+.sheet__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--sp-3) var(--gutter) var(--sp-5); -webkit-overflow-scrolling: touch; }
 
 .entry { display: flex; flex-direction: column; gap: var(--sp-5); }
 
-/* Der Speichern-Knopf bleibt stehen. Vorher lag er bei einer neuen Ausgabe rund
-   350 px unterhalb des Randes: für den häufigsten Handgriff der App musste man
-   erst scrollen. */
-.sheet__body--entry { padding-bottom: 0; }
+/*
+ * Der Speichern-Knopf bleibt stehen, egal wie lang die Maske ist: für den
+ * häufigsten Handgriff der App soll man nicht erst scrollen müssen.
+ *
+ * Eine eigene Fußzeile statt eines `position: sticky`-Knopfs *im* scrollenden
+ * Bereich: sobald der Inhalt auch nur wenig höher als der sichtbare
+ * Ausschnitt war, deckte der schwebende Knopf die letzte Zeile davor zu —
+ * bei einer neuen Ausgabe reichte das, um „Details“ vollständig unter dem
+ * Knopf verschwinden zu lassen, unsichtbar und untippbar zugleich. Die
+ * Fußzeile hier ist eine echte Nachbarin des scrollenden Bereichs (siehe
+ * `openSheet` in `sheet.js`), kein Teil von ihm, und kann darum nichts mehr
+ * verdecken; der scrollende Bereich bekommt seinen Rand am unteren Ende
+ * damit auch wieder wie überall sonst.
+ */
+.sheet__footer {
+  flex: none;
+  border-top: 1px solid var(--border);
+  padding: 0 var(--gutter);
+  background: var(--bg);
+}
 .entry__actions {
-  position: sticky;
-  bottom: 0;
-  z-index: 2;
   display: flex;
   gap: var(--sp-3);
   align-items: center;
   padding: var(--sp-3) 0 var(--sp-5);
-  background: var(--bg);
 }
 .entry__actions .btn--wide { flex: 1; }
 
