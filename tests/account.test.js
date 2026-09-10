@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 
 import {
   normalizeEmail, emailDomain, checkEmail, checkDisplayName, checkAccountPassword,
-  describeAuthError, MAX_DISPLAY_NAME,
+  describeAuthError, MAX_DISPLAY_NAME, MIN_ACCOUNT_PASSWORD, MAX_ACCOUNT_PASSWORD,
 } from '../js/account.js';
 
 test('Adressen werden einheitlich klein und ohne Rand gelesen', () => {
@@ -54,12 +54,16 @@ test('der Anzeigename darf alles sein, nur nicht leer oder endlos', () => {
   assert.match(checkDisplayName('x'.repeat(MAX_DISPLAY_NAME + 1)), /Höchstens/);
 });
 
-test('fürs Konto gilt dieselbe Messlatte wie für ein neues Kassenpasswort', () => {
-  // Zwei verschiedene Vorstellungen davon, was ein gutes Passwort ist, wären
-  // in einer App eine zu viel — deshalb ist das bewusst dieselbe Funktion.
-  assert.equal(checkAccountPassword('sonne-welle-42x'), null);
-  assert.match(checkAccountPassword('kurz'), /mindestens/);
-  assert.match(checkAccountPassword('passwort123'), /erraten/);
+test('fürs Konto gilt eine mildere Messlatte als für ein neues Kassenpasswort', () => {
+  // Firebase Authentication bremst selbst gegen Erraten (Ratenbegrenzung) —
+  // hier reicht deshalb dieselbe Grenze, die Firebase Authentication selbst
+  // verlangt: sechs bis 4096 Zeichen, ohne weitere Prüfung.
+  assert.equal(checkAccountPassword('geheim'), null, 'sechs Zeichen reichen, ganz ohne Ansprüche an die Art');
+  assert.equal(checkAccountPassword('passwort123'), null, 'anders als beim Kassenpasswort gilt hier keine Sperrliste');
+  assert.equal(checkAccountPassword('x'.repeat(MAX_ACCOUNT_PASSWORD)), null, 'bis zur Grenze ist es gültig');
+  assert.match(checkAccountPassword(''), /eintragen/);
+  assert.match(checkAccountPassword('kurz'), new RegExp(`mindestens ${MIN_ACCOUNT_PASSWORD}`));
+  assert.match(checkAccountPassword('x'.repeat(MAX_ACCOUNT_PASSWORD + 1)), /höchstens/);
 });
 
 test('Firebase-Fehler werden zu Sätzen, die man lesen kann', () => {

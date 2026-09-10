@@ -19,8 +19,7 @@ import { h, icon, replace } from '../dom.js';
 import { toast } from '../ui/sheet.js';
 import { privacySheet } from '../ui/parts.js';
 import { plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
-import { checkEmail, checkAccountPassword, checkDisplayName } from '../account.js';
-import { suggestPassword } from '../join.js';
+import { checkEmail, checkAccountPassword, checkDisplayName, MIN_ACCOUNT_PASSWORD, MAX_ACCOUNT_PASSWORD } from '../account.js';
 import * as store from '../store.js';
 
 /**
@@ -98,6 +97,7 @@ function chooseScreen(state, actions, go) {
           onclick: () => { store.hideAccountScreen(); actions.rerender(); },
         }, icon('back', 16), `Zurück zu „${state.trip.name}“`)
       : null,
+    h('p.muted.small', `Urlaubstracker ${document.documentElement.dataset.version || ''}`),
   );
 }
 
@@ -161,33 +161,22 @@ function signInScreen(state, actions, go) {
 function signUpScreen(state, actions, go) {
   const email = plainInput({ type: 'email', autocomplete: 'email', inputmode: 'email', placeholder: 'du@example.org', enterkeyhint: 'next' });
   const name = plainInput({ autocomplete: 'nickname', maxlength: 40, placeholder: 'z. B. Anna', enterkeyhint: 'next' });
-  const password = maskedInput({ autocomplete: 'new-password', placeholder: 'Mindestens 10 Zeichen', enterkeyhint: 'go' });
+  const password = maskedInput({ autocomplete: 'new-password', placeholder: `Mindestens ${MIN_ACCOUNT_PASSWORD} Zeichen`, enterkeyhint: 'go' });
   const error = h('p.field__error');
   const button = h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Konto erstellen');
-
-  // Derselbe Vorschlag wie beim Kassenpasswort: zwei Silben und eine Zahl,
-  // vorlesbar und trotzdem lang genug.
-  const suggest = h('button.btn.btn--ghost.btn--small', {
-    type: 'button',
-    onclick: () => {
-      password.value = suggestPassword();
-      password.type = 'text';
-      password.focus();
-      // Ein von Hand gesetzter Wert löst kein `input` aus — hier aber soll er
-      // wie eine Eingabe zählen, damit die alte Fehlermeldung verschwindet.
-      password.dispatchEvent(new Event('input', { bubbles: true }));
-    },
-  }, icon('repeat', 16), 'Vorschlag');
 
   const title = h('h1.welcome__title', 'Konto erstellen');
   const intro = h('p.welcome__text.small', 'Wir schicken dir eine E-Mail zum Bestätigen. Erst danach lassen sich Kassen anlegen oder teilen.');
   // Sobald jemand etwas ändert, ist die alte Meldung überholt: sie beschriebe
-  // einen Zustand, den es nicht mehr gibt. Das gilt auch für den
-  // Vorschlag-Knopf, der das Passwortfeld von außen füllt.
+  // einen Zustand, den es nicht mehr gibt.
   const form = h('form.authscreen__form', { onsubmit: submit, oninput: () => { error.textContent = ''; } },
     field('E-Mail', email),
     field('Anzeigename', name, 'Steht an deinen Einträgen — ein Spitzname reicht.'),
-    field('Passwort', h('div.authscreen__pwrow', maskedField(password), suggest)),
+    // Kein Vorschlag-Knopf hier, anders als beim Kassenpasswort: das Konto
+    // meldet sich bei Firebase Authentication an, das selbst gegen Erraten
+    // bremst (siehe `account.checkAccountPassword`) — es reicht deshalb, die
+    // Grenze zu nennen, statt ein Passwort vorzuschlagen.
+    field('Passwort', maskedField(password), `Mindestens ${MIN_ACCOUNT_PASSWORD}, höchstens ${MAX_ACCOUNT_PASSWORD} Zeichen — jedes Zeichen ist erlaubt.`),
     error,
     button,
   );

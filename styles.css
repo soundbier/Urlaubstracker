@@ -1673,11 +1673,6 @@ select.field__input { background-image: none; }
 }
 .authscreen__or::before,
 .authscreen__or::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-/* Passwortfeld und Vorschlag nebeneinander: der Vorschlag gehört zum Feld,
-   nicht in die Reihe der Knöpfe darunter. */
-.authscreen__pwrow { display: flex; align-items: center; gap: var(--sp-2); }
-.authscreen__pwrow > .field__reveal { flex: 1; min-width: 0; }
-.authscreen__pwrow > .btn { width: auto; flex: none; }
 /* Der Ladezustand während des Netzwegs zu Firebase (Anmelden, Konto anlegen) —
    ersetzt das Formular an derselben Stelle, statt nur den Knopf zu sperren:
    sonst starrt man 2-3 Sekunden auf eine Maske, die sich nicht rührt. */

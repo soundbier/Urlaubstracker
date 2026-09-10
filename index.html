@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="de" data-version="2.8.0">
+<html lang="de" data-version="2.9.0">
 <head>
 <meta charset="utf-8">
 <title>Urlaubstracker</title>
@@ -13,10 +13,16 @@
      Schlüssel: die übrigen Einstellungen liegen verschlüsselt (siehe
      js/secure-storage.js), Entschlüsseln ist aber unvermeidlich asynchron —
      für eine Farbe, die niemandes Daten preisgibt, lohnt sich der Umweg vor
-     dem ersten Bild nicht. js/prefs.js hält beide Stellen synchron. */
+     dem ersten Bild nicht. js/prefs.js hält beide Stellen synchron.
+
+     Hell ist die Standardversion: nur wer ausdrücklich „Automatisch“ gewählt
+     hat (dann steht hier „auto“, siehe js/prefs.js), folgt dem Gerät. Fehlt
+     der Eintrag ganz, war hier noch nie jemand — dann eben Hell, nicht erst
+     nach dem Gerät fragen. */
   try {
     var t = localStorage.getItem('urlaubstracker.theme.v1');
-    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    else if (t !== 'light' && t !== 'dark') t = 'light';
     document.documentElement.dataset.theme = t;
   } catch (e) {
     document.documentElement.dataset.theme = 'light';

@@ -51,6 +51,7 @@ function inviteScreen(state) {
         onclick: async () => { if (canPromptInstall()) await promptInstall(); else installInstructionsSheet(); },
       }, icon('download', 16), 'Als App installieren'),
       h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => privacySheet({ mode: 'cloud' }) }, 'Datenschutz'),
+      h('p.muted.small', `Urlaubstracker ${document.documentElement.dataset.version || ''}`),
     ),
   );
 }
@@ -318,6 +319,7 @@ function createScreen() {
       // Vor dem ersten Namen, nicht erst danach: wer wissen will, was mit den
       // Eingaben passiert, soll nicht erst eine Kasse anlegen müssen.
       h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: () => privacySheet() }, 'Datenschutz'),
+      h('p.muted.small', `Urlaubstracker ${document.documentElement.dataset.version || ''}`),
     ),
   );
 }
