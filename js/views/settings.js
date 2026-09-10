@@ -130,7 +130,7 @@ const slugFor = (trip) =>
 
 const backupNow = (state) => {
   download(
-    buildExport({ trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems }),
+    buildExport({ trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems, stays: state.stays }),
     `${slugFor(state.trip)}-sicherung.json`,
     'application/json',
   );
@@ -1291,7 +1291,7 @@ function sharingForm({ state, confirmLabel, confirmIcon = 'share', onSubmit, ask
 const MAX_IMPORT_FILE_BYTES = 8 * 1024 * 1024;
 
 function dataGroup(state) {
-  const { trip, contributions, expenses, cashOuts, planItems, packItems } = state;
+  const { trip, contributions, expenses, cashOuts, planItems, packItems, stays } = state;
   const slug = slugFor(trip);
 
   const importFile = h('input', { type: 'file', accept: '.json,application/json', style: { display: 'none' }, onchange: async (e) => {
@@ -1321,8 +1321,8 @@ function dataGroup(state) {
   } });
 
   return group('Daten', {},
-    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions, cashOuts, planItems, packItems }), `${slug}.csv`, 'text/csv;charset=utf-8')),
-    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems }), `${slug}-sicherung.json`, 'application/json')),
+    actionRow('download', 'Als CSV für Excel', () => download(buildCsv({ trip, expenses, contributions, cashOuts, planItems, packItems, stays }), `${slug}.csv`, 'text/csv;charset=utf-8')),
+    actionRow('download', 'Sicherungskopie speichern', () => download(buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems, stays }), `${slug}-sicherung.json`, 'application/json')),
     actionRow('upload', 'Sicherung einspielen', () => importFile.click()),
     importFile,
   );

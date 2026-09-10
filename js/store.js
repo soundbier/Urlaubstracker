@@ -24,6 +24,7 @@ let state = {
   cashOuts: [],
   planItems: [],
   packItems: [],
+  stays: [],
   myPersonId: null,
   invite: null, // offene Einladung aus dem Link
   // Die zuletzt gelöschte Kasse, solange sie noch zurückzuholen ist — siehe
@@ -161,6 +162,9 @@ async function handleChange(data) {
     // Die Packliste sortiert sich nach Kategorie und Eingabereihenfolge, nicht
     // nach Datum — sie hat gar keins (siehe `packItemsByCategory`).
     packItems: data.packItems || [],
+    // Unsortiert wie der Reiseplan: welcher Tag welche Unterkunft trägt, sagt
+    // `stayForDate` anhand des Zeitraums, nicht die Reihenfolge im Feld.
+    stays: data.stays || [],
     // Eine offene Einladung hat Vorrang, sonst würde sie beim nächsten
     // Datenereignis unter dem Finger verschwinden.
     phase: state.invite ? 'onboarding' : trip ? 'ready' : 'onboarding',
@@ -1001,6 +1005,46 @@ export async function markPlanItemOpen(id) {
   await backend.putPlanItem({ ...row, done: false, updatedAt: Date.now() });
 }
 
+// ---------------------------------------------------------------- Unterkünfte
+
+/**
+ * Eine Unterkunft gilt für einen Zeitraum, nicht für einen einzelnen Tag —
+ * dieselbe Angabe reicht dann für jede Nacht dazwischen (siehe
+ * `calc.stayForDate`, das den Reiseplan pro Tag danach fragt). Anders als ein
+ * Programmpunkt hängt daran kein Geld und keine Uhrzeit, nur Name, Adresse
+ * und der Zeitraum — die Adresse ist der eigentliche Grund für dieses Feld:
+ * sie soll perspektivisch als Ausgangspunkt für eine Fahrzeitberechnung zum
+ * ersten Programmpunkt des Tages dienen (eine externe Routen-API, noch nicht
+ * angebunden).
+ */
+export async function addStay({ name, address, startDate, endDate, note }) {
+  const now = Date.now();
+  const start = startDate || todayISO();
+  const row = {
+    id: newId(),
+    name: String(name || '').trim(),
+    address: (address || '').trim(),
+    startDate: start,
+    endDate: endDate && endDate >= start ? endDate : start,
+    note: (note || '').trim(),
+    createdAt: now,
+    updatedAt: now,
+    createdBy: state.myPersonId || null,
+  };
+  await backend.putStay(row);
+  return row;
+}
+
+export async function updateStay(id, patch) {
+  const row = state.stays.find((s) => s.id === id);
+  if (!row) return;
+  await backend.putStay({ ...row, ...patch, updatedAt: Date.now() });
+}
+
+export async function deleteStay(id) {
+  await backend.removeStay(id);
+}
+
 // ------------------------------------------------------------------ Packliste
 
 /**
@@ -1155,7 +1199,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
       throw new Error('Unter diesem Namen liegt in diesem Projekt schon eine Kasse. Wähle einen anderen Namen.');
     }
     await cloud.createTrip({ ...state.trip, joinName: name }, { personId: state.myPersonId });
-    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems });
+    await cloud.importAll({ contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems, stays: state.stays });
   } catch (err) {
     await afterFailedAttempt(cloud);
     throw err;
@@ -1170,7 +1214,7 @@ export async function connectCloud(firebaseConfig, { joinName, password } = {}) 
 
 /** Zurück in den lokalen Modus — mit einer Kopie des aktuellen Standes. */
 export async function disconnectCloud() {
-  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems };
+  const copy = { trip: state.trip, contributions: state.contributions, expenses: state.expenses, cashOuts: state.cashOuts, planItems: state.planItems, packItems: state.packItems, stays: state.stays };
   const prefs = getPrefs();
   // Sich auch wirklich austragen. Vorher hörte dieses Gerät nur auf zuzuhören
   // und stand serverseitig weiter als Mitglied da — mit vollem Zugriff, bloß
@@ -1363,6 +1407,7 @@ export async function deleteTrip() {
     cashOuts: state.cashOuts,
     planItems: state.planItems,
     packItems: state.packItems,
+    stays: state.stays,
   });
 
   await backend.deleteTrip?.();
@@ -1371,7 +1416,7 @@ export async function deleteTrip() {
   // Auch eine ältere lokale Kopie muss weg, sonst taucht sie danach wieder auf.
   await local.deleteTrip();
   set({
-    trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [],
+    trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [],
     myPersonId: null, invite: null, phase: 'onboarding',
     // `keepCopy` ist zu diesem Zeitpunkt schon durch — sofort mitgeben, statt
     // auf das nächste `handleChange` zu warten und die Karte zum
@@ -1402,6 +1447,7 @@ export async function restoreLastDeleted() {
     cashOuts: payload.cashOuts || [],
     planItems: payload.planItems || [],
     packItems: payload.packItems || [],
+    stays: payload.stays || [],
   });
   setPrefs({
     tripRef: { mode: 'local', joinName: payload.trip.joinName || payload.trip.name || '', joinPassword: '' },
@@ -1426,6 +1472,7 @@ export async function importData(payload) {
     cashOuts: payload.cashOuts || [],
     planItems: payload.planItems || [],
     packItems: payload.packItems || [],
+    stays: payload.stays || [],
   });
 }
 

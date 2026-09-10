@@ -445,6 +445,27 @@ export function planDayProgress(items, expenseById) {
   return { done, total: items.length };
 }
 
+// ---------------------------------------------------------------- Unterkünfte
+
+/**
+ * Die Unterkunft, die an diesem Tag gilt — oder `null`, wenn keine hinterlegt
+ * ist. Anders als ein Programmpunkt hängt eine Unterkunft nicht an einem
+ * einzelnen Tag, sondern an einem Zeitraum (siehe `store.addStay`): dieselbe
+ * Angabe gilt dann für jede Nacht dazwischen, ohne dass man sie mehrfach
+ * einträgt.
+ *
+ * Überschneiden sich zwei Zeiträume ausnahmsweise (etwa am Wechseltag von
+ * einem Hotel zum nächsten), gewinnt die zuletzt begonnene — sie ist für
+ * diesen Tag die genauere Angabe.
+ */
+export function stayForDate(stays, date) {
+  let match = null;
+  for (const s of stays) {
+    if (s.startDate <= date && s.endDate >= date && (!match || s.startDate > match.startDate)) match = s;
+  }
+  return match;
+}
+
 // ------------------------------------------------------------------ Packliste
 
 /**

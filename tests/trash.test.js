@@ -111,6 +111,18 @@ test('die Kopie nimmt Reiseplan und Packliste mit', async () => {
   assert.deepEqual(back.packItems, packItems);
 });
 
+test('die Kopie nimmt auch Unterkünfte mit', async () => {
+  store.clear();
+  const stays = [{ id: 's1', name: 'Hotel Fjord', address: 'Strandvegen 1', startDate: '2026-07-01', endDate: '2026-07-03', note: '' }];
+  await keepCopy({ trip, contributions: [], expenses, cashOuts: [], stays });
+
+  const copy = await lastCopy();
+  assert.equal(copy.entries, 2, 'die eine Ausgabe und die eine Unterkunft');
+
+  const back = parseImport(copy.json);
+  assert.deepEqual(back.stays, stays);
+});
+
 test('ein beschädigter Datensatz gilt als „nichts da“, nicht als Absturz', async () => {
   store.clear();
   await keepCopy({ trip, contributions: [], expenses, cashOuts: [] });

@@ -153,7 +153,7 @@ export function privacySections({ contact = '', region = null, mode = 'local', a
     },
     {
       title: 'Was verarbeitet wird',
-      text: `Namen der Teilnehmenden (frei wählbar, ein Spitzname reicht), Einzahlungen, Ausgaben mit Datum, Kategorie und Notiz, Auszahlungen sowie Zeitraum und Währung der Kasse. Dazu geräteeigene Einstellungen (Aussehen, wer an diesem Gerät sitzt) im Speicher des Browsers.${
+      text: `Namen der Teilnehmenden (frei wählbar, ein Spitzname reicht), Einzahlungen, Ausgaben mit Datum, Kategorie und Notiz, Auszahlungen, den Reiseplan mit Ort und ggf. hinterlegte Unterkünfte mit Adresse und Zeitraum, sowie Zeitraum und Währung der Kasse. Dazu geräteeigene Einstellungen (Aussehen, wer an diesem Gerät sitzt) im Speicher des Browsers.${
         cloud
           ? ' Für jedes verbundene Gerät kommt hinzu: eine zufällige Kennung der anonymen Anmeldung, wem das Gerät gehört, wann es beigetreten ist und wann es zuletzt verbunden war. Das braucht die Gruppe, um ein verlorenes Gerät wieder aussperren zu können; Gerätemodell, Browser oder Standort werden nicht erhoben.'
           : ''

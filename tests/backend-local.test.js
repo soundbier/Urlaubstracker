@@ -74,6 +74,24 @@ test('ein neu gestartetes Backend findet denselben Stand wieder', async () => {
   assert.equal(second.b.data.expenses[0].amount, 4500);
 });
 
+test('eine Unterkunft übersteht einen Neustart wie jede andere Liste', async () => {
+  store.clear();
+  const first = backend();
+  await first.start();
+  await first.b.createTrip(trip);
+  await first.b.putStay({ id: 's1', name: 'Hotel Fjord', address: 'Strandvegen 1', startDate: '2026-07-01', endDate: '2026-07-03', note: '' });
+
+  const second = backend();
+  await second.start();
+  assert.equal(second.b.data.stays.length, 1);
+  assert.equal(second.b.data.stays[0].name, 'Hotel Fjord');
+
+  await second.b.removeStay('s1');
+  const third = backend();
+  await third.start();
+  assert.equal(third.b.data.stays.length, 0);
+});
+
 test('unverschlüsselter Altbestand aus einer Fassung vor der Verschlüsselung wird übernommen und migriert', async () => {
   store.clear();
   // So, wie es vor `secure-storage.js` aussah: rohes JSON am Speicherplatz.
