@@ -4,10 +4,13 @@
  * Blick. Was heute schon eingetragen wurde, steht darunter.
  */
 import { h, icon } from '../dom.js';
-import { computeBudget, plannedOnly, planItemsOnDay, clampDateToTrip, addDays, daysInclusive, todayISO } from '../calc.js';
-import { money, moneySigned, days, dayMonth, weekdayShort } from '../format.js';
+import { computeBudget, plannedOnly, planItemsOnDay, stayForDate, clampDateToTrip, addDays, daysInclusive, todayISO } from '../calc.js';
+import { money, moneySigned, days, dayMonth, weekdayShort, duration, distanceKm } from '../format.js';
 import { stat, sectionTitle, expenseRow, plannedRow, planItemRow, emptyState, bar, whoAmICallout } from '../ui/parts.js';
+import { toast } from '../ui/sheet.js';
 import { setFinancePane } from './finances.js';
+import { travelPairs, segmentTravelTime } from '../travel.js';
+import { ensureTravelApiKey } from '../store.js';
 
 // Der Tagesbudget-Balken bleibt im Normalfall farblos (neutral) — Farbe ist
 // Verdikt, kein Dauerzustand. Erst beim Kippen ins Knappe oder Über zeigt er
@@ -36,6 +39,20 @@ function setSelectedDate(date) {
 }
 
 /**
+ * Berechnete Fahrzeiten — Strecken-Schlüssel (siehe `travel.travelPairs`) auf
+ * `{ seconds, meters }` oder, wenn die Berechnung für diese Strecke
+ * fehlschlug, `{ error }`. Wie `selectedDate` nur für die laufende Sitzung
+ * gemerkt, hier aus demselben Grund wie im Kommentar zu `travel.js`: eine
+ * Fahrzeit soll immer frisch berechnet sein, wenn man sie anfordert, aber sie
+ * muss deswegen nicht sofort wieder verschwinden, nur weil zwischendurch ein
+ * anderer Tag aufgeschlagen wurde — die Strecken-Schlüssel hängen an den
+ * Adressen und Eintrags-IDs, ein anderer Tag hat andere.
+ */
+let travelResults = {};
+/** Läuft gerade eine Berechnung? Sperrt den Knopf gegen doppeltes Antippen. */
+let travelPending = false;
+
+/**
  * Einen bestimmten Tag aufschlagen — von der Tagesplanung aus, wo die
  * Übersicht aller Tage steht. Übersicht und Tagesansicht, wie Monats- und
  * Tagesblatt im Kalender.
@@ -45,7 +62,7 @@ export function openPlanDay(date) {
 }
 
 export function renderToday(state, actions) {
-  const { trip, expenses, contributions, planItems } = state;
+  const { trip, expenses, contributions, planItems, stays } = state;
   const knowsMe = trip.people.some((p) => p.id === state.myPersonId);
   const today = todayISO();
   const b = computeBudget({ trip, contributions, expenses, today });
@@ -63,6 +80,8 @@ export function renderToday(state, actions) {
   const selected = resolveSelectedDate(trip);
   const dayItems = planItemsOnDay(planItems, selected);
   const expenseById = new Map(expenses.map((e) => [e.id, e]));
+  const stay = stayForDate(stays, selected);
+  const pairs = travelPairs(dayItems, stay);
 
   return h('div.view',
     knowsMe ? null : whoAmICallout(trip, actions),
@@ -96,9 +115,12 @@ export function renderToday(state, actions) {
     // darüber — deshalb steht sie hier und nicht über der großen Zahl.
     dayNav(trip, selected, today, actions),
     h('section.section',
-      sectionTitle('Programm', h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: selected }) }, icon('plus', 16), 'Eintragen')),
+      sectionTitle('Programm', h('div.section__actions',
+        travelButton(pairs, actions),
+        h('button.btn.btn--small', { type: 'button', onclick: () => actions.addPlanItem({ date: selected }) }, icon('plus', 16), 'Eintragen'),
+      )),
       dayItems.length
-        ? h('div.list', ...dayItems.map((item) => planItemRow(item, trip, { onEdit: actions.editPlanItem, onToggle: actions.togglePlanItem, expenseById })))
+        ? h('div.list', ...programRows(dayItems, pairs, trip, expenseById, actions))
         : h('p.section__note', 'Für diesen Tag ist noch nichts geplant.'),
     ),
 
@@ -168,6 +190,101 @@ function dayNav(trip, selected, today, actions) {
       type: 'button', disabled: atEnd, title: 'Nächster Tag', 'aria-label': 'Nächster Tag', onclick: () => go(1),
     }, icon('chevron', 20)),
   );
+}
+
+// -------------------------------------------------------------- Fahrzeiten
+
+/**
+ * Von der Eintrags-ID zum Paar, das *bei ihr endet* — also der Strecke, die
+ * vor diesem Eintrag in der Liste steht. `travelPairs` (siehe `travel.js`)
+ * kennt schon jedes Paar benachbarter Adressen; hier wird daraus nur
+ * nachgeschlagen, ohne dieselbe Regel ein zweites Mal aufzuschreiben.
+ */
+function pairsByItemId(pairs) {
+  const map = new Map();
+  for (const pair of pairs) {
+    const toKey = pair.key.split('>')[1];
+    if (toKey?.startsWith('item:')) map.set(toKey.slice('item:'.length), pair);
+  }
+  return map;
+}
+
+/**
+ * Die Programmpunkte des Tages, mit einer schmalen Fahrzeit-Zeile davor,
+ * überall dort, wo für die Strecke schon ein Ergebnis vorliegt (siehe
+ * `travelResults`). Ohne Ergebnis — der Normalfall vor dem ersten Antippen
+ * des Knopfs — steht dort schlicht nichts; erst `computeTravel` füllt das.
+ */
+function programRows(dayItems, pairs, trip, expenseById, actions) {
+  const byItemId = pairsByItemId(pairs);
+  const rows = [];
+  for (const item of dayItems) {
+    const pair = byItemId.get(item.id);
+    if (pair) rows.push(travelRow(pair.key, pair.fromIsStay));
+    rows.push(planItemRow(item, trip, { onEdit: actions.editPlanItem, onToggle: actions.togglePlanItem, expenseById }));
+  }
+  return rows;
+}
+
+/** Eine berechnete (oder fehlgeschlagene) Fahrzeit — oder `null`, noch nichts angefragt. */
+function travelRow(pairKey, fromStay) {
+  const result = travelResults[pairKey];
+  if (!result) return null;
+  if (result.error) {
+    return h('div.travelrow.travelrow--error',
+      icon('transport', 14),
+      h('span', fromStay ? 'Fahrzeit ab der Unterkunft nicht ermittelbar.' : 'Fahrzeit nicht ermittelbar.'),
+    );
+  }
+  return h('div.travelrow',
+    icon('transport', 14),
+    h('span', `${duration(result.seconds)} · ${distanceKm(result.meters)}${fromStay ? ' ab der Unterkunft' : ''}`),
+  );
+}
+
+/**
+ * Der kleine Knopf, der die Fahrzeiten für den aufgeschlagenen Tag anfragt —
+ * und einzige Stelle, von der aus `segmentTravelTime` je aufgerufen wird.
+ * Ohne berechenbare Strecke (keine zwei benachbarten Adressen) bleibt er ganz
+ * weg, statt untätig dazustehen.
+ */
+function travelButton(pairs, actions) {
+  if (!pairs.length) return null;
+  return h('button.icon-btn', {
+    type: 'button',
+    disabled: travelPending,
+    title: 'Fahrzeiten berechnen',
+    'aria-label': 'Fahrzeiten berechnen',
+    onclick: () => computeTravel(pairs, actions),
+  }, icon('transport', 18));
+}
+
+async function computeTravel(pairs, actions) {
+  if (travelPending) return; // gegen doppeltes Antippen, bevor der Knopf sich sperrt.
+  const apiKey = await ensureTravelApiKey();
+  if (!apiKey) {
+    toast('Für Fahrzeiten fehlt noch ein TomTom-API-Key.', {
+      type: 'error',
+      action: { label: 'Einstellungen', onClick: () => actions.goto('mehr') },
+    });
+    return;
+  }
+
+  travelPending = true;
+  actions.rerender();
+
+  const settled = await Promise.all(pairs.map(async (pair) => {
+    try {
+      const result = await segmentTravelTime(pair.fromAddress, pair.toAddress, apiKey);
+      return [pair.key, result];
+    } catch (err) {
+      return [pair.key, { error: err?.message || 'Fehler bei der Berechnung.' }];
+    }
+  }));
+
+  travelResults = { ...travelResults, ...Object.fromEntries(settled) };
+  travelPending = false;
+  actions.rerender();
 }
 
 /**

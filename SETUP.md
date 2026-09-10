@@ -95,7 +95,34 @@ Nach erfolgreicher Prüfung die Durchsetzung unter **App Check → APIs** für f
 * Cloud Firestore
 * Authentication
 
-### 5. Lokale Entwicklung
+### 5. TomTom (optional)
+
+Für die Fahrzeit zwischen den Tageszielen auf „Heute“ braucht es einen TomTom-API-Key. Ohne ihn läuft die App unverändert weiter, nur bleibt der Fahrzeit-Knopf ohne Wirkung.
+
+Ein kostenloses Konto bei [TomTom Developer Portal](https://developer.tomtom.com/) erstellen und einen Website-Schlüssel anlegen, freigeschaltet für:
+
+* Geocoding API
+* Routing API
+
+Den Schlüssel im TomTom-Dashboard auf die eigenen Domains beschränken — er ist kein Geheimnis im technischen Sinn (er steckt lesbar im ausgelieferten Bündel, wie bei jeder Karten-API für den Browser üblich), Sicherheit kommt aus dieser Beschränkung, nicht aus Geheimhaltung.
+
+Für die lokale Entwicklung kann `tomtom-config.json` verwendet werden. Vorlage:
+
+```text
+tomtom-config.example.json
+```
+
+Beispiel:
+
+```json
+{
+  "apiKey": "YOUR_TOMTOM_KEY"
+}
+```
+
+Ohne die Datei — und ohne die Cloudflare-Variable unten — trägt jede Person ihren eigenen Key von Hand unter **Mehr → Dieses Gerät → Fahrzeiten (TomTom)** ein; der bleibt dann nur auf diesem Gerät.
+
+### 6. Lokale Entwicklung
 
 ```bash
 npm test
@@ -112,7 +139,7 @@ Für lokale Tests kann ein App-Check-Debug-Token verwendet werden.
 
 Ein Debug-Token darf niemals in die produktive Anwendung übernommen werden.
 
-### 6. Cloudflare Pages
+### 7. Cloudflare Pages
 
 Repository mit Cloudflare Pages verbinden.
 
@@ -130,7 +157,7 @@ npm run build
 
 ### Environment Variables
 
-Firebase-Konfiguration und App Check können als Cloudflare Environment Variables hinterlegt werden:
+Firebase-Konfiguration, App Check und der TomTom-Key können als Cloudflare Environment Variables hinterlegt werden:
 
 ```text
 FIREBASE_API_KEY
@@ -138,18 +165,20 @@ FIREBASE_AUTH_DOMAIN
 FIREBASE_PROJECT_ID
 FIREBASE_APP_ID
 FIREBASE_APPCHECK_SITE_KEY
+TOMTOM_API_KEY
 ```
 
 Produktive Werte gehören ausschließlich in die Cloudflare-Konfiguration und nicht in Git.
 
-Der Firebase Web API Key ist grundsätzlich kein Secret. Die Sicherheit wird durch korrekte Firebase Rules, Authentication und App Check gewährleistet.
+Der Firebase Web API Key ist grundsätzlich kein Secret. Die Sicherheit wird durch korrekte Firebase Rules, Authentication und App Check gewährleistet. Für den TomTom-Key gilt sinngemäß dasselbe — siehe Schritt 5.
 
-### 7. Sicherheitscheck
+### 8. Sicherheitscheck
 
 Vor der Veröffentlichung:
 
 ```text
 [ ] firebase-config.json nicht im Repository
+[ ] tomtom-config.json nicht im Repository
 [ ] keine Secrets im Quellcode
 [ ] Firestore Rules veröffentlicht
 [ ] Anonymous Authentication aktiviert
@@ -158,9 +187,10 @@ Vor der Veröffentlichung:
 [ ] App Check für Authentication aktiviert
 [ ] Produktionsdomain bei reCAPTCHA registriert
 [ ] kein Debug-Token in Production
+[ ] TomTom-Key (falls gesetzt) auf die Produktionsdomain beschränkt
 ```
 
-### 8. Aktualisierung
+### 9. Aktualisierung
 
 ```bash
 npm ci
@@ -273,7 +303,34 @@ After successful testing, enable enforcement under **App Check → APIs** for:
 * Cloud Firestore
 * Authentication
 
-### 5. Local development
+### 5. TomTom (optional)
+
+The travel time between the day's destinations on "Today" needs a TomTom API key. Without it, the app works as before — the travel-time button simply does nothing.
+
+Create a free account on the [TomTom Developer Portal](https://developer.tomtom.com/) and add a website key, enabled for:
+
+* Geocoding API
+* Routing API
+
+Restrict the key to your own domains in the TomTom dashboard — it is not a secret in the technical sense (it ships readable inside the delivered bundle, as is normal for any browser-facing map API); security comes from that restriction, not from secrecy.
+
+For local development, `tomtom-config.json` can be used. Template:
+
+```text
+tomtom-config.example.json
+```
+
+Example:
+
+```json
+{
+  "apiKey": "YOUR_TOMTOM_KEY"
+}
+```
+
+Without the file — and without the Cloudflare variable below — anyone can paste their own key under **More → This device → Travel times (TomTom)**; that key then stays on that device only.
+
+### 6. Local development
 
 ```bash
 npm test
@@ -290,7 +347,7 @@ An App Check debug token may be used for local development.
 
 Never ship a debug token with the production application.
 
-### 6. Cloudflare Pages
+### 7. Cloudflare Pages
 
 Connect the repository to Cloudflare Pages.
 
@@ -308,7 +365,7 @@ npm run build
 
 ### Environment Variables
 
-Firebase configuration and App Check can be stored as Cloudflare Environment Variables:
+Firebase configuration, App Check, and the TomTom key can be stored as Cloudflare Environment Variables:
 
 ```text
 FIREBASE_API_KEY
@@ -316,18 +373,20 @@ FIREBASE_AUTH_DOMAIN
 FIREBASE_PROJECT_ID
 FIREBASE_APP_ID
 FIREBASE_APPCHECK_SITE_KEY
+TOMTOM_API_KEY
 ```
 
 Production values should only exist in the Cloudflare configuration and must not be committed to Git.
 
-The Firebase Web API key is not considered a secret by itself. Security relies on properly configured Firebase Rules, Authentication and App Check.
+The Firebase Web API key is not considered a secret by itself. Security relies on properly configured Firebase Rules, Authentication and App Check. The same applies to the TomTom key — see step 5.
 
-### 7. Security checklist
+### 8. Security checklist
 
 Before deploying:
 
 ```text
 [ ] firebase-config.json is not committed
+[ ] tomtom-config.json is not committed
 [ ] no secrets are present in source code
 [ ] Firestore Rules are deployed
 [ ] Anonymous Authentication is enabled
@@ -336,9 +395,10 @@ Before deploying:
 [ ] App Check enforcement is enabled for Authentication
 [ ] production domains are registered with reCAPTCHA
 [ ] no debug token is included in production
+[ ] TomTom key (if set) is restricted to the production domain
 ```
 
-### 8. Updating
+### 9. Updating
 
 ```bash
 npm ci

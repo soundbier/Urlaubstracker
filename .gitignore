@@ -7,3 +7,6 @@ firebase-debug.log
 # Wird beim Cloudflare-Pages-Build aus Variables and secrets erzeugt
 # (siehe tools/write-firebase-config.mjs) — gehört nicht ins Repository.
 firebase-config.json
+
+# Dasselbe für den TomTom-API-Key (siehe tools/write-tomtom-config.mjs).
+tomtom-config.json

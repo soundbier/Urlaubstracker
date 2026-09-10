@@ -1,0 +1,15 @@
+{
+  "_hinweis": [
+    "Diese Datei als tomtom-config.json neben index.html legen (Kopie mit richtigem Wert),",
+    "dann kann jedes Gerät, das die Adresse öffnet, ohne eigene Einrichtung Fahrzeiten",
+    "zwischen den Tageszielen auf „Heute“ berechnen (siehe js/travel.js).",
+    "Ohne die Datei bleibt die Fahrzeitberechnung aus, bis jemand von Hand einen Key",
+    "unter Mehr → Dieses Gerät einträgt.",
+    "Der Key ist kein Geheimnis im technischen Sinn — er steckt lesbar im ausgelieferten",
+    "Bündel, wie bei jeder Karten-API für den Browser üblich. Sicherheit kommt aus der",
+    "Domain-Beschränkung im TomTom-Dashboard (Website-Schlüssel, auf die eigene Domain",
+    "eingeschränkt), nicht aus Geheimhaltung.",
+    "Unterstriche-Felder wie dieses werden ignoriert."
+  ],
+  "apiKey": "eUer-TomTom-Key"
+}

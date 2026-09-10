@@ -11,6 +11,9 @@
 # Dazu die optionale firebase-config.json: sie sagt jedem Gerät, in welchem
 # Firebase-Projekt die Kassen liegen. Wird sie ausgetauscht, muss das ankommen —
 # sonst suchen neue Geräte im alten Projekt nach einer Kasse, die dort nicht ist.
+# Aus demselben Grund auch die optionale tomtom-config.json (siehe
+# tools/write-tomtom-config.mjs): ein gedrehter Key soll nicht erst nach
+# Tagen ankommen.
 #
 # Alles andere (js/, styles.css, icons/, vendor/) darf Cloudflare ruhig lange
 # vorhalten: der Service Worker holt es beim Installieren einer neuen Fassung
@@ -29,6 +32,9 @@
   Cache-Control: no-cache, max-age=0
 
 /firebase-config.json
+  Cache-Control: no-cache, max-age=0
+
+/tomtom-config.json
   Cache-Control: no-cache, max-age=0
 
 # Sicherheits-Kopfzeilen für alle Pfade.
@@ -56,11 +62,14 @@
 #                kein Nachteil gegenüber dem heutigen Zustand ganz ohne CSP.
 #   connect-src  *.googleapis.com für Firestore/Auth, google.com für den
 #                reCAPTCHA-Nachweis von App Check — beides nur gebraucht, wenn
-#                die Kasse geteilt wird bzw. App Check eingerichtet ist.
+#                die Kasse geteilt wird bzw. App Check eingerichtet ist. Dazu
+#                api.tomtom.com für die Fahrzeitberechnung auf „Heute“ (siehe
+#                js/travel.js) — nur angefragt, wenn jemand den Knopf dafür
+#                antippt und ein Key hinterlegt ist.
 # Firebase/Firestore läuft immer über *.googleapis.com, unabhängig vom
 # eigenen Projekt — deshalb reicht die eine Zeile für jede Einrichtung.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-VcwLFoAlojYNATs6Q4NYMLTSfWWwzZ/Ufq8DnAR7xqo=' 'sha256-p65p9tNzxsio9scHyvD4HTSCHXOAM6WmPic/doAHdgk=' https://www.gstatic.com https://www.google.com; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://*.googleapis.com https://www.google.com; frame-src https://www.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'sha256-VcwLFoAlojYNATs6Q4NYMLTSfWWwzZ/Ufq8DnAR7xqo=' 'sha256-p65p9tNzxsio9scHyvD4HTSCHXOAM6WmPic/doAHdgk=' https://www.gstatic.com https://www.google.com; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self' https://*.googleapis.com https://www.google.com https://api.tomtom.com; frame-src https://www.google.com; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin

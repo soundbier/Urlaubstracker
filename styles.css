@@ -309,6 +309,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
   border-bottom: 1px solid var(--rule);
 }
 .section__title--warn { color: var(--warn); }
+/* Zwei Knöpfe statt einem in der Augenbraue eines Abschnitts — etwa der
+   kleine Fahrzeit-Knopf neben „Eintragen“ auf „Heute“. */
+.section__actions { display: flex; align-items: center; gap: var(--sp-2); }
 .section__meta { font-size: var(--fs-sm); color: var(--text-muted); }
 .section__meta--amount { font-weight: 600; color: var(--text); }
 .section__note { font-size: var(--fs-xs); color: var(--text-faint); }
@@ -637,6 +640,23 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
    hier also: blasser, mit gefülltem statt umrissenem Haken, nicht: weg. */
 .prow.is-done .row__title { color: var(--text-faint); }
 .prow__done.is-done { color: var(--on-accent); background: var(--accent); border-radius: var(--radius-pill); }
+
+/*
+ * Die Fahrzeit zwischen zwei Stationen des Tages — schmal und blass wie ein
+ * Beiwort, nicht wie ein eigener Eintrag: sie gehört zur Lücke zwischen den
+ * beiden Programmpunkten, nicht zu einem von ihnen. Erscheint erst, wenn
+ * jemand den Knopf über der Liste angetippt hat (siehe `views/today.js`).
+ */
+.travelrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  font-size: var(--fs-xs);
+  color: var(--text-faint);
+}
+.travelrow .icon { flex: none; }
+.travelrow--error { color: var(--warn); }
 
 /* Ein Beiwort an der Zeile — Zahler, Fälligkeit, Herkunft. Ohne Fläche und
    ohne Rahmen: zwanzig umrandete Pillen in einer Liste sind zwanzig kleine

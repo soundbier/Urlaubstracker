@@ -168,8 +168,12 @@ export function privacySections({ contact = '', region = null, mode = 'local', a
     {
       title: 'Wer die Daten sieht',
       text: cloud
-        ? 'Alle Geräte, die der Kasse beigetreten sind — sie stehen unter „Gemeinsam nutzen → Verbundene Geräte“ und lassen sich dort einzeln aussperren. Als Auftragsverarbeiter (Art. 28 DSGVO) kommt Google Ireland Ltd. mit Firebase/Firestore hinzu; die Auftragsverarbeitung ist im Google-Cloud-Datenverarbeitungszusatz geregelt, den der Betreiber des Projekts akzeptieren muss. Eine Weitergabe darüber hinaus findet nicht statt — die App enthält keine Werbung, kein Tracking und keine Analyse.'
-        : 'Niemand. Ohne Synchronisierung verlässt kein Eintrag dieses Gerät. Die App enthält keine Werbung, kein Tracking und keine Analyse.',
+        ? 'Alle Geräte, die der Kasse beigetreten sind — sie stehen unter „Gemeinsam nutzen → Verbundene Geräte“ und lassen sich dort einzeln aussperren. Als Auftragsverarbeiter (Art. 28 DSGVO) kommt Google Ireland Ltd. mit Firebase/Firestore hinzu; die Auftragsverarbeitung ist im Google-Cloud-Datenverarbeitungszusatz geregelt, den der Betreiber des Projekts akzeptieren muss. Darüber hinaus geht nichts hinaus — die App enthält keine Werbung, kein Tracking und keine Analyse —, mit einer Ausnahme: siehe „Fahrzeiten (TomTom)“ unten.'
+        : 'Niemand. Ohne Synchronisierung verlässt kein Eintrag dieses Gerät — die App enthält keine Werbung, kein Tracking und keine Analyse —, mit einer Ausnahme: siehe „Fahrzeiten (TomTom)“ unten.',
+    },
+    {
+      title: 'Fahrzeiten (TomTom)',
+      text: 'Optional, und nur auf Antippen: Wer auf „Heute“ den Fahrzeit-Knopf drückt, schickt die dort hinterlegten Adressen (Unterkunft, Programmpunkte des aufgeschlagenen Tages) an TomTom N.V. (Niederlande) — einmalig für diesen einen Tag, nie automatisch und nie im Hintergrund. TomTom liefert daraus Koordinaten und eine Fahrzeit zurück; darüber hinaus wird nichts gespeichert. Ohne hinterlegten TomTom-Key (siehe „Mehr → Dieses Gerät → Fahrzeiten“) passiert das nie. Grundlage ist die Einwilligung durch die aktive Nutzung dieser einen Funktion (Art. 6 Abs. 1 lit. a DSGVO).',
     },
     {
       title: 'Wo die Daten liegen',

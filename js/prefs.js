@@ -24,6 +24,10 @@ const THEME_KEY = 'urlaubstracker.theme.v1';
 
 const DEFAULTS = {
   firebaseConfig: null, // { apiKey, authDomain, projectId, appId, … }
+  // Eigener TomTom-API-Key für die Fahrzeitberechnung auf „Heute“ (siehe
+  // `travel.js`). `null` heißt: es gilt der mit der Auslieferung mitgegebene
+  // Key, falls es einen gibt (siehe `store.js`, `travelApiKey`).
+  tomtomApiKey: null,
   // { mode: 'local' } | { mode: 'cloud', tripId, inviteCode }
   // Dazu, wenn bekannt: joinName und joinPassword — die zwei Angaben, mit denen
   // andere beitreten. Sie stehen hier und nicht im Trip: das Passwort gehört

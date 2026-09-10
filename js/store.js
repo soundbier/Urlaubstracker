@@ -243,6 +243,59 @@ export function cloudReady() {
   return !!cloudConfig();
 }
 
+// ------------------------------------------------------ TomTom-Konfiguration
+
+/**
+ * Der TomTom-API-Key für die Fahrzeitberechnung auf „Heute“ (siehe
+ * `travel.js`).
+ *
+ * Genau dasselbe Muster wie bei der Firebase-Konfiguration oben: liegt neben
+ * `index.html` eine `tomtom-config.json`, gilt sie für alle, die diese
+ * Auslieferung öffnen (siehe `tools/write-tomtom-config.mjs`, gedacht für
+ * Cloudflare Pages). Anders als dort wird sie nicht beim Start geladen,
+ * sondern erst, wenn die Fahrzeitberechnung tatsächlich zum ersten Mal
+ * angefragt wird (`ensureTravelApiKey`) — ein Gerät, das den Knopf nie
+ * antippt, soll dafür keinen zusätzlichen Netzzugriff beim Start bekommen.
+ */
+let ambientTomTomKey = null;
+let ambientTomTomLoaded = false;
+
+async function loadAmbientTomTomKey() {
+  if (ambientTomTomLoaded) return ambientTomTomKey;
+  ambientTomTomLoaded = true;
+  try {
+    const res = await withTimeout(fetch('./tomtom-config.json'), 4000, 'zu langsam');
+    if (res.ok) {
+      const cfg = await res.json();
+      ambientTomTomKey = typeof cfg?.apiKey === 'string' && cfg.apiKey ? cfg.apiKey : null;
+    }
+  } catch {
+    ambientTomTomKey = null;
+  }
+  return ambientTomTomKey;
+}
+
+/**
+ * Der Key, mit dem dieses Gerät gerade Fahrzeiten berechnen könnte — ein von
+ * Hand eingetragener geht vor (siehe `views/settings.js`), sonst der
+ * mitgelieferte, falls schon geladen. `null`, solange keiner von beidem da
+ * ist oder die mitgelieferte Konfiguration noch nicht abgefragt wurde.
+ */
+export function travelApiKey() {
+  return getPrefs().tomtomApiKey || ambientTomTomKey;
+}
+
+/**
+ * Lädt bei Bedarf die mitgelieferte TomTom-Konfiguration nach und gibt den
+ * Key zurück, mit dem jetzt gerechnet werden kann — oder `null`, wenn es
+ * keinen gibt. Das hier ruft `views/today.js` beim Antippen des
+ * Fahrzeit-Knopfs auf, nicht beim Start.
+ */
+export async function ensureTravelApiKey() {
+  if (!getPrefs().tomtomApiKey) await loadAmbientTomTomKey();
+  return travelApiKey();
+}
+
 /**
  * Gehört jetzt die Anmeldemaske auf den Schirm?
  *

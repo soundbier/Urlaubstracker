@@ -12,7 +12,7 @@ import { h, icon } from '../dom.js';
 import { openSheet, confirmSheet, toast } from '../ui/sheet.js';
 import { installInstructionsSheet, privacySheet } from '../ui/parts.js';
 import { joinSheet, plainInput, maskedInput, maskedField } from '../ui/join-sheet.js';
-import { getPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
+import { getPrefs, setPrefs, setTheme, parseFirebaseConfig, validateFirebaseConfig } from '../prefs.js';
 import { checkJoinName, checkNewPassword, suggestPassword } from '../join.js';
 import { buildInviteLink, buildExport, buildCsv, parseImport } from '../link.js';
 import { daysInclusive, isValidDate, allocateByShares, normalizeShares, MAX_PEOPLE, personEntryCount } from '../calc.js';
@@ -580,8 +580,14 @@ function deviceGroup(actions) {
   const label = (THEMES.find(([id]) => id === current) || THEMES[0])[1];
   const status = lock.status();
   const delay = (lock.DELAYS.find(([m]) => m === status.minutes) || lock.DELAYS[2])[1];
+  const tomtomKey = getPrefs().tomtomApiKey;
 
   return group('Dieses Gerät', {},
+    navRow('Fahrzeiten (TomTom)', {
+      value: tomtomKey ? 'Eigener Key' : 'Voreingestellt, falls vorhanden',
+      sub: 'Für die Fahrzeit zwischen Tageszielen auf „Heute“.',
+      onClick: () => tomtomKeySheet(actions),
+    }),
     navRow('App-Sperre', {
       value: status.enabled ? (status.biometrics ? 'Code + Biometrie' : 'Code') : 'Aus',
       sub: status.enabled
@@ -609,6 +615,42 @@ function deviceGroup(actions) {
       },
     }),
   );
+}
+
+/**
+ * Der TomTom-API-Key für die Fahrzeitberechnung auf „Heute“ (siehe
+ * `views/today.js`, `travel.js`) — von Hand eintragbar, falls die
+ * Auslieferung selbst keinen mitbringt oder ein anderer gelten soll. Wie der
+ * Rest dieses Geräts landet er verschlüsselt in den Geräteeinstellungen
+ * (siehe `prefs.js`), nicht in der geteilten Kasse: er gehört zu diesem
+ * Gerät, nicht zur Reise.
+ */
+function tomtomKeySheet(actions) {
+  return openSheet({
+    title: 'TomTom-API-Key',
+    subtitle: 'Für die Fahrzeit zwischen Tageszielen. Kostenlos bei TomTom erhältlich und dort auf die eigene Domain beschränkbar.',
+    build: (close) => {
+      const input = h('input.field__input', {
+        value: getPrefs().tomtomApiKey || '', placeholder: 'API-Key einfügen', maxlength: 200, enterkeyhint: 'done',
+      });
+      const save = () => {
+        setPrefs({ tomtomApiKey: input.value.trim() || null });
+        actions.rerender();
+        close();
+      };
+      return h('form.stack', { onsubmit: (e) => { e.preventDefault(); save(); } },
+        h('label.field', h('span.field__label', 'Key'), input),
+        h('button.btn.btn--primary.btn--wide', { type: 'submit' }, 'Speichern'),
+        getPrefs().tomtomApiKey
+          ? h('button.btn.btn--ghost.btn--wide', {
+              type: 'button',
+              onclick: () => { setPrefs({ tomtomApiKey: null }); actions.rerender(); close(); },
+            }, 'Eigenen Key entfernen')
+          : null,
+        h('p.field__note', 'Bleibt nur auf diesem Gerät, verschlüsselt wie die übrigen Einstellungen — kein Teil der geteilten Kasse.'),
+      );
+    },
+  });
 }
 
 /**
