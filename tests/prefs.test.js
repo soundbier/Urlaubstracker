@@ -66,16 +66,19 @@ test('die Farbwahl steht zusätzlich unverschlüsselt an ihrer eigenen Stelle', 
 
   prefs.setPrefs({ theme: 'auto' });
   await new Promise((r) => setTimeout(r, 50));
-  assert.equal(store.has(THEME_KEY), false, '„automatisch“ hinterlässt keinen eigenen Eintrag');
+  // Auch „automatisch“ steht literal da — sonst ließe sich in index.html
+  // nicht unterscheiden zwischen „bewusst automatisch“ und „noch nie
+  // gewählt“ (dann gilt Hell, die Standardversion).
+  assert.equal(store.get(THEME_KEY), 'auto', '„automatisch“ steht genauso da wie hell/dunkel');
 });
 
 test('clearPrefs() räumt beide Stellen weg', async () => {
-  prefs.setPrefs({ tripRef: { mode: 'local' }, theme: 'light' });
+  prefs.setPrefs({ tripRef: { mode: 'local' }, theme: 'dark' });
   await new Promise((r) => setTimeout(r, 50));
 
   prefs.clearPrefs();
   assert.equal(store.has(PREFS_KEY), false);
   assert.equal(store.has(THEME_KEY), false);
   assert.equal(prefs.getPrefs().tripRef, null);
-  assert.equal(prefs.getPrefs().theme, 'auto');
+  assert.equal(prefs.getPrefs().theme, 'light', 'Hell ist die Standardversion');
 });

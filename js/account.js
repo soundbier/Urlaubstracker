@@ -11,10 +11,15 @@
  * über eine Person weiß, desto weniger kann darüber verlorengehen
  * (Art. 5 Abs. 1 lit. c DSGVO, Datenminimierung).
  */
-import { checkNewPassword } from './join.js';
-
 /** So lang darf ein Anzeigename werden — er steht in Listen, nicht in Aufsätzen. */
 export const MAX_DISPLAY_NAME = 40;
+
+/**
+ * Grenzen fürs Konto-Passwort — dieselben, die Firebase Authentication selbst
+ * durchsetzt (siehe `checkAccountPassword`).
+ */
+export const MIN_ACCOUNT_PASSWORD = 6;
+export const MAX_ACCOUNT_PASSWORD = 4096;
 
 /**
  * Groß-/Kleinschreibung und Leerzeichen wegräumen. Der lokale Teil einer
@@ -55,11 +60,24 @@ export function checkEmail(email) {
 }
 
 /**
- * Das Passwort fürs Konto. Dieselbe Messlatte wie beim Passwort einer neuen
- * Kasse (siehe `join.js`) — zwei verschiedene Vorstellungen davon, was ein
- * gutes Passwort ist, wären in einer App eine zu viel.
+ * Das Passwort fürs Konto — bewusst milder als das Passwort einer Kasse
+ * (siehe `join.js`, `checkNewPassword`). Dort wird aus Name und Passwort ein
+ * Nachweis errechnet, der in Firestore steht: ein schwaches Passwort ließe
+ * sich offline gegen Wortlisten vorrechnen, deshalb dort die höhere
+ * Mindestlänge, die Sperrliste naheliegender Passwörter und der
+ * Vorschlag-Knopf. Ein Konto-Passwort verlässt dieses Gerät dagegen nur als
+ * Anfrage an Firebase Authentication, das selbst gegen Erraten bremst
+ * (Ratenbegrenzung — siehe `describeAuthError`, `auth/too-many-requests`).
+ * Hier reicht deshalb, was Firebase Authentication selbst verlangt: eine
+ * Länge zwischen sechs und 4096 Zeichen, jedes Zeichen erlaubt.
  */
-export const checkAccountPassword = checkNewPassword;
+export function checkAccountPassword(password) {
+  const value = String(password || '');
+  if (!value.trim()) return 'Bitte ein Passwort eintragen.';
+  if (value.length < MIN_ACCOUNT_PASSWORD) return `Das Passwort braucht mindestens ${MIN_ACCOUNT_PASSWORD} Zeichen.`;
+  if (value.length > MAX_ACCOUNT_PASSWORD) return `Das Passwort darf höchstens ${MAX_ACCOUNT_PASSWORD} Zeichen haben.`;
+  return null;
+}
 
 /** Taugt der Anzeigename? Gibt eine Meldung zurück, sonst `null`. */
 export function checkDisplayName(name) {

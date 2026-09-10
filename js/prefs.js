@@ -34,7 +34,10 @@ const DEFAULTS = {
   // nicht in die Datenbank, in der es geprüft wird.
   tripRef: null,
   myPersonId: null,     // wer sitzt an diesem Gerät
-  theme: 'auto',        // auto | light | dark
+  // Hell ist die Standardversion — unabhängig davon, was das Gerät für sich
+  // eingestellt hat. Wer das nicht will, wählt „Automatisch“ oder „Dunkel“
+  // unter „Mehr → Dieses Gerät“; beides bleibt vollwertig erreichbar.
+  theme: 'light',        // auto | light | dark
   // Was auf diesem Gerät zum Konto entschieden wurde: `null` heißt „noch
   // nicht gefragt“ (dann kommt die Anmeldemaske), 'local' heißt „nur auf
   // diesem Gerät, kein Konto“, 'account' heißt „hier meldet sich jemand an“.
@@ -46,9 +49,16 @@ const DEFAULTS = {
   accountChoice: null,  // null | 'local' | 'account'
 };
 
+/**
+ * Alle drei Werte kommen hierhin, auch „auto“ — nicht nur hell/dunkel. Ohne
+ * das ließe sich in `index.html` nicht unterscheiden zwischen „noch nie
+ * etwas gewählt“ (dann gilt Hell, die Standardversion) und „Automatisch
+ * bewusst gewählt“ (dann soll das Gerät entscheiden): beides sähe von dort
+ * aus wie ein fehlender Eintrag.
+ */
 function writeThemeMirror(theme) {
   try {
-    if (theme === 'light' || theme === 'dark') localStorage.setItem(THEME_KEY, theme);
+    if (theme === 'light' || theme === 'dark' || theme === 'auto') localStorage.setItem(THEME_KEY, theme);
     else localStorage.removeItem(THEME_KEY);
   } catch {
     /* egal — dann blitzt es beim nächsten Start eben einmal auf */

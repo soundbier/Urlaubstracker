@@ -576,7 +576,7 @@ function shareSplit(trip, save) {
  * dem anderen die Helligkeit umstellen.
  */
 function deviceGroup(actions) {
-  const current = getPrefs().theme || 'auto';
+  const current = getPrefs().theme || 'light';
   const label = (THEMES.find(([id]) => id === current) || THEMES[0])[1];
   const status = lock.status();
   const delay = (lock.DELAYS.find(([m]) => m === status.minutes) || lock.DELAYS[2])[1];
