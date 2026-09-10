@@ -1,6 +1,6 @@
 {
   "name": "urlaubstracker",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "description": "Gemeinsame Urlaubskasse als PWA: einzahlen, Tagesbudget sehen, Ausgaben eintragen.",
   "type": "module",
@@ -9,7 +9,7 @@
     "start": "node tools/serve.mjs",
     "build:firebase": "node tools/build-firebase.mjs",
     "check:deps": "node tools/check-deps.mjs",
-    "build": "node tools/write-firebase-config.mjs && npm test"
+    "build": "node tools/write-firebase-config.mjs && node tools/write-tomtom-config.mjs && npm test"
   },
   "//": "Zur Laufzeit hat die App keine Abhängigkeiten — vendor/firebase.js ist gebündelt und liegt im Repo. Was hier steht, baut genau dieses Bündel: die Fassung darin ist die Fassung, die ausgeliefert wird (siehe vendor/firebase.lock.json und tools/check-deps.mjs).",
   "devDependencies": {

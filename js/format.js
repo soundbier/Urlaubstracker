@@ -70,3 +70,19 @@ export function days(n) {
 export function plural(n, one, many) {
   return `${number(n)} ${n === 1 ? one : many}`;
 }
+
+/** „18 Min.“, „1 Std. 5 Min.“ — für Fahrzeiten (siehe `travel.js`). */
+export function duration(seconds) {
+  const totalMinutes = Math.round(Math.max(0, seconds || 0) / 60);
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (!h) return `${number(m)} Min.`;
+  return m ? `${number(h)} Std. ${number(m)} Min.` : `${number(h)} Std.`;
+}
+
+/** „12 km“, „850 m“ — für Fahrstrecken (siehe `travel.js`). */
+export function distanceKm(meters) {
+  const m = Math.max(0, meters || 0);
+  if (m < 1000) return `${number(m)} m`;
+  return `${number(m / 1000, 1)} km`;
+}

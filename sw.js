@@ -14,7 +14,7 @@
  * Beim Veröffentlichen: APP_VERSION hochzählen (und `data-version` in
  * index.html mitziehen, `npm test` prüft das).
  */
-const APP_VERSION = '2.7.0';
+const APP_VERSION = '2.8.0';
 const CACHE = `urlaubstracker-${APP_VERSION}`;
 
 const SHELL = [
@@ -26,6 +26,7 @@ const SHELL = [
   './js/calc.js',
   './js/dom.js',
   './js/format.js',
+  './js/travel.js',
   './js/ids.js',
   './js/join.js',
   './js/lock.js',
