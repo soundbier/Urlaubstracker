@@ -13,7 +13,7 @@ import { secureRead, secureWrite, secureRemove, SecureStorageError } from './sec
 
 const KEY = 'urlaubstracker.data.v1';
 
-const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
+const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] };
 
 /**
  * Gibt den gespeicherten Stand zurück — oder `EMPTY`, wenn nichts da ist,
@@ -34,6 +34,7 @@ async function load() {
       cashOuts: Array.isArray(raw.cashOuts) ? raw.cashOuts : [],
       planItems: Array.isArray(raw.planItems) ? raw.planItems : [],
       packItems: Array.isArray(raw.packItems) ? raw.packItems : [],
+      stays: Array.isArray(raw.stays) ? raw.stays : [],
       corrupted: false,
     };
   } catch (err) {
@@ -85,6 +86,7 @@ export class LocalBackend {
       cashOuts: [...this.data.cashOuts],
       planItems: [...this.data.planItems],
       packItems: [...this.data.packItems],
+      stays: [...this.data.stays],
     });
   }
 
@@ -114,7 +116,7 @@ export class LocalBackend {
   }
 
   async createTrip(trip) {
-    this.data = { trip, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
+    this.data = { trip, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] };
     await this._persist();
   }
 
@@ -124,7 +126,7 @@ export class LocalBackend {
   }
 
   async deleteTrip() {
-    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [] };
+    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] };
     try {
       secureRemove(KEY);
     } catch {
@@ -143,9 +145,11 @@ export class LocalBackend {
   async removePlanItem(id) { await this._remove('planItems', id); }
   async putPackItem(row) { await this._put('packItems', row); }
   async removePackItem(id) { await this._remove('packItems', id); }
+  async putStay(row) { await this._put('stays', row); }
+  async removeStay(id) { await this._remove('stays', id); }
 
-  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
-    this.data = { trip, contributions, expenses, cashOuts, planItems, packItems };
+  async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [], stays = [] }) {
+    this.data = { trip, contributions, expenses, cashOuts, planItems, packItems, stays };
     await this._persist();
   }
 }

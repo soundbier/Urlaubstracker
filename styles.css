@@ -734,6 +734,27 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .daygroup__open .icon { flex: none; color: var(--text-faint); transform: rotate(-90deg); }
 .daygroup__open:active .daygroup__title { color: var(--accent); }
 
+/*
+ * Die Unterkunft dieses Tages, falls hinterlegt: eine schmale Zeile, blass
+ * wie jede Meta-Auskunft hier — sonst würde sie bei mehreren Tagen mit
+ * derselben Unterkunft lauter als der Tag selbst. Ohne Eintrag steht hier ein
+ * ebenso blasser Vorschlag statt einer Lücke.
+ */
+.daygroup__stay {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 2px 0 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+}
+.daygroup__stay .icon { flex: none; }
+.daygroup__stay span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .daygroup__sub { font-size: var(--fs-xs); color: var(--text-faint); }
 .daygroup__sub.is-over { color: var(--text-muted); font-weight: 500; }
 .daygroup__total { font-weight: 600; }

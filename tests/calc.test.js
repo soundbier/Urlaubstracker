@@ -9,7 +9,7 @@ import {
   tripPhase, POT, MAX_PEOPLE, PERSON_COLORS, nextPersonColor, personEntryCount,
   normalizeShares, averageShare,
   cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
-  planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip,
+  planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip, stayForDate,
   planCategory, planSub, planSubLabel, planSubs, planExpenseCategory,
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
   packSub, packSubLabel, packSubs, packQty, packOverview,
@@ -577,6 +577,27 @@ test('Tagesfortschritt im Reiseplan zählt über planItemDone, nicht über das e
   ];
   assert.deepEqual(planDayProgress(items, expenseById), { done: 2, total: 3 });
   assert.deepEqual(planDayProgress([], expenseById), { done: 0, total: 0 });
+});
+
+test('Die Unterkunft eines Tages gilt für ihren ganzen Zeitraum, nicht nur für den Anreisetag', () => {
+  const stays = [
+    { id: 's1', name: 'Hotel Fjord', startDate: '2026-07-01', endDate: '2026-07-03' },
+    { id: 's2', name: 'Hütte im Wald', startDate: '2026-07-04', endDate: '2026-07-06' },
+  ];
+  assert.equal(stayForDate(stays, '2026-07-01')?.id, 's1', 'Anreisetag');
+  assert.equal(stayForDate(stays, '2026-07-02')?.id, 's1', 'ein Tag mittendrin');
+  assert.equal(stayForDate(stays, '2026-07-03')?.id, 's1', 'Abreisetag zählt noch dazu');
+  assert.equal(stayForDate(stays, '2026-07-04')?.id, 's2', 'die nächste Unterkunft beginnt');
+  assert.equal(stayForDate(stays, '2026-06-30'), null, 'vor jeder Unterkunft ist keine hinterlegt');
+  assert.equal(stayForDate(stays, '2026-07-10'), null, 'nach der letzten Unterkunft ebenso');
+});
+
+test('Überschneiden sich zwei Unterkünfte an einem Tag, gewinnt die zuletzt begonnene', () => {
+  const stays = [
+    { id: 's1', name: 'Altes Hotel', startDate: '2026-07-01', endDate: '2026-07-05' },
+    { id: 's2', name: 'Neues Hotel', startDate: '2026-07-03', endDate: '2026-07-08' },
+  ];
+  assert.equal(stayForDate(stays, '2026-07-03')?.id, 's2', 'am Wechseltag zählt die genauere, spätere Angabe');
 });
 
 test('Der Reiseplan hat eigene Kategorien, unabhängig von den Ausgaben', () => {

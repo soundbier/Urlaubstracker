@@ -210,6 +210,39 @@ test('Sorte und Anzahl kommen geprüft zurück', () => {
   ]);
 });
 
+test('Unterkünfte reisen mit der Sicherung — über ihren ganzen Zeitraum', () => {
+  const stays = [
+    { id: 's1', name: 'Hotel Fjord', address: 'Strandvegen 1, 6001 Ålesund', startDate: '2026-07-01', endDate: '2026-07-03', note: 'Buchungsnr. 4711' },
+    { id: 's2', name: 'Hütte im Wald', address: '', startDate: '2026-07-04', endDate: '2026-07-04', note: '' },
+  ];
+  const back = parseImport(buildExport({ trip: TRIP, contributions: [], expenses: [], stays }));
+  assert.deepEqual(back.stays, stays);
+});
+
+test('Import weist eine Unterkunft ohne Namen oder mit verdrehtem Zeitraum ab', () => {
+  const back = parseImport(buildExport({
+    trip: TRIP,
+    contributions: [],
+    expenses: [],
+    stays: [
+      { id: 's1', name: '  ', address: '', startDate: '2026-07-01', endDate: '2026-07-03', note: '' },
+      { id: 's2', name: 'Hotel Fjord', address: '', startDate: '2026-07-05', endDate: '2026-07-01', note: '' },
+      { id: 's3', name: 'Gültige Hütte', address: '', startDate: '2026-07-06', endDate: '2026-07-06', note: '' },
+    ],
+  }));
+  assert.deepEqual(back.stays.map((s) => s.id), ['s3']);
+});
+
+test('CSV: eine Unterkunft steht mit ihrem Anreisetag und dem Zeitraum in der Notiz', () => {
+  const csv = buildCsv({
+    trip: TRIP,
+    contributions: [],
+    expenses: [],
+    stays: [{ id: 's1', name: 'Hotel Fjord', address: 'Strandvegen 1', startDate: '2026-07-01', endDate: '2026-07-03', note: '' }],
+  });
+  assert.ok(csv.includes('"Unterkunft";"2026-07-01";"";"";"";"";"Hotel Fjord · Strandvegen 1 · bis 2026-07-03"'));
+});
+
 test('CSV: die Packliste steht als eigene Art dabei — dafür druckt man sie', () => {
   const csv = buildCsv({
     trip: TRIP,

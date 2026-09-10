@@ -8,7 +8,7 @@ import { money, days, compactDate } from './format.js';
 import { toast, confirmSheet, promptSheet, closeAllSheets, hideToast } from './ui/sheet.js';
 import * as lock from './lock.js';
 import { lockScreen } from './ui/lock-screen.js';
-import { expenseSheet, contributionSheet, cashOutSheet, planItemSheet, packItemSheet } from './ui/entry-sheets.js';
+import { expenseSheet, contributionSheet, cashOutSheet, planItemSheet, staySheet, packItemSheet } from './ui/entry-sheets.js';
 import { renderToday } from './views/today.js';
 import { renderFinances, financePane, setFinancePane } from './views/finances.js';
 import { renderSettings } from './views/settings.js';
@@ -314,6 +314,32 @@ const actions = {
           await store.updatePlanItem(item.id, { done: false });
           if (linked?.planned) await store.updateExpense(linked.id, { planned: true, fromPlan: false, date: linked.date });
         });
+      }
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  async addStay(defaults = {}) {
+    const result = await staySheet({ defaults });
+    if (result?.action !== 'save') return;
+    try {
+      const row = await store.addStay(result.values);
+      undoable(`„${row.name}“ eingetragen`, () => store.deleteStay(row.id));
+    } catch (err) {
+      toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
+    }
+  },
+
+  async editStay(stay) {
+    const result = await staySheet({ stay });
+    if (!result) return;
+    try {
+      if (result.action === 'save') {
+        await store.updateStay(stay.id, result.values);
+      } else if (result.action === 'delete') {
+        const ok = await confirmSheet({ title: 'Unterkunft löschen?', confirmLabel: 'Löschen', danger: true });
+        if (ok) await store.deleteStay(stay.id);
       }
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });

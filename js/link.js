@@ -56,7 +56,7 @@ export function clearInviteFromLocation() {
 }
 
 /** Vollständige Sicherungskopie als JSON-Datei. */
-export function buildExport({ trip, contributions, expenses, cashOuts = [], planItems = [], packItems = [] }) {
+export function buildExport({ trip, contributions, expenses, cashOuts = [], planItems = [], packItems = [], stays = [] }) {
   return JSON.stringify(
     {
       format: 'urlaubstracker',
@@ -68,6 +68,7 @@ export function buildExport({ trip, contributions, expenses, cashOuts = [], plan
       cashOuts,
       planItems,
       packItems,
+      stays,
     },
     null,
     2,
@@ -95,6 +96,7 @@ export function parseImport(text) {
     [data.cashOuts, 'Auszahlungen'],
     [data.planItems, 'Programmpunkte'],
     [data.packItems, 'Packlisten-Einträge'],
+    [data.stays, 'Unterkünfte'],
   ]) {
     if (Array.isArray(list) && list.length > MAX_IMPORT_ROWS) {
       throw new Error(`Die Datei enthält zu viele ${label} für eine Sicherung.`);
@@ -186,6 +188,19 @@ export function parseImport(text) {
       };
     });
 
+  // Eine Unterkunft hat wie die Packliste weder Betrag noch einen einzelnen
+  // Tag — dafür einen Zeitraum. Ohne Namen oder mit einem Ende vor dem Anfang
+  // wäre der Eintrag zu nichts mehr zu gebrauchen, also fliegt er raus statt
+  // kaputt weiterzureisen.
+  const stays = (Array.isArray(data.stays) ? data.stays : [])
+    .filter((s) => s && typeof s.id === 'string' && s.id && String(s.name || '').trim() && isValidDate(s.startDate) && isValidDate(s.endDate) && s.endDate >= s.startDate)
+    .map((s) => ({
+      ...s,
+      name: String(s.name).trim(),
+      address: String(s.address || '').trim(),
+      note: String(s.note || '').trim(),
+    }));
+
   return {
     trip: {
       ...t,
@@ -201,11 +216,12 @@ export function parseImport(text) {
     expenses,
     planItems,
     packItems,
+    stays,
   };
 }
 
 /** Ausgaben als CSV, für Tabellenkalkulationen. */
-export function buildCsv({ trip, expenses, contributions, cashOuts = [], planItems = [], packItems = [] }) {
+export function buildCsv({ trip, expenses, contributions, cashOuts = [], planItems = [], packItems = [], stays = [] }) {
   const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
   const money = (cents) => (cents / 100).toFixed(2).replace('.', ',');
   const personName = (id) => trip.people.find((p) => p.id === id)?.name || 'Unbekannt';
@@ -242,6 +258,13 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
       'Programm', p.date, zeit, linked ? money(linked.amount) : '',
       planCategoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,
     ].map(esc).join(';'));
+  }
+  // Eine Unterkunft steht mit ihrem Anreisetag in der Datumsspalte — der
+  // Zeitraum selbst gehört, wie bei der Packliste die Merkmale, in die Notiz.
+  for (const s of [...stays].sort((a, b) => (a.startDate < b.startDate ? -1 : 1))) {
+    const zeitraum = s.endDate !== s.startDate ? `bis ${s.endDate}` : '';
+    const notiz = [s.name, s.address, zeitraum, s.note].filter(Boolean).join(' · ');
+    lines.push(['Unterkunft', s.startDate, '', '', '', '', notiz].map(esc).join(';'));
   }
   // Die Packliste hat in dieser Tabelle keine Spalte für sich: kein Datum,
   // kein Betrag. Sie steht trotzdem drin, weil genau dafür jemand exportiert —

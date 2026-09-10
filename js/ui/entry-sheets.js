@@ -3,12 +3,12 @@ import { h, icon, replace } from '../dom.js';
 import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
 import {
-  CATEGORIES, POT, parseAmount, todayISO, addDays, cashPayerFor, isCashPayer, cashPayerPerson,
+  CATEGORIES, POT, parseAmount, todayISO, addDays, isValidDate, daysInclusive, cashPayerFor, isCashPayer, cashPayerPerson,
   PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX, PACK_SCOPES,
   packCategory, packStatus, packBag, packSub, packSubs, packQty, packItemShared,
   PLAN_CATEGORIES, planSub, planSubs,
 } from '../calc.js';
-import { money, dayLabel, fullDate } from '../format.js';
+import { money, days, dayLabel, fullDate } from '../format.js';
 
 /**
  * Der zuletzt gewählte Zahler — nur für diese Sitzung, bewusst nicht in den
@@ -497,8 +497,13 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
   const title = h('input.field__input', { type: 'text', value: planItem?.title || '', placeholder: 'z. B. Trollstigen', maxlength: 120, enterkeyhint: 'next' });
   const time = h('input.field__input', { type: 'time', value: planItem?.time || '' });
   const endTime = h('input.field__input', { type: 'time', value: planItem?.endTime || '' });
-  const location = h('input.field__input', { type: 'text', value: planItem?.location || '', placeholder: 'z. B. Altstadt, Hafenpromenade', maxlength: 120, enterkeyhint: 'next' });
-  const note = h('input.field__input', { type: 'text', value: planItem?.note || '', placeholder: 'Notiz, Adresse, Reservierung', maxlength: 120, enterkeyhint: 'done' });
+  // Eine echte Adresse statt eines bloßen Stichworts — nicht nur, weil sie
+  // sich so leichter wiederfindet, sondern weil sie perspektivisch als Ziel
+  // für eine Fahrzeitberechnung taugen soll (siehe `staySheet`, mit derselben
+  // Begründung). Ein Stichwort wie „Altstadt“ bleibt trotzdem möglich, wird
+  // nur nicht mehr als Beispiel vorgeschlagen.
+  const location = h('input.field__input', { type: 'text', value: planItem?.location || '', placeholder: 'z. B. Museumsplatz 5, 80538 München', maxlength: 160, enterkeyhint: 'next' });
+  const note = h('input.field__input', { type: 'text', value: planItem?.note || '', placeholder: 'Notiz, Reservierung', maxlength: 120, enterkeyhint: 'done' });
   const amount = amountField(linkedExpense?.amount || 0, trip.currency);
 
   const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
@@ -584,12 +589,95 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
           h('label.field', h('span.field__label', 'Von (optional)'), time),
           h('label.field', h('span.field__label', 'Bis (optional)'), endTime),
         ),
-        field('Ort (optional)', location),
+        field('Ort / Adresse (optional)', location),
         h('div.field',
           h('span.field__label', 'Kosten (optional)'),
           costBody,
           costNote,
         ),
+        field('Notiz', note),
+      );
+      const footer = h('div.entry__actions',
+        editing ? h('button.btn.btn--ghost.btn--danger', { type: 'button', onclick: () => close({ action: 'delete' }) }, icon('trash', 19), 'Löschen') : null,
+        h('button.btn.btn--primary.btn--wide', { type: 'submit', form: formId }, editing ? 'Speichern' : 'Eintragen'),
+      );
+      return { body, footer };
+    },
+  });
+}
+
+/**
+ * Unterkunft anlegen oder bearbeiten: wo übernachtet die Gruppe, und von wann
+ * bis wann. Anders als ein Programmpunkt gilt sie nicht für einen einzelnen
+ * Tag, sondern für einen Zeitraum — dieselbe Unterkunft steht dann an jedem
+ * Tag dazwischen im Reiseplan (siehe `views/plan.js`), ohne dass man sie
+ * mehrfach einträgt.
+ *
+ * Die Adresse ist der eigentliche Grund für dieses Feld: perspektivisch soll
+ * von hier aus die Fahrzeit zum ersten Programmpunkt des Tages berechnet
+ * werden (eine externe Routen-API, noch nicht angebunden) — dafür braucht es
+ * eine echte Adresse, kein bloßes Stichwort wie beim Ort eines Programmpunkts.
+ */
+export function staySheet({ stay = null, defaults = {} } = {}) {
+  const editing = Boolean(stay);
+  let start = stay?.startDate || defaults.date || todayISO();
+  let end = stay?.endDate || defaults.date || start;
+  const name = h('input.field__input', { type: 'text', value: stay?.name || '', placeholder: 'z. B. Hotel Sonne', maxlength: 120, enterkeyhint: 'next' });
+  const address = h('input.field__input', { type: 'text', value: stay?.address || '', placeholder: 'z. B. Seestraße 12, 8280 Kreuzlingen', maxlength: 200, enterkeyhint: 'next' });
+  const note = h('input.field__input', { type: 'text', value: stay?.note || '', placeholder: 'Buchungsnummer, Zimmer, Ansprechpartner', maxlength: 120, enterkeyhint: 'done' });
+
+  return openSheet({
+    title: editing ? 'Unterkunft bearbeiten' : 'Unterkunft eintragen',
+    fullHeight: true,
+    build: (close) => {
+      const formId = nextFormId();
+      const nameError = h('p.field__error');
+      const rangeNote = h('p.field__note');
+      const rangeError = h('p.field__error');
+
+      const sync = () => {
+        endInput.min = start;
+        rangeNote.textContent = end >= start ? days(daysInclusive(start, end)) : '';
+        rangeError.textContent = end < start ? 'Das Ende liegt vor dem Anfang.' : '';
+      };
+
+      const startInput = h('input.field__input', { type: 'date', value: start, onchange: (e) => {
+        if (!isValidDate(e.target.value)) return;
+        start = e.target.value;
+        // Mitziehen statt meckern: wer den Anfang nach hinten schiebt, meint
+        // meistens den ganzen Aufenthalt, nicht einen Zeitraum mit negativer
+        // Länge (wie bei „Zeitraum“ in den Einstellungen).
+        if (end < start) { end = start; endInput.value = end; }
+        sync();
+      } });
+      const endInput = h('input.field__input', { type: 'date', value: end, min: start, onchange: (e) => {
+        if (!isValidDate(e.target.value)) return;
+        end = e.target.value;
+        sync();
+      } });
+      sync();
+
+      const save = () => {
+        const n = name.value.trim();
+        if (!n) {
+          nameError.textContent = 'Bitte einen Namen eingeben';
+          name.focus();
+          return;
+        }
+        if (end < start) return;
+        nameError.textContent = '';
+        close({ action: 'save', values: { name: n, address: address.value.trim(), startDate: start, endDate: end, note: note.value } });
+      };
+
+      const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
+        h('label.field', h('span.field__label', 'Name'), name, nameError),
+        h('div.field__pair',
+          h('label.field', h('span.field__label', 'Von'), startInput),
+          h('label.field', h('span.field__label', 'Bis'), endInput),
+        ),
+        rangeNote,
+        rangeError,
+        field('Adresse', address),
         field('Notiz', note),
       );
       const footer = h('div.entry__actions',

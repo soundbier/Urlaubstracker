@@ -34,18 +34,18 @@ const day = 86400000;
  * Kopie ablegen. Gibt `false` zurück, wenn das nicht geklappt hat — die
  * Oberfläche sagt dann, dass es nur die Datei von Hand gibt.
  */
-export async function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [] }) {
+export async function keepCopy({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [], stays = [] }) {
   if (!trip) return false;
   try {
-    const json = buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems });
+    const json = buildExport({ trip, contributions, expenses, cashOuts, planItems, packItems, stays });
     if (json.length > MAX_CHARS) return false;
     await secureWrite(KEY, {
       savedAt: Date.now(),
       name: trip.name || 'Urlaubskasse',
       // Was hier gezählt wird, steht der Person auf dem Schirm, die gerade
       // gelöscht hat — es muss also alles sein, was verloren ginge, nicht nur
-      // das Geld. Reiseplan und Packliste zählen mit.
-      entries: contributions.length + expenses.length + cashOuts.length + planItems.length + packItems.length,
+      // das Geld. Reiseplan, Packliste und Unterkünfte zählen mit.
+      entries: contributions.length + expenses.length + cashOuts.length + planItems.length + packItems.length + stays.length,
       json,
     });
     return true;
