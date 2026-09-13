@@ -46,6 +46,11 @@ function centsToRaw(cents) {
  * Auf dem Handy ist die Systemtastatur für Beträge unangenehm: sie verdeckt
  * das halbe Sheet und der Komma-Punkt sitzt je nach Layout woanders. Diese
  * hier hat große Ziffern und genau eine Komma-Taste.
+ *
+ * Am Rechner gilt das Gegenteil: dort liegt die Tastatur ohnehin unter den
+ * Händen, und zwölf Ziffern mit der Maus anzuklicken ist der Umweg. Das Feld
+ * hört deshalb zusätzlich auf echte Tastendrücke (siehe `onKey`) — das
+ * Ziffernfeld bleibt trotzdem stehen, es ist am Handy der einzige Weg.
  */
 function amountField(initialCents, currency) {
   let raw = centsToRaw(initialCents);
@@ -89,9 +94,40 @@ function amountField(initialCents, currency) {
     key('', 'del', 'key--muted'),
   );
 
+  const el = h('div.amount', h('div.amount__row', display, h('span.amount__cur', currency === 'EUR' ? '€' : currency)), hint, pad);
+
+  /*
+   * Der Zuhörer hängt am Dokument, nicht am Feld: in einer frisch geöffneten
+   * Maske ist nichts ausgewählt, und ein Tastendruck landet dann nirgendwo,
+   * wo dieses Feld ihn mitbekäme.
+   *
+   * Zwei Absicherungen. Was in einem echten Eingabefeld getippt wird (Titel,
+   * Notiz), geht diesen Weg nicht — sonst stünde jede Ziffer aus dem Titel
+   * zusätzlich im Betrag. Und ist die Maske wieder zu, trägt sich der Zuhörer
+   * beim nächsten Tastendruck selbst aus; das erspart jeder einzelnen Maske
+   * eine eigene Aufräumrunde für ein Feld, das sie nur benutzt.
+   */
+  const onKey = (e) => {
+    if (!el.isConnected) {
+      document.removeEventListener('keydown', onKey);
+      return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const target = e.target;
+    if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select'))) return;
+    if (/^\d$/.test(e.key)) press(e.key);
+    // Auf dem Ziffernblock liegt ein Punkt, im deutschen Betrag steht ein
+    // Komma — beide meinen hier dasselbe.
+    else if (e.key === ',' || e.key === '.') press(',');
+    else if (e.key === 'Backspace') press('del');
+    else return;
+    e.preventDefault();
+  };
+  document.addEventListener('keydown', onKey);
+
   render();
   return {
-    el: h('div.amount', h('div.amount__row', display, h('span.amount__cur', currency === 'EUR' ? '€' : currency)), hint, pad),
+    el,
     getCents: () => parseAmount(raw),
     focusHint: hint,
   };

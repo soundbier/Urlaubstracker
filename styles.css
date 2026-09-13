@@ -97,7 +97,17 @@
   --tap: 44px;
   --nav-h: 58px;
   --safe-b: env(safe-area-inset-bottom, 0px);
+  /* Wie viel Platz die Navigation am unteren Rand belegt. Auf breiten Schirmen
+     steht sie als Leiste links und belegt unten gar nichts mehr — dann ist
+     dieser Wert 0, und alles, was sonst über der Leiste endet (Ansicht, Knopf,
+     Meldung), rückt selbstverständlich nach unten. */
+  --nav-space: calc(var(--nav-h) + var(--safe-b));
   --page: min(560px, 100%);
+  /* Breite der Seitenleiste und der ganzen Hülle — erst ab dem Desktop-Umbruch
+     im Einsatz, aber hier definiert, damit die Rechnungen unten nur einen Namen
+     brauchen. */
+  --rail: 0px;
+  --shell: calc(var(--page) + var(--rail));
 
   --on-accent: #f8f7f3;
   --toast-bg: #26241f;
@@ -281,7 +291,7 @@ strong { font-weight: 600; }
 .main { flex: 1; }
 
 .view {
-  padding: var(--sp-1) var(--gutter) calc(var(--nav-h) + var(--safe-b) + 96px);
+  padding: var(--sp-1) var(--gutter) calc(var(--nav-space) + 96px);
   display: flex;
   flex-direction: column;
   /* Der wichtigste Hebel gegen „gedrängt“: viel Luft zwischen den Abschnitten,
@@ -348,11 +358,14 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 }
 .nav__item.is-active { color: var(--accent); }
 .nav__label { font-size: var(--fs-eyebrow); font-weight: 600; letter-spacing: 0.01em; }
+/* Steht nur in der Seitenleiste am Rechner (siehe unten) — am Handy wäre eine
+   fünfte Zelle im Vierer-Raster. */
+.nav__brand { display: none; }
 
 .fab {
   position: fixed;
-  right: max(var(--gutter), calc(50% - var(--page) / 2 + var(--gutter)));
-  bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
+  right: max(var(--gutter), calc(50% - var(--shell) / 2 + var(--gutter)));
+  bottom: calc(var(--nav-space) + 16px);
   z-index: 31;
   display: grid;
   place-items: center;
@@ -1730,7 +1743,7 @@ select.field__input { background-image: none; }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--nav-h) + var(--safe-b) + 80px);
+  bottom: calc(var(--nav-space) + 80px);
   transform: translate(-50%, 12px);
   z-index: 80;
   width: max-content;
@@ -1773,8 +1786,176 @@ select.field__input { background-image: none; }
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
 
+/* --------------------------------------------------------------- Zeigegerät */
+
+/*
+ * Was eine Maus braucht und ein Finger nicht: eine Rückmeldung, bevor geklickt
+ * wird. Die App ist für den Daumen entworfen — dort gibt es kein „darüber“,
+ * nur ein „gedrückt“ (siehe die `:active`-Regeln oben). Am Rechner fehlt genau
+ * dieser Zwischenschritt: ohne ihn sieht eine Liste aus wie gedruckt, und man
+ * probiert erst durch Klicken, was überhaupt anfassbar ist.
+ *
+ * Die Abfrage ist Absicht doppelt: `hover: hover` allein sagt auf manchen
+ * Tablets mit Stift ebenfalls „ja“, und dort bliebe der Zustand nach dem
+ * Antippen kleben. Erst zusammen mit `pointer: fine` ist wirklich ein
+ * Zeigegerät gemeint.
+ *
+ * Farben wie beim Drücken, nur schwächer: dasselbe Vokabular, eine Stufe
+ * leiser — sonst lernt man zwei Sprachen für dieselbe Zeile.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .row:hover,
+  .prow__open:hover,
+  .srow:hover:not(.srow--static),
+  .key:hover,
+  .stepper__btn:hover,
+  .icon-btn:hover { background: var(--surface-2); }
+
+  .btn:hover { border-color: var(--rule); }
+  .btn--primary:hover { filter: brightness(1.08); }
+  .btn--small:hover, .toast__action:hover { opacity: 0.75; }
+  /* Nur die nicht gewählten: eine gewählte Angabe trägt schon den Akzent, und
+     der soll unter dem Zeiger nicht wieder zu gewöhnlicher Tinte werden. */
+  .chip:not(.is-active):hover { border-color: var(--rule); color: var(--text); }
+
+  .erow__again:hover { color: var(--accent); opacity: 1; }
+  .prow__done:hover { background: var(--accent-soft); border-radius: var(--radius-sm); }
+  .daygroup__open:hover .daygroup__title,
+  .daygroup__stay:hover,
+  .syncdot:hover { color: var(--accent); }
+
+  .fab:hover { filter: brightness(1.08); }
+  .nav__item:hover { color: var(--text); }
+  .nav__item.is-active:hover { color: var(--accent); }
+}
+
+/* ------------------------------------------------------- Größere Schirme */
+
+/*
+ * Ab hier ist mehr Platz da, als eine Spalte braucht. Das Layout wächst in drei
+ * Stufen, und keine davon baut die Ansichten um: eine Kasse liest sich in einer
+ * Spalte, ob am Handy oder am Rechner. Breiter wird nur die Spalte selbst — und
+ * am Rechner wandert die Navigation an die Seite, wo ohnehin Platz frei liegt.
+ */
+
+/* Große Handys quer, Tablets hochkant: dieselbe Anordnung, nur mit mehr Luft. */
 @media (min-width: 620px) {
+  :root { --page: min(640px, 100%); }
   .app { border-inline: 1px solid var(--border); min-height: 100dvh; }
   .view { padding-inline: var(--sp-6); }
   .chips--scroll, .tabs { margin-inline: calc(var(--sp-6) * -1); padding-inline: var(--sp-6); }
+}
+
+/*
+ * Der Rechner. Die vier Reiter stehen nicht mehr als Leiste unter dem Daumen,
+ * sondern als Spalte links — unten am Bildschirmrand wären sie am Rechner weit
+ * weg vom Blick und weit weg vom Zeiger. Alles andere bleibt, wie es ist: die
+ * Hülle rückt um die Breite der Leiste nach rechts, damit beides zusammen
+ * mittig steht.
+ *
+ * `:has(> .nav)` ist der Schalter dafür: die Navigation gibt es nur, wenn eine
+ * Kasse offen ist — auf dem Anmelde-, Anfangs- und Sperrbildschirm steht die
+ * Hülle weiterhin allein und mittig, ohne leere Spalte daneben. Kennt ein
+ * Browser `:has()` nicht, bleibt es dort beim Handy-Bild: unschön, aber
+ * vollständig bedienbar.
+ *
+ * Die Grenze liegt bei 960 px, nicht schon bei 900: Leiste und Spalte sind
+ * zusammen 872 px breit, und darunter klebte die Hülle fast am Rand. Tablets
+ * quer (ab 1024 px) sind damit drin, hochkant bleiben sie beim Handy-Bild —
+ * dort ist der Daumen ohnehin näher als der Zeiger.
+ */
+@media (min-width: 960px) {
+  :root {
+    --page: 640px;
+    --rail: 232px;
+    --nav-space: 0px;
+  }
+
+  .app:has(> .nav) {
+    width: var(--shell);
+    padding-left: var(--rail);
+    /* Die Leiste bringt ihre eigene Trennlinie mit — sonst stünden hier zwei. */
+    border-left: 0;
+  }
+
+  /*
+   * Anmelden, Anfang, Kassenübersicht, Sperrbildschirm: alles Formulare, und
+   * die bleiben schmal. Eine Kasse anlegen heißt Name, Zeitraum, Namen
+   * eintippen — über 700 px auseinandergezogen stehen die Felder wie
+   * Steuerformular statt wie Notizbuch. Eine Liste verträgt Breite, ein
+   * Eingabefeld nicht.
+   */
+  .app:not(:has(> .nav)) { width: min(560px, 100%); }
+
+  .nav {
+    top: 0;
+    bottom: auto;
+    left: max(0px, calc(50% - var(--shell) / 2));
+    transform: none;
+    width: var(--rail);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: calc(env(safe-area-inset-top, 0px) + 18px) var(--sp-3) var(--sp-5);
+    overflow-y: auto;
+    border-top: 0;
+    /* Links wie rechts eine Linie: die Hülle hat ab 620 px zwei Ränder und
+       sieht damit aus wie ein Blatt Papier. Ohne die linke Linie hinge die
+       rechte in der Luft — die Leiste übernimmt sie, weil sie hier die linke
+       Kante der Hülle ist. */
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+
+  /* Am Handy trägt die Kopfzeile den Namen der Kasse und sonst nichts; am
+     Rechner bleibt oben in der Leiste Platz, und ein leeres Eck sieht aus wie
+     ein Fehler. Also steht dort, wo man ist. */
+  .nav__brand {
+    display: block;
+    padding: 0 var(--sp-3) var(--sp-5);
+    font-family: var(--font-display);
+    font-size: var(--fs-md);
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .nav__item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: var(--sp-3);
+    height: auto;
+    min-height: var(--tap);
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius);
+  }
+  .nav__label { font-size: var(--fs-sm); letter-spacing: 0; }
+  .nav__item.is-active { background: var(--accent-soft); }
+
+  /*
+   * Eingabemasken stehen am Rechner mittig im Bild statt am unteren Rand: ein
+   * Blatt, das von unten hereinfährt, ist die Geste eines Daumens, der von dort
+   * kommt. Mit einer Maus kommt niemand von unten — und ein 27-Zoll-Schirm
+   * schiebt die Maske sonst ans andere Ende des Sichtfelds.
+   */
+  .overlay { align-items: center; padding: var(--sp-6) var(--sp-4); }
+  .sheet {
+    width: min(560px, 100%);
+    max-height: min(86dvh, 760px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding-bottom: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+
+  /* Die Meldung gehört über die Spalte, nicht über die ganze Breite — sonst
+     steht sie zur Hälfte unter der Leiste. */
+  body:has(.app > .nav) .toast { left: calc(50% + var(--rail) / 2); }
+}
+
+/* Noch mehr Platz: die Spalte darf etwas breiter werden, aber nur etwas — eine
+   Zeile, die über den halben Schirm läuft, liest sich schlechter, nicht
+   besser. */
+@media (min-width: 1280px) {
+  :root { --page: 720px; }
 }
