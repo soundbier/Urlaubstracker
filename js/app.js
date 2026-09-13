@@ -571,6 +571,10 @@ function fab(route) {
 
 function nav(activeId) {
   return h('nav.nav', { 'aria-label': 'Hauptbereiche' },
+    // Sichtbar nur in der Seitenleiste am Rechner (siehe styles.css): dort
+    // bliebe oben sonst ein leeres Eck. Am Handy ausgeblendet — die vier
+    // Reiter stehen dort als Raster, und eine fünfte Zelle hätte keinen Platz.
+    h('p.nav__brand', 'Urlaubstracker'),
     ...TABS.map((t) =>
       h('button.nav__item', {
         type: 'button',
