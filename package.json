@@ -14,7 +14,7 @@
   "//": "Zur Laufzeit hat die App keine Abhängigkeiten — vendor/firebase.js ist gebündelt und liegt im Repo. Was hier steht, baut genau dieses Bündel: die Fassung darin ist die Fassung, die ausgeliefert wird (siehe vendor/firebase.lock.json und tools/check-deps.mjs).",
   "devDependencies": {
     "esbuild": "0.28.2",
-    "firebase": "12.18.0"
+    "firebase": "12.19.0"
   },
   "engines": {
     "node": ">=22"
