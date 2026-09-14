@@ -241,7 +241,7 @@ const actions = {
     if (result?.action !== 'save') return;
     try {
       const row = await store.addCashOut(result.values);
-      undoable(`${money(row.amount, state.trip.currency)} Bargeld ausgezahlt`, () => store.deleteCashOut(row.id));
+      undoable(`${money(row.amount, state.trip.currency)} vom Konto abgehoben`, () => store.deleteCashOut(row.id));
     } catch (err) {
       toast(err?.message || 'Konnte nicht gespeichert werden.', { type: 'error' });
     }
@@ -254,7 +254,7 @@ const actions = {
       if (result.action === 'save') {
         await store.updateCashOut(cashOut.id, result.values);
       } else if (result.action === 'delete') {
-        const ok = await confirmSheet({ title: 'Bargeld-Auszahlung löschen?', confirmLabel: 'Löschen', danger: true });
+        const ok = await confirmSheet({ title: 'Abhebung löschen?', confirmLabel: 'Löschen', danger: true });
         if (ok) await store.deleteCashOut(cashOut.id);
       }
     } catch (err) {

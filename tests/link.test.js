@@ -30,7 +30,7 @@ test('CSV enthält Klartext, keine internen Kennungen', () => {
   assert.ok(csv.includes('"Übernachtung"'), 'Kategorie steht ausgeschrieben da');
   assert.ok(csv.includes('"Essen & Trinken"'));
   assert.ok(!/"(stay|food|pot)"/.test(csv), 'keine internen Kennungen in der Tabelle');
-  assert.ok(csv.includes('"Gemeinsame Kasse"'));
+  assert.ok(csv.includes('"Gemeinsames Konto"'));
   assert.ok(csv.includes('"Kim"'));
   assert.ok(csv.includes('"42,50"'), 'Beträge mit Komma, wie Excel sie hier erwartet');
   assert.ok(csv.startsWith('﻿'), 'BOM für die Umlaute');
@@ -105,7 +105,9 @@ test('Import füllt fehlende Angaben mit etwas Brauchbarem', () => {
 });
 
 test('Was exportiert wurde, lässt sich wieder einlesen', () => {
-  const contributions = [{ id: 'c1', personId: 'p1', amount: 80000, date: '2026-06-20', note: '' }];
+  // Ohne Ziel gilt das Konto — so stand jede Einzahlung da, bevor es das
+  // Bargeld als eigenen Topf gab. Beim Einlesen steht es dann ausdrücklich da.
+  const contributions = [{ id: 'c1', personId: 'p1', amount: 80000, date: '2026-06-20', note: '', target: 'pot' }];
   const expenses = [
     { id: 'e1', date: '2026-07-01', amount: 20000, category: 'stay', payer: POT, note: '', planned: false, fromPlan: false },
     { id: 'e2', date: '2026-07-08', amount: 12000, category: 'activity', payer: POT, note: 'Bootstour', planned: true, fromPlan: false },
@@ -117,6 +119,35 @@ test('Was exportiert wurde, lässt sich wieder einlesen', () => {
   assert.deepEqual(back.expenses, expenses);
   assert.equal(back.trip.id, TRIP.id);
   assert.deepEqual(back.trip.people, TRIP.people);
+});
+
+test('Eine Einzahlung ohne Ziel kommt als Konto-Einzahlung zurück', () => {
+  const back = parseImport(backup({
+    contributions: [
+      { id: 'c1', personId: 'p1', amount: 120000, date: '2026-06-20' },
+      { id: 'c2', personId: 'p2', amount: 10000, date: '2026-06-20', target: 'cash' },
+      { id: 'c3', personId: 'p2', amount: 5000, date: '2026-06-20', target: 'quatsch' },
+    ],
+  }));
+
+  assert.deepEqual(back.contributions.map((c) => c.target), ['pot', 'cash', 'pot'],
+    'nur „cash“ ist Bargeld; alles andere — auch Unsinn — ist das Konto');
+});
+
+test('CSV: bei einer Einzahlung steht dabei, in welchen Topf sie ging', () => {
+  const csv = buildCsv({
+    trip: TRIP,
+    expenses: [],
+    contributions: [
+      { id: 'c1', personId: 'p1', amount: 120000, date: '2026-06-20', note: 'Überweisung' },
+      { id: 'c2', personId: 'p2', amount: 10000, date: '2026-06-20', target: 'cash', note: '' },
+    ],
+    cashOuts: [{ id: 'co1', personId: 'p1', amount: 5000, date: '2026-07-03', note: '' }],
+  });
+
+  assert.ok(csv.includes('"Einzahlung";"2026-06-20";"";"1200,00";"Konto"'));
+  assert.ok(csv.includes('"Einzahlung";"2026-06-20";"";"100,00";"Bargeld"'));
+  assert.ok(csv.includes('"Bargeld abgehoben";"2026-07-03";"";"50,00";"Konto → Bargeld"'), 'die Abhebung ist ein Umzug, keine Einzahlung');
 });
 
 test('Der Reiseplan reist mit der Sicherung — auch ohne eigenen Betrag', () => {

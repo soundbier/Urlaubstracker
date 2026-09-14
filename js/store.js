@@ -1165,7 +1165,13 @@ export async function deletePackItem(id) {
 
 // ------------------------------------------------------------- Einzahlungen
 
-export async function addContribution({ personId, amount, date, note }) {
+/**
+ * Geld in die Reisekasse. `target` sagt, in welchen der beiden Töpfe: aufs
+ * gemeinsame Konto oder als Bargeld in die Tasche dieser Person (siehe
+ * `calc.contributionTarget`). Ohne Angabe aufs Konto — so stand jede
+ * Einzahlung da, bevor es das Bargeld als eigenen Topf gab.
+ */
+export async function addContribution({ personId, amount, date, note, target }) {
   const now = Date.now();
   const row = {
     id: newId(),
@@ -1173,6 +1179,7 @@ export async function addContribution({ personId, amount, date, note }) {
     amount,
     date: date || todayISO(),
     note: (note || '').trim(),
+    target: target === 'cash' ? 'cash' : POT,
     createdAt: now,
     updatedAt: now,
   };

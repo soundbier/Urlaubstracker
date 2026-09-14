@@ -7,6 +7,7 @@ import {
   PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX, PACK_SCOPES,
   packCategory, packStatus, packBag, packSub, packSubs, packQty, packItemShared,
   PLAN_CATEGORIES, planSub, planSubs,
+  CONTRIBUTION_TARGETS, contributionTarget,
 } from '../calc.js';
 import { money, days, dayLabel, fullDate } from '../format.js';
 
@@ -298,7 +299,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
   const amount = amountField(expense?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: expense?.note || '', placeholder: 'z. B. Abendessen am Hafen', maxlength: 120, enterkeyhint: 'done' });
 
-  const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
+  const payers = [{ id: POT, label: 'Konto', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
   // Welcher Chip aktiv ist: Bargeld ist derselbe Chip wie die Person, nur mit
   // dem Umschalter daneben — sonst stünde jede Person doppelt in der Reihe.
   const chipFor = (id) => (id === POT ? POT : cashPayerPerson(id) || id);
@@ -431,12 +432,16 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
   const editing = Boolean(contribution);
   let personId = contribution?.personId || defaults.personId || trip.people[0]?.id;
   let date = contribution?.date || defaults.date || todayISO();
+  // Wohin das Geld geht, ist die zweite Frage nach „wie viel“ — und die erste,
+  // die man falsch beantworten kann: dieselben 100 € sind auf dem Konto für
+  // alle da und in der Tasche nur für die eine Person unterwegs.
+  let target = contribution ? contributionTarget(contribution) : defaults.target || POT;
   const amount = amountField(contribution?.amount || 0, trip.currency);
   const note = h('input.field__input', { type: 'text', value: contribution?.note || '', placeholder: 'z. B. Überweisung vom 12.6.', maxlength: 120 });
 
   return openSheet({
     title: editing ? 'Einzahlung bearbeiten' : 'Geld eingezahlt',
-    subtitle: 'Was ist auf das gemeinsame Urlaubskonto gegangen?',
+    subtitle: 'Was ist in die Reisekasse gegangen — aufs Konto oder als Bargeld?',
     fullHeight: true,
     build: (close) => {
       const formId = nextFormId();
@@ -447,12 +452,25 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
           amount.focusHint.classList.add('is-error');
           return;
         }
-        close({ action: 'save', values: { amount: cents, date, personId, note: note.value } });
+        close({ action: 'save', values: { amount: cents, date, personId, note: note.value, target } });
       };
+
+      const targetNote = h('p.field__note');
+      const syncTargetNote = () => {
+        targetNote.textContent = target === 'cash'
+          ? 'Bargeld, das diese Person mitbringt und selbst dabeihat. Zählt zur Reisekasse wie das Geld auf dem Konto — nur eben in bar.'
+          : 'Geld auf dem gemeinsamen Urlaubskonto, aus dem alle bezahlen.';
+      };
+      syncTargetNote();
 
       const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
         field('Von wem?', chipRow(trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color })), personId, (id) => { personId = id; })),
+        h('div.field',
+          h('span.field__label', 'Wohin?'),
+          chipRow(CONTRIBUTION_TARGETS, target, (id) => { target = id; syncTargetNote(); }),
+          targetNote,
+        ),
         field('Wann?', dateRow(date, (iso) => { date = iso; }).el),
         field('Notiz', note),
       );
@@ -466,7 +484,12 @@ export function contributionSheet({ trip, contribution = null, defaults = {} }) 
 }
 
 /**
- * Bargeld aus der Kasse an eine Person ausgezahlt.
+ * Bargeld vom gemeinsamen Konto abgehoben.
+ *
+ * Kein neues Geld, nur ein Umzug zwischen den beiden Töpfen der Kasse: vom
+ * Konto in die Tasche einer Person. Wer Bargeld *mitbringt*, trägt das als
+ * Einzahlung mit Ziel „Als Bargeld“ ein (siehe `contributionSheet`) — das
+ * vergrößert die Kasse, dieses hier nicht.
  *
  * Anders als eine Einzahlung fließt hier nichts dazu — das Geld war schon in
  * der Kasse, es wechselt nur die Form. Deshalb zählt der Eintrag auch nicht
@@ -481,8 +504,8 @@ export function cashOutSheet({ trip, cashOut = null, defaults = {} }) {
   const note = h('input.field__input', { type: 'text', value: cashOut?.note || '', placeholder: 'z. B. vom Automaten geholt', maxlength: 120 });
 
   return openSheet({
-    title: editing ? 'Bargeld-Auszahlung bearbeiten' : 'Bargeld ausgezahlt',
-    subtitle: 'Wer hat wie viel Bargeld aus der Kasse bekommen?',
+    title: editing ? 'Abhebung bearbeiten' : 'Vom Konto abgehoben',
+    subtitle: 'Wer hat wie viel vom gemeinsamen Konto abgehoben?',
     fullHeight: true,
     build: (close) => {
       const formId = nextFormId();
@@ -542,7 +565,7 @@ export function planItemSheet({ trip, planItem = null, linkedExpense = null, def
   const note = h('input.field__input', { type: 'text', value: planItem?.note || '', placeholder: 'Notiz, Reservierung', maxlength: 120, enterkeyhint: 'done' });
   const amount = amountField(linkedExpense?.amount || 0, trip.currency);
 
-  const payers = [{ id: POT, label: 'Kasse', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
+  const payers = [{ id: POT, label: 'Konto', icon: 'wallet' }, ...trip.people.map((p) => ({ id: p.id, label: p.name, dot: p.color }))];
 
   return openSheet({
     title: editing ? 'Programmpunkt bearbeiten' : 'Was steht an?',

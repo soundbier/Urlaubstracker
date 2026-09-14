@@ -5,10 +5,11 @@ import {
   parseAmount, splitCents, allocateByShares,
   addDays, daysInclusive, dateRange, todayISO, isValidDate,
   computeBudget, dailySeries, settleUp, spentByCategory, groupByDay,
-  totalSpent, totalPlanned, plannedOnly, paidOnly,
+  totalSpent, totalPlanned, totalContributed, plannedOnly, paidOnly,
   tripPhase, POT, MAX_PEOPLE, PERSON_COLORS, nextPersonColor, personEntryCount,
   normalizeShares, averageShare,
-  cashBalances, cashPayerFor, isCashPayer, cashPayerPerson,
+  cashBalances, accountBalance, cashPayerFor, isCashPayer, cashPayerPerson,
+  contributionTarget, isCashContribution,
   planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip, stayForDate,
   planCategory, planSub, planSubLabel, planSubs, planExpenseCategory,
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
@@ -330,6 +331,68 @@ test('Bargeld-Zahler kodiert die Person im Wert', () => {
   assert.equal(cashPayerPerson(cashPayerFor('lukas')), 'lukas');
   assert.equal(cashPayerPerson('lukas'), null);
   assert.equal(cashPayerPerson(POT), null);
+});
+
+test('Das Ziel einer Einzahlung ist das Konto, solange nicht ausdrücklich Bargeld dasteht', () => {
+  assert.equal(contributionTarget({ target: 'cash' }), 'cash');
+  assert.equal(isCashContribution({ target: 'cash' }), true);
+  for (const c of [{}, { target: 'pot' }, { target: '' }, { target: 'quatsch' }, null, undefined]) {
+    assert.equal(contributionTarget(c), POT, `„${c?.target}“ ist kein Bargeld`);
+    assert.equal(isCashContribution(c), false);
+  }
+});
+
+test('Bargeld ist ein eigener Topf: mitgebrachtes Geld vergrößert die Kasse', () => {
+  // Der Fall, für den es die zwei Ziele gibt: 1200 € aufs Konto überwiesen und
+  // zusätzlich 100 € bar mitgenommen. Zusammen 1300 € Reisekasse — vorher
+  // musste man beides in eine Einzahlung rechnen und die 100 € danach wieder
+  // als Auszahlung herausbuchen.
+  const contributions = [
+    { id: 'c1', personId: 'marie', amount: 120000, date: '2026-06-20' },
+    { id: 'c2', personId: 'marie', amount: 10000, date: '2026-06-20', target: 'cash' },
+  ];
+  const trip = { ...TRIP, people: [TRIP.people[0]] };
+
+  assert.equal(totalContributed(contributions), 130000, 'beide Töpfe zusammen sind die Reisekasse');
+
+  const [marie] = cashBalances({ people: trip.people, contributions, expenses: [] });
+  assert.equal(marie.brought, 10000);
+  assert.equal(marie.paidOut, 0, 'vom Konto wurde nichts abgehoben');
+  assert.equal(marie.balance, 10000);
+
+  assert.equal(accountBalance({ contributions, expenses: [], cashOuts: [] }), 120000,
+    'auf dem Konto liegt nur, was auch dorthin überwiesen wurde');
+});
+
+test('Abheben vom Konto verschiebt nur, mitbringen legt dazu', () => {
+  const contributions = [
+    { id: 'c1', personId: 'marie', amount: 120000, date: '2026-06-20' },
+    { id: 'c2', personId: 'marie', amount: 10000, date: '2026-06-20', target: 'cash' },
+  ];
+  const cashOuts = [{ id: 'k1', personId: 'marie', amount: 5000, date: '2026-07-02' }];
+  const trip = { ...TRIP, people: [TRIP.people[0]] };
+
+  assert.equal(totalContributed(contributions), 130000, 'die Abhebung ist keine Einzahlung');
+
+  const [marie] = cashBalances({ people: trip.people, contributions, cashOuts, expenses: [] });
+  assert.equal(marie.brought, 10000);
+  assert.equal(marie.paidOut, 5000);
+  assert.equal(marie.balance, 15000, 'mitgebracht plus abgehoben liegt in der Tasche');
+  assert.equal(accountBalance({ contributions, expenses: [], cashOuts }), 115000, 'und fehlt so lange auf dem Konto');
+});
+
+test('Kontostand ist nicht dasselbe wie „in der Kasse“: privat Vorgestrecktes lief nie darüber', () => {
+  const contributions = [{ id: 'c1', personId: 'marie', amount: 100000, date: '2026-06-20' }];
+  const expenses = [
+    { id: 'e1', date: '2026-07-01', amount: 20000, category: 'stay', payer: POT },
+    { id: 'e2', date: '2026-07-02', amount: 4000, category: 'food', payer: 'marie' },
+  ];
+  const trip = { ...TRIP, people: [TRIP.people[0]] };
+
+  assert.equal(accountBalance({ contributions, expenses, cashOuts: [] }), 80000,
+    'nur die 200 € aus der Kasse sind vom Konto abgeflossen');
+  assert.equal(computeBudget({ trip, contributions, expenses, today: TODAY }).remaining, 76000,
+    'rechnerisch übrig ist weniger — die 40 € privat sind ausgegebenes Geld der Reise');
 });
 
 test('Bargeldbestand: Auszahlung rein, bar bezahlte Ausgabe raus', () => {
