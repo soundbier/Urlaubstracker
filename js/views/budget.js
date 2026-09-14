@@ -1,6 +1,6 @@
 /** Die Kasse: was reinkam, wie es sich verteilt, und wer am Ende was bekommt. */
 import { h, s, icon } from '../dom.js';
-import { computeBudget, dailySeries, settleUp, spentByCategory, cashBalances, todayISO } from '../calc.js';
+import { computeBudget, dailySeries, settleUp, spentByCategory, cashBalances, accountBalance, isCashContribution, todayISO } from '../calc.js';
 import { money, moneySigned, days, dayMonthShort } from '../format.js';
 import { stat, sectionTitle, contributionRow, cashOutRow, emptyState, bar, bufferLabel } from '../ui/parts.js';
 
@@ -40,49 +40,106 @@ export function renderBudget(state, actions) {
 
     b.total ? h('section.section', sectionTitle('Verlauf'), trendChart(trip, contributions, expenses, today, b)) : null,
 
-    h('section.section',
-      sectionTitle('Einzahlungen', h('button.btn.btn--small', { type: 'button', onclick: actions.addContribution }, icon('plus', 16), 'Eintragen')),
-      contributions.length
-        ? h('div',
-            h('div.list', ...contributions.map((c) => contributionRow(c, trip, actions.editContribution))),
-            h('div.split', ...trip.people.map((p) => {
-              const sum = contributions.filter((c) => c.personId === p.id).reduce((a, c) => a + c.amount, 0);
-              return h('div.split__item', h('span.dot', { style: { background: p.color } }), h('span.split__name', p.name), h('span.split__value', money(sum, cur)));
-            })),
-          )
-        : emptyState('Tragt ein, wer wie viel auf das gemeinsame Konto überwiesen hat.', 'Einzahlung eintragen', actions.addContribution),
-    ),
+    accountSection(trip, contributions, expenses, cashOuts, cur, actions),
 
-    trip.people.length > 1 ? cashSection(trip, cashOuts, expenses, cur, actions) : null,
+    cashSection(trip, contributions, cashOuts, expenses, cur, actions),
 
     expenses.length ? h('section.section', sectionTitle('Wofür'), categoryList(expenses, b.spent, cur)) : null,
   );
 }
 
-// -------------------------------------------------------------------- Bargeld
+// --------------------------------------------------------- Die beiden Töpfe
 
-/**
- * Wer noch wie viel Bargeld in der Tasche hat.
+/*
+ * Die Reisekasse hat zwei Töpfe, und jeder bekommt seinen eigenen Abschnitt:
+ * das gemeinsame Konto und das Bargeld, das die Leute dabeihaben. Vorher war
+ * Bargeld ein Ableger des Kontos — es konnte nur daraus abgehoben werden, und
+ * wer 1200 € überwiesen und 100 € bar mitgenommen hatte, musste 1300 €
+ * einzahlen und die 100 € danach wieder herausbuchen. Jetzt ist es eine
+ * Einzahlung wie jede andere, nur mit einem anderen Ziel (siehe
+ * `calc.contributionTarget`).
  *
- * Steht extra neben den Einzahlungen: eine Auszahlung ist keine Ausgabe (das
- * Geld ist ja noch da, nur eben in bar statt auf dem Konto) und würde deshalb
- * in keiner anderen Liste auftauchen. Ohne diese Übersicht wüsste am Ende
- * niemand mehr, wer noch Bargeld übrig hat und in die Kasse zurücklegen muss.
+ * Was wo steht, folgt derselben Trennung: eine Einzahlung erscheint in genau
+ * dem Topf, in den sie gegangen ist. Was jemand insgesamt beigesteuert hat,
+ * steht dafür weiterhin an einer Stelle zusammen — in der Abrechnung oben.
  */
-function cashSection(trip, cashOuts, expenses, cur, actions) {
-  const balances = cashBalances({ people: trip.people, cashOuts, expenses });
-  const relevant = balances.some((r) => r.paidOut || r.spent);
+
+function personDot(trip, personId) {
+  return h('span.dot', { style: { background: trip.people.find((p) => p.id === personId)?.color || 'var(--text-faint)' } });
+}
+
+function splitRow(trip, entries, cur) {
+  return h('div.split', ...entries.map(([personId, name, value]) =>
+    h('div.split__item', personDot(trip, personId), h('span.split__name', name), h('span.split__value', money(value, cur))),
+  ));
+}
+
+/** Das gemeinsame Konto: was darauf überwiesen wurde und was noch daraufliegt. */
+function accountSection(trip, contributions, expenses, cashOuts, cur, actions) {
+  const onAccount = contributions.filter((c) => !isCashContribution(c));
+  const left = accountBalance({ contributions, expenses, cashOuts });
 
   return h('section.section',
-    sectionTitle('Bargeld', h('button.btn.btn--small', { type: 'button', onclick: actions.addCashOut }, icon('plus', 16), 'Eintragen')),
-    relevant
+    sectionTitle('Gemeinsames Konto', h('button.btn.btn--small', { type: 'button', onclick: () => actions.addContribution() }, icon('plus', 16), 'Eintragen')),
+    onAccount.length
       ? h('div',
-          h('div.list', ...cashOuts.map((c) => cashOutRow(c, trip, actions.editCashOut))),
-          h('div.split', ...balances.map((r) =>
-            h('div.split__item', h('span.dot', { style: { background: trip.people.find((p) => p.id === r.personId)?.color } }), h('span.split__name', r.name), h('span.split__value', money(r.balance, cur))),
-          )),
+          h('div.list', ...onAccount.map((c) => contributionRow(c, trip, actions.editContribution))),
+          splitRow(trip, trip.people.map((p) => [
+            p.id,
+            p.name,
+            onAccount.filter((c) => c.personId === p.id).reduce((a, c) => a + c.amount, 0),
+          ]), cur),
+          // Der Kontostand ist etwas anderes als „In der Kasse“ oben: privat
+          // vorgestrecktes Geld ist nie über dieses Konto gelaufen.
+          h('p.note', `Auf dem Konto liegen noch ${money(left, cur)}.`),
         )
-      : emptyState('Nehmt ihr Bargeld aus der Kasse für unterwegs mit, steht hier, wer davon noch wie viel hat.', 'Bargeld ausgezahlt', actions.addCashOut),
+      : emptyState('Tragt ein, wer wie viel auf das gemeinsame Konto überwiesen hat.', 'Einzahlung eintragen', () => actions.addContribution()),
+  );
+}
+
+/**
+ * Bargeld: ein eigener Topf, kein Ableger des Kontos.
+ *
+ * Zwei Wege führen hinein, und sie bedeuten Verschiedenes. Mitgebrachtes
+ * Bargeld ist frisches Geld und vergrößert die Reisekasse; vom Konto
+ * abgehobenes ist nur ein Umzug zwischen den Töpfen. Deshalb steht das
+ * Mitbringen auf dem Knopf oben (der häufige Fall) und das Abheben als
+ * leisere Zeile darunter.
+ *
+ * Was zählt, ist am Ende der Bestand je Person: das Geld liegt in einer
+ * bestimmten Tasche, und nur wer sie dabeihat, kann damit zahlen.
+ */
+function cashSection(trip, contributions, cashOuts, expenses, cur, actions) {
+  const balances = cashBalances({ people: trip.people, contributions, cashOuts, expenses });
+  const brought = contributions.filter(isCashContribution);
+  const relevant = brought.length || cashOuts.length || balances.some((r) => r.spent);
+  const total = balances.reduce((a, r) => a + r.balance, 0);
+
+  const withdraw = h('button.btn.btn--ghost.btn--small', { type: 'button', onclick: actions.addCashOut },
+    icon('download', 16), 'Vom Konto abgehoben');
+
+  // Beide Zuflüsse in einer Liste, nach Datum: unterwegs interessiert die
+  // Reihenfolge, nicht die Bauart des Eintrags.
+  const rows = [
+    ...brought.map((c) => ({ date: c.date, createdAt: c.createdAt, node: () => contributionRow(c, trip, actions.editContribution) })),
+    ...cashOuts.map((c) => ({ date: c.date, createdAt: c.createdAt, node: () => cashOutRow(c, trip, actions.editCashOut) })),
+  ].sort((a, b) => (a.date === b.date ? (b.createdAt || 0) - (a.createdAt || 0) : a.date < b.date ? 1 : -1));
+
+  return h('section.section',
+    sectionTitle('Bargeld', h('button.btn.btn--small', { type: 'button', onclick: () => actions.addContribution({ target: 'cash' }) }, icon('plus', 16), 'Eintragen')),
+    relevant
+      ? h('div.stack',
+          h('div',
+            rows.length ? h('div.list', ...rows.map((r) => r.node())) : null,
+            splitRow(trip, balances.map((r) => [r.personId, r.name, r.balance]), cur),
+            h('p.note', `Zusammen ${money(total, cur)} bar dabei.`),
+          ),
+          withdraw,
+        )
+      : h('div.stack',
+          emptyState('Bargeld, das ihr mitnehmt, gehört genauso zur Reisekasse wie das Geld auf dem Konto — hier steht, wer wie viel davon dabeihat.', 'Bargeld eintragen', () => actions.addContribution({ target: 'cash' })),
+          withdraw,
+        ),
   );
 }
 
@@ -191,8 +248,6 @@ function settlement(trip, contributions, expenses, cashOuts, cur, phase = 'after
     return emptyState('Sobald Geld eingezahlt oder ausgegeben ist, steht hier, wer wem noch was schuldet.');
   }
 
-  const openCash = st.rows.filter((r) => r.cashBalance > 0);
-
   const table = h('div.settle',
     ...st.rows.map((r) =>
       h('div.settle__row',
@@ -208,34 +263,18 @@ function settlement(trip, contributions, expenses, cashOuts, cur, phase = 'after
     ),
   );
 
-  const names = (list) => list.map((p, i) => h('span', i ? ', ' : '', h('strong', p.name), ` ${money(p.amount, cur)}`));
-
-  const actions = [];
-  if (st.payouts.length && st.potBalance > 0) {
-    actions.push(h('li', `Vom gemeinsamen Konto (${money(st.potBalance, cur)}) zurück: `, ...names(st.payouts)));
-  }
-  if (st.topUps.length) {
-    actions.push(h('li',
-      `Auf dem gemeinsamen Konto fehlen ${money(-st.potBalance, cur)} — nachzahlen: `,
-      ...names(st.topUps),
-    ));
-  }
-  for (const t of st.transfers) {
-    actions.push(h('li', h('strong', t.from), ' überweist ', h('strong', money(t.amount, cur)), ' an ', h('strong', t.to), '.'));
-  }
-  // Rechnerisch gehört das noch der Kasse — solange es nicht zurück ist,
-  // stimmen die Beträge oben nur, wenn diese Person es auch wirklich beisteuert.
-  for (const r of openCash) {
-    actions.push(h('li', h('strong', r.name), ' hat noch ', h('strong', money(r.cashBalance, cur)), ' Bargeld übrig — das erst zurück in die Kasse.'));
-  }
-  if (!actions.length) actions.push(h('li', 'Alles ausgeglichen. Nichts mehr zu überweisen.'));
-
+  /*
+   * Kein Kasten mit Anweisungen mehr darunter.
+   *
+   * Er zählte auf, was die Tabelle schon sagt — nur in Sätzen, und mit einer
+   * Zeile je Person und Topf wurde er länger als die Tabelle selbst. Was zu
+   * tun ist, steht rechts an jeder Zeile: eine positive Zahl bekommt die
+   * Person zurück, eine negative legt sie nach. Seit Bargeld ein eigener Topf
+   * ist (siehe `cashSection`), galt außerdem sein wichtigster Satz nicht mehr —
+   * übriges Bargeld muss nicht erst „zurück in die Kasse“, es *ist* Kasse.
+   */
   return h('div.stack',
     table,
-    h('div.callout',
-      h('p.callout__title', 'Zum Ausgleich'),
-      h('ul.settle__todo', ...actions),
-      done ? null : h('p.settle__hint', 'Mitten im Urlaub ist das eine Momentaufnahme: jede Ausgabe verschiebt sie wieder.'),
-    ),
+    done ? null : h('p.settle__hint', 'Mitten im Urlaub ist das eine Momentaufnahme: jede Ausgabe verschiebt sie wieder.'),
   );
 }

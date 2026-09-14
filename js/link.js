@@ -10,6 +10,7 @@ import {
   CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson, MAX_PEOPLE,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packSub, packSubLabel, packQty,
   PLAN_CATEGORY_BY_ID, planSub, planSubLabel,
+  contributionTarget, isCashContribution,
 } from './calc.js';
 
 // Wie viele Zeilen eine Sicherung je Liste höchstens mitbringen darf. Eine
@@ -211,7 +212,10 @@ export function parseImport(text) {
     },
     // Einzahlungen und Auszahlungen ohne bekannte Person würden in der
     // Abrechnung Geld erfinden bzw. verschwinden lassen.
-    contributions: rows(data.contributions, (c) => knownPerson.has(c.personId)),
+    // Beim Ziel zählt nur, ob dort „Bargeld“ steht: alles andere ist das
+    // Konto, so wie jede Einzahlung aus der Zeit vor den zwei Töpfen.
+    contributions: rows(data.contributions, (c) => knownPerson.has(c.personId))
+      .map((c) => ({ ...c, target: contributionTarget(c) })),
     cashOuts: rows(data.cashOuts, (c) => knownPerson.has(c.personId)),
     expenses,
     planItems,
@@ -231,17 +235,19 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   const categoryLabel = (id) => (CATEGORY_BY_ID[id] || CATEGORY_BY_ID.other).label;
   const planCategoryLabel = (id) => (PLAN_CATEGORY_BY_ID[id] || PLAN_CATEGORY_BY_ID.other).label;
   const payerLabel = (payer) => {
-    if (payer === POT) return 'Gemeinsame Kasse';
+    if (payer === POT) return 'Gemeinsames Konto';
     if (isCashPayer(payer)) return `Bargeld (${personName(cashPayerPerson(payer))})`;
     return personName(payer);
   };
   const lines = [['Art', 'Datum', 'Zeit', 'Betrag', 'Kategorie', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
 
   for (const c of [...contributions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(['Einzahlung', c.date, '', money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
+    // Die Kategoriespalte steht bei Einzahlungen sonst leer — dort passt die
+    // Auskunft hin, in welchen der beiden Töpfe das Geld gegangen ist.
+    lines.push(['Einzahlung', c.date, '', money(c.amount), isCashContribution(c) ? 'Bargeld' : 'Konto', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const c of [...cashOuts].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(['Bargeld ausgezahlt', c.date, '', money(c.amount), '', personName(c.personId), c.note].map(esc).join(';'));
+    lines.push(['Bargeld abgehoben', c.date, '', money(c.amount), 'Konto → Bargeld', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const e of [...expenses].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     // Vorgemerktes steht mit eigener Art da — sonst zählte eine Tabelle Geld

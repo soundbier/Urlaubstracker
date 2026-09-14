@@ -4,7 +4,7 @@ import {
   CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone, MAX_PEOPLE,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packCategory, packStatus, packBag, packItemPacked,
   packSubLabel, packQty,
-  PLAN_CATEGORY_BY_ID, planSubLabel,
+  PLAN_CATEGORY_BY_ID, planSubLabel, isCashContribution,
 } from '../calc.js';
 import { money, dayLabel } from '../format.js';
 import { openSheet } from './sheet.js';
@@ -81,7 +81,10 @@ export function disclosure(title, summaryEl, ...body) {
 }
 
 export function payerLabel(trip, payer) {
-  if (payer === POT) return 'Kasse';
+  // „Konto“, nicht „Kasse“: die Kasse sind seit den zwei Töpfen beide
+  // zusammen (siehe `calc.contributionTarget`) — bezahlt wurde aber von
+  // genau einem davon.
+  if (payer === POT) return 'Konto';
   const personId = cashPayerPerson(payer) ?? payer;
   const name = trip.people.find((p) => p.id === personId)?.name || 'Unbekannt';
   // Bar bezahlt ist der Kasse ihr Geld, nur unterwegs in der Tasche — anders
@@ -287,7 +290,9 @@ export function contributionRow(contribution, trip, onClick) {
     h('span.row__icon.row__icon--person', h('span.dot', { style: { background: person?.color || 'var(--text-faint)' } })),
     h('span.row__main',
       h('span.row__title', person?.name || 'Unbekannt'),
-      h('span.row__sub', contribution.note || 'Einzahlung'),
+      // Ohne Notiz sagt die Zeile wenigstens, in welchen Topf das Geld ging —
+      // beide Listen stehen untereinander auf derselben Seite.
+      h('span.row__sub', contribution.note || (isCashContribution(contribution) ? 'Bargeld mitgebracht' : 'Aufs Konto überwiesen')),
     ),
     h('span.row__amount.row__amount--in', `+ ${money(contribution.amount, trip.currency)}`),
   );
@@ -300,7 +305,7 @@ export function cashOutRow(cashOut, trip, onClick) {
     h('span.row__icon.row__icon--person', h('span.dot', { style: { background: person?.color || 'var(--text-faint)' } })),
     h('span.row__main',
       h('span.row__title', person?.name || 'Unbekannt'),
-      h('span.row__sub', cashOut.note || 'Bargeld ausgezahlt'),
+      h('span.row__sub', cashOut.note || 'Vom Konto abgehoben'),
     ),
     h('span.row__amount', money(cashOut.amount, trip.currency)),
   );

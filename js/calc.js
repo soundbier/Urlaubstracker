@@ -41,6 +41,31 @@ export const isCashPayer = (payer) => typeof payer === 'string' && payer.startsW
 export const cashPayerPerson = (payer) => (isCashPayer(payer) ? payer.slice(CASH_PREFIX.length) : null);
 
 /**
+ * Wohin eine Einzahlung geht: aufs gemeinsame Konto oder ins Bargeld der
+ * Person, die sie mitbringt.
+ *
+ * Bargeld ist damit ein zweiter Topf neben dem Konto, kein Ableger davon.
+ * Vorher konnte Bargeld nur *aus* dem Konto kommen (siehe `cashOuts`), und wer
+ * 1200 € überwiesen und 100 € bar mitgenommen hatte, musste beides in eine
+ * Einzahlung von 1300 € zusammenrechnen und die 100 € danach noch einmal als
+ * Auszahlung eintragen, damit klar war, wer sie in der Tasche hat. Jetzt sind
+ * es zwei Einzahlungen mit zwei Zielen — und die Reisekasse ist die Summe aus
+ * beiden Töpfen.
+ *
+ * Abheben vom gemeinsamen Konto gibt es weiterhin (`cashOuts`): das ist dann
+ * wirklich nur noch ein Umzug zwischen den Töpfen, keine neue Einzahlung.
+ *
+ * Ohne Angabe zählt eine Einzahlung aufs Konto — so stand jede Einzahlung aus
+ * der Zeit vor den zwei Töpfen schon immer da.
+ */
+export const CONTRIBUTION_TARGETS = [
+  { id: POT, label: 'Aufs Konto', icon: 'wallet' },
+  { id: 'cash', label: 'Als Bargeld', icon: 'cash' },
+];
+export const contributionTarget = (c) => (c?.target === 'cash' ? 'cash' : POT);
+export const isCashContribution = (c) => contributionTarget(c) === 'cash';
+
+/**
  * Wie viele Personen eine Kasse haben kann.
  *
  * Die Zahl ist keine technische Grenze, sondern eine des Bildschirms: bei mehr
@@ -944,21 +969,45 @@ export function dailySeries({ trip, contributions = [], expenses = [], today = t
 // -------------------------------------------------------------------- Bargeld
 
 /**
- * Bargeldbestand je Person: was aus der Kasse an sie ausgezahlt wurde, abzüglich
- * dessen, was davon schon bar ausgegeben ist.
+ * Bargeldbestand je Person: was sie bar mitgebracht und was sie zusätzlich vom
+ * Konto abgehoben hat, abzüglich dessen, was davon schon bar ausgegeben ist.
  *
- * Das ist ein eigenes, kleines Buch neben der Kasse selbst — eine Auszahlung
- * verschiebt Geld nur von der Form „auf dem Konto“ in die Form „in der
- * Tasche“, sie ist keine Ausgabe und keine Einzahlung. Sie taucht deshalb
- * weder im Tagesbudget noch im Kontostand der Endabrechnung auf; die zählt
- * erst, wenn das Bargeld tatsächlich für etwas draufgeht.
+ * Der zweite Topf der Kasse, Person für Person. Die beiden Zuflüsse sind
+ * verschiedene Dinge und stehen deshalb auch getrennt: `brought` ist frisches
+ * Geld der Person (eine Einzahlung mit Ziel Bargeld, siehe
+ * `isCashContribution`) und vergrößert die Reisekasse. `paidOut` ist ein Umzug
+ * vom Konto in die Tasche (siehe `cashOuts`) und lässt die Kasse insgesamt
+ * unberührt — das Geld war vorher schon da, nur in anderer Form.
+ *
+ * Beides ist keine Ausgabe: gezählt wird erst, wenn das Bargeld tatsächlich
+ * für etwas draufgeht.
  */
-export function cashBalances({ people = [], cashOuts = [], expenses = [] } = {}) {
+/**
+ * Was tatsächlich noch auf dem gemeinsamen Konto liegt.
+ *
+ * Bewusst etwas anderes als `computeBudget().remaining`: dort steht, was von
+ * der Reisekasse rechnerisch übrig ist, und davon geht *jede* bezahlte Ausgabe
+ * ab — auch eine, die jemand privat vorgestreckt hat. Vom Konto ist die aber
+ * nie abgeflossen. Hier zählt deshalb nur, was wirklich über das Konto lief:
+ * Einzahlungen aufs Konto, minus daraus bezahlte Ausgaben, minus das, was als
+ * Bargeld abgehoben wurde.
+ */
+export function accountBalance({ contributions = [], expenses = [], cashOuts = [] } = {}) {
+  const paid = paidOnly(expenses);
+  return (
+    sum(contributions.filter((c) => !isCashContribution(c)), (c) => c.amount) -
+    sum(paid.filter((e) => e.payer === POT), (e) => e.amount) -
+    sum(cashOuts, (c) => c.amount)
+  );
+}
+
+export function cashBalances({ people = [], cashOuts = [], expenses = [], contributions = [] } = {}) {
   const paid = paidOnly(expenses);
   return people.map((p) => {
+    const brought = sum(contributions.filter((c) => c.personId === p.id && isCashContribution(c)), (c) => c.amount);
     const paidOut = sum(cashOuts.filter((c) => c.personId === p.id), (c) => c.amount);
     const spent = sum(paid.filter((e) => cashPayerPerson(e.payer) === p.id), (e) => e.amount);
-    return { personId: p.id, name: p.name, paidOut, spent, balance: paidOut - spent };
+    return { personId: p.id, name: p.name, brought, paidOut, spent, balance: brought + paidOut - spent };
   });
 }
 
@@ -993,7 +1042,7 @@ export function settleUp({ trip, contributions = [], expenses = [], cashOuts = [
 
   const paidIntoPot = sum(paid.filter((e) => e.payer === POT || isCashPayer(e.payer)), (e) => e.amount);
   const potBalance = totalContributed(contributions) - paidIntoPot;
-  const cashByPerson = new Map(cashBalances({ people, cashOuts, expenses }).map((c) => [c.personId, c.balance]));
+  const cashByPerson = new Map(cashBalances({ people, cashOuts, expenses, contributions }).map((c) => [c.personId, c.balance]));
 
   const rows = people.map((p, i) => {
     const paidIn = sum(contributions.filter((c) => c.personId === p.id), (c) => c.amount);
