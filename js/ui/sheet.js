@@ -200,6 +200,15 @@ let toastTimer = null;
  * kostet ein Vertipper einen Tipp statt: Zeile suchen, öffnen, löschen,
  * bestätigen. Mit Knopf steht die Meldung länger, sonst ist sie weg, bevor
  * man sie gelesen hat.
+ *
+ * Verschwinden tut dabei nur die Sichtbarkeit: das Element selbst bleibt
+ * stehen, sonst könnte das Ausblenden gar nicht laufen. Genau daran hing ein
+ * böser Fehler — der längst unsichtbare Rückgängig-Knopf lag als tote
+ * Fläche weiter über der Liste und löschte, wer dort hintippte, den zuletzt
+ * eingetragenen Posten. Dagegen stehen jetzt zwei voneinander unabhängige
+ * Riegel: `visibility: hidden` im Stylesheet nimmt dem Knopf die
+ * Anfassbarkeit, und die Abfrage unten fängt ab, was während des
+ * Ausblendens noch durchkommt.
  */
 export function toast(message, { type = 'info', duration = null, action = null } = {}) {
   let host = $('#toast');
@@ -219,6 +228,9 @@ export function toast(message, { type = 'info', duration = null, action = null }
       ? h('button.toast__action', {
           type: 'button',
           onclick: () => {
+            // Ein Tipp auf eine Meldung, die nicht mehr steht, war keiner für
+            // sie — und „Rückgängig“ ist nichts, was ungefragt passieren darf.
+            if (!host.classList.contains('is-visible')) return;
             clearTimeout(toastTimer);
             hide();
             action.onClick();
