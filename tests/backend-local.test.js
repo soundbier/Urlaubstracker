@@ -141,3 +141,56 @@ test('kaputtes JSON (nicht einmal ein Umschlag) startet ebenso leer und meldet s
   const statusEvent = events.find((e) => e.status)?.status;
   assert.ok(statusEvent?.error, 'auch ein von Hand verstelltes Feld verschwindet nicht kommentarlos');
 });
+
+/**
+ * Der leere Anfangszustand darf nichts sein, was sich zwischen zwei Kassen
+ * teilen lässt.
+ *
+ * Er stand einmal als Konstante da und wurde mit `{ ...EMPTY }` „kopiert“ —
+ * das kopiert aber nur die äußere Hülle, die Listen darin blieben ein und
+ * dasselbe Array. Aufgefallen ist das nie, weil zwischen „leer“ und dem
+ * ersten Eintrag immer `createTrip` lag, das die Listen ersetzt. Der Test
+ * hält fest, dass es darauf nicht ankommen soll: ein Eintrag in der einen
+ * Kasse darf in der nächsten nicht wieder auftauchen, in welcher Reihenfolge
+ * auch immer.
+ */
+test('eine gelöschte und eine neue Kasse teilen sich keine Listen', async () => {
+  store.clear();
+  const first = backend();
+  await first.start();
+  await first.b.createTrip(trip);
+  await first.b.putExpense({ id: 'e1', amount: 1000, date: '2026-07-01', category: 'food', payer: 'pot' });
+  await first.b.deleteTrip();
+
+  // Nach dem Löschen steht die Kasse leer da — und was jetzt noch hineinfällt,
+  // gehört dieser einen Instanz, nicht dem Modul.
+  assert.deepEqual(first.b.data.expenses, []);
+  await first.b.putExpense({ id: 'e2', amount: 500, date: '2026-07-02', category: 'food', payer: 'pot' });
+
+  // Leerer Speicher, frisches Backend: was jetzt noch auftaucht, kann nur über
+  // ein geteiltes Feld hereingekommen sein, denn abgelegt ist nichts mehr.
+  store.clear();
+  const second = backend();
+  await second.start();
+  assert.deepEqual(second.b.data.expenses, [], 'die nächste Kasse fängt wirklich bei null an');
+  assert.deepEqual(second.b.data.contributions, []);
+  await second.b.createTrip(trip);
+  assert.deepEqual(second.b.data.expenses, [], 'und bleibt leer, auch nachdem sie angelegt ist');
+});
+
+/**
+ * `replaceAll` bekommt die Listen des Aufrufers gereicht (den Zustand im
+ * `store`, eine eingelesene Sicherung). Würden sie einfach übernommen, änderte
+ * der nächste Eintrag fremde Daten hinter deren Rücken.
+ */
+test('eingespielte Listen bleiben unberührt, wenn danach etwas eingetragen wird', async () => {
+  store.clear();
+  const expenses = [{ id: 'e1', amount: 1000, date: '2026-07-01', category: 'food', payer: 'pot' }];
+  const { b, start } = backend();
+  await start();
+  await b.replaceAll({ trip, contributions: [], expenses, cashOuts: [], planItems: [], packItems: [], stays: [] });
+
+  await b.putExpense({ id: 'e2', amount: 500, date: '2026-07-02', category: 'food', payer: 'pot' });
+  assert.equal(expenses.length, 1, 'die Liste des Aufrufers hat sich nicht verändert');
+  assert.equal(b.data.expenses.length, 2);
+});

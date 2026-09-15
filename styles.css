@@ -1757,9 +1757,26 @@ select.field__input { background-image: none; }
   box-shadow: var(--shadow-float);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s, transform 0.2s;
+  /*
+   * Ausgeblendet heißt hier auch: nicht mehr da.
+   *
+   * Der Toast bleibt stehen, damit das Ausblenden überhaupt laufen kann — und
+   * ein durchsichtiges Element ist weiterhin anzutippen. `pointer-events: none`
+   * rettet das nicht: der Knopf darin setzt es wieder auf `auto`, sonst ließe
+   * er sich gar nicht drücken. Übrig blieb eine unsichtbare Fläche mitten
+   * über der Liste, die beim nächsten Tipp dorthin das zuletzt Eingetragene
+   * wieder gelöscht hat. `visibility` nimmt sie dem ganzen Zweig; die
+   * Verzögerung lässt das Ausblenden trotzdem zu Ende laufen.
+   */
+  visibility: hidden;
+  transition: opacity 0.2s, transform 0.2s, visibility 0s linear 0.2s;
 }
-.toast.is-visible { opacity: 1; transform: translate(-50%, 0); }
+.toast.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  visibility: visible;
+  transition: opacity 0.2s, transform 0.2s, visibility 0s;
+}
 .toast__text { min-width: 0; flex: 1; }
 /* Der Toast selbst fängt keine Tipps ab — der Knopf darin schon. */
 .toast__action {

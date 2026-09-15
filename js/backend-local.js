@@ -13,10 +13,21 @@ import { secureRead, secureWrite, secureRemove, SecureStorageError } from './sec
 
 const KEY = 'urlaubstracker.data.v1';
 
-const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] };
+/**
+ * Der leere Stand — als Funktion, nicht als Konstante.
+ *
+ * `{ ...EMPTY }` kopierte nur die äußere Hülle: die Listen darin blieben ein
+ * und dieselben Arrays, geteilt von jedem „leeren“ Stand dieser Sitzung.
+ * Gutgegangen ist das bisher nur, weil `createTrip` die Listen ohnehin gleich
+ * ersetzt und ohne Trip niemand etwas eintragen kann — jede Stelle, die diese
+ * Reihenfolge einmal anders hält, schöbe ihre Einträge in ein Feld, aus dem
+ * sich jede weitere leere Kasse bedient. Eine Funktion kann das gar nicht
+ * erst falsch machen.
+ */
+const empty = () => ({ trip: null, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] });
 
 /**
- * Gibt den gespeicherten Stand zurück — oder `EMPTY`, wenn nichts da ist,
+ * Gibt den gespeicherten Stand zurück — oder einen leeren, wenn nichts da ist,
  * das JSON kaputt ist, oder sich der Datensatz nicht entschlüsseln ließ.
  * `corrupted` unterscheidet den letzten Fall von den ersten beiden: „nichts
  * da“ ist der ganz normale erste Start, ein nicht entschlüsselbarer
@@ -26,7 +37,7 @@ const EMPTY = { trip: null, contributions: [], expenses: [], cashOuts: [], planI
 async function load() {
   try {
     const raw = await secureRead(KEY);
-    if (!raw || typeof raw !== 'object') return { ...EMPTY, corrupted: false };
+    if (!raw || typeof raw !== 'object') return { ...empty(), corrupted: false };
     return {
       trip: raw.trip || null,
       contributions: Array.isArray(raw.contributions) ? raw.contributions : [],
@@ -38,7 +49,7 @@ async function load() {
       corrupted: false,
     };
   } catch (err) {
-    return { ...EMPTY, corrupted: err instanceof SecureStorageError };
+    return { ...empty(), corrupted: err instanceof SecureStorageError };
   }
 }
 
@@ -48,7 +59,7 @@ export class LocalBackend {
     // Erst mit leerem Stand, bis `start()` den echten (entschlüsselten) Stand
     // geladen hat — Entschlüsseln ist unvermeidlich asynchron, ein
     // Konstruktor nicht.
-    this.data = { ...EMPTY };
+    this.data = empty();
     this.onChange = null;
     this.onStatus = null;
     this._onStorage = async (e) => {
@@ -116,7 +127,7 @@ export class LocalBackend {
   }
 
   async createTrip(trip) {
-    this.data = { trip, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] };
+    this.data = { ...empty(), trip };
     await this._persist();
   }
 
@@ -126,7 +137,7 @@ export class LocalBackend {
   }
 
   async deleteTrip() {
-    this.data = { ...EMPTY, contributions: [], expenses: [], cashOuts: [], planItems: [], packItems: [], stays: [] };
+    this.data = empty();
     try {
       secureRemove(KEY);
     } catch {
@@ -148,8 +159,22 @@ export class LocalBackend {
   async putStay(row) { await this._put('stays', row); }
   async removeStay(id) { await this._remove('stays', id); }
 
+  /**
+   * Jede Liste als eigene Kopie: was hier hereingereicht wird, gehört der
+   * aufrufenden Stelle (dem Zustand im `store`, einer eingelesenen Sicherung).
+   * Würde `_put` später direkt darin herumschieben, änderte dieses Backend
+   * fremde Daten hinter deren Rücken.
+   */
   async replaceAll({ trip, contributions = [], expenses = [], cashOuts = [], planItems = [], packItems = [], stays = [] }) {
-    this.data = { trip, contributions, expenses, cashOuts, planItems, packItems, stays };
+    this.data = {
+      trip,
+      contributions: [...contributions],
+      expenses: [...expenses],
+      cashOuts: [...cashOuts],
+      planItems: [...planItems],
+      packItems: [...packItems],
+      stays: [...stays],
+    };
     await this._persist();
   }
 }
