@@ -310,15 +310,22 @@ export function spentByDay(expenses) {
   return out;
 }
 
-/** Ausgaben je Kategorie, absteigend sortiert. */
+/**
+ * Ausgaben je Kategorie, absteigend sortiert — mit der Anzahl der Einträge,
+ * aus der die Auswertung den Schnitt je Eintrag bildet. Wo nur der Betrag
+ * gebraucht wird, stört die Zahl nicht; sie kostet nichts, weil hier ohnehin
+ * schon jede Ausgabe durch die Hand geht.
+ */
 export function spentByCategory(expenses) {
   const acc = {};
   for (const e of paidOnly(expenses)) {
     const id = CATEGORY_BY_ID[e.category] ? e.category : 'other';
-    acc[id] = (acc[id] || 0) + e.amount;
+    acc[id] = acc[id] || { amount: 0, count: 0 };
+    acc[id].amount += e.amount;
+    acc[id].count += 1;
   }
   return Object.entries(acc)
-    .map(([id, amount]) => ({ ...CATEGORY_BY_ID[id], amount }))
+    .map(([id, tally]) => ({ ...CATEGORY_BY_ID[id], ...tally }))
     .sort((a, b) => b.amount - a.amount);
 }
 
@@ -1113,4 +1120,121 @@ export function settleUp({ trip, contributions = [], expenses = [], cashOuts = [
   }
 
   return { rows, potBalance, totalSpent: spent, payouts, topUps, transfers, leftInPot: pot };
+}
+
+// ----------------------------------------------------------------- Auswertung
+
+/*
+ * Der dritte Reiter unter „Finanzen“ rechnet nichts Neues aus, er schaut
+ * dieselben Einträge nur von der Seite an: nicht „wie steht die Kasse“, sondern
+ * „wie ist das Geld ausgegeben worden“. Alles hier zählt deshalb jede bezahlte
+ * Ausgabe voll mit, auch eine, die einmal vorgemerkt war — sie ist bezahlt, das
+ * Geld ist weg. Nur die noch offenen Vormerkungen bleiben draußen: die sind
+ * vergeben, aber nicht ausgegeben.
+ *
+ * Das ist bewusst ein anderer Maßstab als beim Tagesbudget (siehe
+ * `computeBudget`): dort bleibt Verplantes dauerhaft außen vor, weil es nie
+ * Teil des täglichen Geldes war. Hier ordnet sich jede Zahl unter eine einzige
+ * Summe — „was die Reise bisher gekostet hat“ —, und dazu gehört das Hotel.
+ */
+
+/**
+ * Ausgaben je Reisetag: ein Wert pro Kalendertag der Reise, Lücken inklusive.
+ *
+ * Etwas anderes als `dailySeries` — dort läuft der Kontostand über die Reise,
+ * hier steht jeder Tag für sich. Das eine beantwortet „wie lange reicht es
+ * noch“, das andere „welcher Tag war teuer“.
+ *
+ * Tage in der Zukunft tragen `isFuture` und keinen Betrag: an einem Tag, der
+ * noch nicht war, ist nichts ausgeblieben — als leerer Balken sähe er aber aus
+ * wie ein besonders sparsamer.
+ */
+export function spendingByDay({ trip, expenses = [], today = todayISO() }) {
+  const paid = paidOnly(expenses);
+  const amounts = spentByDay(paid);
+  const counts = {};
+  for (const e of paid) counts[e.date] = (counts[e.date] || 0) + 1;
+  return dateRange(trip.startDate, trip.endDate).map((date) => ({
+    date,
+    total: amounts[date] || 0,
+    count: counts[date] || 0,
+    isToday: date === today,
+    isFuture: date > today,
+  }));
+}
+
+/**
+ * Die Kennzahlen der Auswertung: Durchschnitte, Ausschläge, Lücken.
+ *
+ * `perDay` teilt alles Bezahlte durch die angebrochenen Reisetage, samt dem,
+ * was vor der Abfahrt anfiel (`outside` — die Anzahlung fürs Hotel gehört zu
+ * dieser Reise, sie fiel nur vorher an). Damit geht die Rechnung mit der Summe
+ * oben auf der Seite auf: jede Zahl der Auswertung ordnet sich unter dieselbe
+ * Gesamtsumme ein. Die Kasse rechnet ihr „Ø bisher“ aus dem obigen Grund
+ * anders — beides steht bewusst in verschiedenen Reitern.
+ *
+ * `perActiveDay` zählt nur Tage, an denen überhaupt etwas eingetragen wurde:
+ * bei einer Reise mit drei Ruhetagen sagt der Schnitt über alle Tage wenig
+ * darüber, was ein Tag kostet, an dem man unterwegs ist.
+ */
+export function spendingStats({ trip, expenses = [], today = todayISO() }) {
+  const paid = paidOnly(expenses);
+  const spent = sum(paid, (e) => e.amount);
+  const phase = tripPhase(trip, today);
+  const totalDays = daysInclusive(trip.startDate, trip.endDate);
+  const elapsedDays =
+    phase === 'before' ? 0 : phase === 'after' ? totalDays : daysInclusive(trip.startDate, today);
+
+  // Nur angebrochene Tage: ein Tag, der noch nicht war, ist kein ruhiger Tag.
+  const days = spendingByDay({ trip, expenses: paid, today }).filter((d) => !d.isFuture);
+  const busy = days.filter((d) => d.count > 0);
+  const topDay = busy.reduce((best, d) => (!best || d.total > best.total ? d : best), null);
+  const biggest = paid.reduce((best, e) => (!best || e.amount > best.amount ? e : best), null);
+  const outside = paid.filter((e) => e.date < trip.startDate || e.date > trip.endDate);
+
+  return {
+    spent,
+    entries: paid.length,
+    perEntry: paid.length ? Math.round(spent / paid.length) : 0,
+    perDay: elapsedDays ? Math.round(spent / elapsedDays) : 0,
+    totalDays,
+    elapsedDays,
+    activeDays: busy.length,
+    quietDays: days.length - busy.length,
+    perActiveDay: busy.length ? Math.round(sum(busy, (d) => d.total) / busy.length) : 0,
+    topDay: topDay ? { date: topDay.date, total: topDay.total, count: topDay.count } : null,
+    biggest,
+    outside: sum(outside, (e) => e.amount),
+    outsideCount: outside.length,
+  };
+}
+
+/**
+ * Woraus bezahlt wurde: aus dem gemeinsamen Konto, aus dem Bargeld einer
+ * Person, oder privat vorgestreckt.
+ *
+ * Drei Sorten Geld, die in der Abrechnung ganz verschiedene Wege gehen (siehe
+ * `settleUp`) — in einer Aufstellung zeigen sie, wie viel überhaupt über das
+ * gemeinsame Konto lief und wie viel jemand vorgestreckt hat. Sortiert nach
+ * Betrag: was den größten Teil trug, steht oben.
+ *
+ * Der rohe Zahler-Wert bleibt an der Zeile, damit die Beschriftung an einer
+ * Stelle entsteht (`ui/parts.payerLabel`) und nicht hier ein zweites Mal.
+ */
+export function spentByPayer(expenses) {
+  const acc = new Map();
+  for (const e of paidOnly(expenses)) {
+    const payer = e.payer ?? POT;
+    const row = acc.get(payer) || {
+      payer,
+      kind: payer === POT ? 'pot' : isCashPayer(payer) ? 'cash' : 'private',
+      personId: payer === POT ? null : cashPayerPerson(payer) ?? payer,
+      amount: 0,
+      count: 0,
+    };
+    row.amount += e.amount;
+    row.count += 1;
+    acc.set(payer, row);
+  }
+  return [...acc.values()].sort((a, b) => b.amount - a.amount);
 }

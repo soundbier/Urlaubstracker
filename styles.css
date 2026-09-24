@@ -879,6 +879,14 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .chart__plan { fill: none; stroke: var(--text-faint); stroke-width: 1; stroke-dasharray: 3 4; vector-effect: non-scaling-stroke; }
 .chart__actual { fill: none; stroke: var(--accent); stroke-width: 1.75; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
 .chart__dot { fill: var(--accent); stroke: var(--bg); stroke-width: 2; }
+/*
+ * Ausgaben Tag für Tag (Auswertung): ein Balken je Reisetag, in Tinte wie die
+ * Linien auch. Über dem Tagesbudget zu liegen ist kein Verdikt, das eine Farbe
+ * bräuchte — das sagt die gestrichelte Linie darüber. Farbe trägt nur der
+ * heutige Tag, damit man im Bild wiederfindet, wo man steht.
+ */
+.chart__bar { fill: var(--text-faint); }
+.chart__bar--today { fill: var(--accent); }
 .chart__legend { display: flex; gap: var(--sp-4); font-size: var(--fs-xs); color: var(--text-muted); }
 .legend__item { display: inline-flex; align-items: center; gap: 6px; }
 .legend__swatch { width: 14px; height: 2px; display: inline-block; }
@@ -908,6 +916,9 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 .cat__top { display: flex; justify-content: space-between; gap: var(--sp-3); font-size: var(--fs-sm); }
 .cat__label { color: var(--text-muted); }
 .cat__amount { font-weight: 600; }
+/* Unter dem Balken, nur in der Auswertung: wie viele Einträge das waren und
+   was einer im Schnitt kostete. Dieselbe blasse Stufe wie jede Beiwortzeile. */
+.cat__meta { font-size: var(--fs-xs); color: var(--text-faint); font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------ Abrechnung */
 
