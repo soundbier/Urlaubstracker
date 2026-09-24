@@ -36,6 +36,23 @@ test('CSV enthält Klartext, keine internen Kennungen', () => {
   assert.ok(csv.startsWith('﻿'), 'BOM für die Umlaute');
 });
 
+test('CSV: die Sorte hat eine eigene Spalte — danach lässt sich gruppieren', () => {
+  const csv = buildCsv({
+    trip: TRIP,
+    contributions: [],
+    expenses: [
+      { id: 'e1', date: '2026-07-01', amount: 4250, category: 'food', sub: 'restaurant', payer: POT, note: 'Hafen' },
+      { id: 'e2', date: '2026-07-02', amount: 1200, category: 'food', payer: POT, note: '' },
+      // Eine Sorte aus einer anderen Kategorie ist keine — die Spalte bleibt leer.
+      { id: 'e3', date: '2026-07-03', amount: 900, category: 'shopping', sub: 'restaurant', payer: POT, note: '' },
+    ],
+  });
+
+  assert.ok(csv.includes('"Ausgabe";"2026-07-01";"";"42,50";"Essen & Trinken";"Restaurant";"Gemeinsames Konto";"Hafen"'));
+  assert.ok(csv.includes('"Ausgabe";"2026-07-02";"";"12,00";"Essen & Trinken";"";"Gemeinsames Konto";""'), 'ohne Sorte bleibt die Spalte leer');
+  assert.ok(csv.includes('"Ausgabe";"2026-07-03";"";"9,00";"Einkaufen";"";"Gemeinsames Konto";""'), 'eine fremde Sorte steht nirgends');
+});
+
 test('CSV maskiert Anführungszeichen in Notizen', () => {
   const csv = buildCsv({
     trip: TRIP,
@@ -108,10 +125,12 @@ test('Was exportiert wurde, lässt sich wieder einlesen', () => {
   // Ohne Ziel gilt das Konto — so stand jede Einzahlung da, bevor es das
   // Bargeld als eigenen Topf gab. Beim Einlesen steht es dann ausdrücklich da.
   const contributions = [{ id: 'c1', personId: 'p1', amount: 80000, date: '2026-06-20', note: '', target: 'pot' }];
+  // Die Sorte reist mit, auch die leere: eine Ausgabe ohne Angabe kommt als
+  // Ausgabe ohne Angabe zurück, nicht als eine ohne das Feld.
   const expenses = [
-    { id: 'e1', date: '2026-07-01', amount: 20000, category: 'stay', payer: POT, note: '', planned: false, fromPlan: false },
-    { id: 'e2', date: '2026-07-08', amount: 12000, category: 'activity', payer: POT, note: 'Bootstour', planned: true, fromPlan: false },
-    { id: 'e3', date: '2026-07-02', amount: 30000, category: 'stay', payer: POT, note: 'Hotel', planned: false, fromPlan: true },
+    { id: 'e1', date: '2026-07-01', amount: 20000, category: 'stay', payer: POT, note: '', sub: '', planned: false, fromPlan: false },
+    { id: 'e2', date: '2026-07-08', amount: 12000, category: 'activity', payer: POT, note: 'Bootstour', sub: 'sport', planned: true, fromPlan: false },
+    { id: 'e3', date: '2026-07-02', amount: 30000, category: 'stay', payer: POT, note: 'Hotel', sub: 'hotel', planned: false, fromPlan: true },
   ];
   const back = parseImport(buildExport({ trip: TRIP, contributions, expenses }));
 
@@ -119,6 +138,25 @@ test('Was exportiert wurde, lässt sich wieder einlesen', () => {
   assert.deepEqual(back.expenses, expenses);
   assert.equal(back.trip.id, TRIP.id);
   assert.deepEqual(back.trip.people, TRIP.people);
+});
+
+test('Import: eine Sorte gilt nur in ihrer Kategorie', () => {
+  const back = parseImport(backup({
+    expenses: [
+      { id: 'e1', date: '2026-07-01', amount: 4000, category: 'food', sub: 'restaurant', payer: POT },
+      { id: 'e2', date: '2026-07-01', amount: 4000, category: 'shopping', sub: 'restaurant', payer: POT },
+      // Unbekannte Kategorie wird „Sonstiges“ — die alte Sorte rutscht nicht mit.
+      { id: 'e3', date: '2026-07-01', amount: 4000, category: 'quatsch', sub: 'restaurant', payer: POT },
+      { id: 'e4', date: '2026-07-01', amount: 4000, category: 'food', sub: 42, payer: POT },
+    ],
+  }));
+
+  assert.deepEqual(back.expenses.map((e) => [e.category, e.sub]), [
+    ['food', 'restaurant'],
+    ['shopping', ''],
+    ['other', ''],
+    ['food', ''],
+  ]);
 });
 
 test('Eine Einzahlung ohne Ziel kommt als Konto-Einzahlung zurück', () => {
@@ -271,7 +309,7 @@ test('CSV: eine Unterkunft steht mit ihrem Anreisetag und dem Zeitraum in der No
     expenses: [],
     stays: [{ id: 's1', name: 'Hotel Fjord', address: 'Strandvegen 1', startDate: '2026-07-01', endDate: '2026-07-03', note: '' }],
   });
-  assert.ok(csv.includes('"Unterkunft";"2026-07-01";"";"";"";"";"Hotel Fjord · Strandvegen 1 · bis 2026-07-03"'));
+  assert.ok(csv.includes('"Unterkunft";"2026-07-01";"";"";"";"";"";"Hotel Fjord · Strandvegen 1 · bis 2026-07-03"'));
 });
 
 test('CSV: die Packliste steht als eigene Art dabei — dafür druckt man sie', () => {
@@ -285,7 +323,7 @@ test('CSV: die Packliste steht als eigene Art dabei — dafür druckt man sie', 
     ],
   });
 
-  assert.ok(csv.includes('"Packliste";"";"";"";"Dokumente"'), 'kein Datum, kein Betrag, aber die Kategorie');
-  assert.ok(csv.includes('"Reisepass · Ausweis & Pass · Eingepackt · Handgepäck"'), 'ohne Anzahl steht keine davor');
-  assert.ok(csv.includes('"2 × Handtücher · Strandtuch · Noch zu waschen · Aufgabegepäck · zwei große"'));
+  assert.ok(csv.includes('"Packliste";"";"";"";"Dokumente";"Ausweis & Pass"'), 'kein Datum, kein Betrag, aber Kategorie und Sorte');
+  assert.ok(csv.includes('"Reisepass · Eingepackt · Handgepäck"'), 'ohne Anzahl steht keine davor');
+  assert.ok(csv.includes('"2 × Handtücher · Noch zu waschen · Aufgabegepäck · zwei große"'));
 });

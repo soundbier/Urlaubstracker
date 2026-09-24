@@ -11,7 +11,8 @@ import {
   cashBalances, accountBalance, cashPayerFor, isCashPayer, cashPayerPerson,
   contributionTarget, isCashContribution,
   planItemsOnDay, planItemsByDay, planItemDone, planDayProgress, clampDateToTrip, stayForDate,
-  planCategory, planSub, planSubLabel, planSubs, planExpenseCategory,
+  planCategory, planSub, planSubLabel, planSubs, planExpenseCategory, planExpenseSub,
+  expenseCategory, expenseSub, expenseSubLabel, expenseSubs,
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
   packSub, packSubLabel, packSubs, packQty, packOverview,
   packItemShared, packItemsMine, packItemsShared,
@@ -936,4 +937,58 @@ test('Womit bezahlt: Konto, Bargeld und privat bleiben auseinander', () => {
 test('Kategorien zählen auch ihre Einträge', () => {
   const cats = spentByCategory(EXPENSES);
   assert.deepEqual(cats.map((c) => [c.id, c.amount, c.count]), [['stay', 20000, 1], ['food', 14000, 2]]);
+});
+
+test('Eine Sorte gilt nur in ihrer Ausgaben-Kategorie', () => {
+  // Wie bei Packliste und Reiseplan: die Sorte hängt an der Kategorie, nicht
+  // an einer gemeinsamen Liste. „Restaurant“ an einem Einkauf wäre sonst eine
+  // Angabe, die die Auswertung ernst nimmt und niemand gemacht hat.
+  assert.equal(expenseSub({ category: 'food', sub: 'restaurant' }), 'restaurant');
+  assert.equal(expenseSub({ category: 'shopping', sub: 'restaurant' }), '', 'Restaurant ist keine Sorte Einkauf');
+  assert.equal(expenseSub({ category: 'food', sub: 'quatsch' }), '');
+  assert.equal(expenseSub({ category: 'food' }), '', 'ohne Sorte ist ein gültiger Zustand');
+  assert.equal(expenseSub({ category: 'quatsch', sub: 'restaurant' }), '', 'unbekannte Kategorie wird Sonstiges');
+
+  // Dieselbe Kennung in zwei Kategorien meint zwei verschiedene Dinge.
+  assert.equal(expenseSubLabel({ category: 'other', sub: 'fees' }), 'Gebühren & Bank');
+  assert.equal(expenseSubLabel({ category: 'stay', sub: 'fees' }), '', 'unter Übernachtung heißt sie „tax“');
+  assert.equal(expenseSubLabel({ category: 'transport', sub: 'fuel' }), 'Tanken');
+  assert.equal(expenseSubLabel({ category: 'transport' }), '', 'ohne Sorte steht nichts an der Zeile');
+
+  assert.equal(expenseCategory({ category: 'quatsch' }), 'other', 'unbekannt landet unter Sonstiges');
+  assert.equal(expenseCategory({}), 'other');
+  assert.equal(expenseSubs('quatsch').length, 0, 'auch eine unbekannte Kategorie liefert eine Liste');
+  assert.ok(expenseSubs('other').length, 'anders als beim Gepäck hat „Sonstiges“ hier Sorten');
+});
+
+test('Die Auswertung teilt eine Kategorie auf ihre Sorten auf', () => {
+  const expenses = [
+    { id: 'e1', date: '2026-07-01', amount: 4000, category: 'food', sub: 'restaurant' },
+    { id: 'e2', date: '2026-07-02', amount: 9000, category: 'food', sub: 'groceries' },
+    { id: 'e3', date: '2026-07-02', amount: 2000, category: 'food', sub: 'restaurant' },
+    { id: 'e4', date: '2026-07-03', amount: 1000, category: 'food' },
+    // Vorgemerktes ist noch nicht ausgegeben und zählt hier so wenig mit wie
+    // in der Summe darüber.
+    { id: 'p1', date: '2026-07-09', amount: 5000, category: 'food', sub: 'restaurant', planned: true },
+    { id: 'e5', date: '2026-07-03', amount: 3000, category: 'stay' },
+  ];
+  const [food, stay] = spentByCategory(expenses);
+
+  assert.deepEqual(food.rows.map((r) => [r.id, r.amount, r.count]), [
+    ['groceries', 9000, 1],
+    ['restaurant', 6000, 2],
+    ['', 1000, 1],
+  ], 'nach Betrag, „Ohne Angabe“ immer zuletzt');
+  assert.equal(food.rows.reduce((a, r) => a + r.amount, 0), food.amount, 'die Sorten ergeben ihre Kategorie');
+  assert.deepEqual(stay.rows, [], 'ohne eine einzige Sorte bleibt die Aufstellung leer');
+});
+
+test('Aus dem Reiseplan nimmt eine Vormerkung ihre Sorte mit', () => {
+  // „Erleben“ heißt auf beiden Seiten gleich — dort reist die Sorte mit.
+  assert.equal(planExpenseSub('activity', 'museum'), 'museum');
+  assert.equal(planExpenseSub('activity', 'quatsch'), '');
+  // Flug und Bahn werden zu „Sprit & Transport“, deren Sorten heißen anders.
+  assert.equal(planExpenseSub('flight', 'museum'), '', 'ein Flug hat keine Sorte, die dorthin passt');
+  assert.equal(planExpenseSub('other', 'museum'), '');
+  assert.equal(planExpenseSub('activity'), '', 'ohne Sorte bleibt sie leer');
 });

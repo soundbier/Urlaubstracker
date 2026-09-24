@@ -172,6 +172,9 @@ const actions = {
       const row = await store.addExpense({
         amount: expense.amount,
         category: expense.category,
+        // Die Sorte gehört zur Ausgabe wie die Kategorie: derselbe Kaffee ist
+        // beim zweiten Mal wieder einer im Café, nicht einer ohne Angabe.
+        sub: expense.sub,
         note: expense.note,
         payer: expense.payer,
         date: todayISO(),

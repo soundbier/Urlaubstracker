@@ -2,6 +2,7 @@
 import { h, icon } from '../dom.js';
 import {
   CATEGORY_BY_ID, POT, isFromPlan, isCashPayer, cashPayerPerson, planItemDone, MAX_PEOPLE,
+  expenseSubLabel,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packCategory, packStatus, packBag, packItemPacked,
   packSubLabel, packQty,
   PLAN_CATEGORY_BY_ID, planSubLabel, isCashContribution,
@@ -112,6 +113,17 @@ function byLabel(expense, trip, me) {
 }
 
 /**
+ * Was in der Zeile steht, wenn keine Notiz da ist.
+ *
+ * Bis eben stand dort die Kategorie — dasselbe Wort, das links schon als
+ * Symbol steht. Die Sorte ist die genauere Auskunft und kostet keine zweite
+ * Zeile: „Restaurant“ sagt mehr als „Essen & Trinken“ neben einem Besteck.
+ * Eine eigene Notiz bleibt trotzdem vorn; sie ist das, was jemand selbst
+ * aufgeschrieben hat.
+ */
+const rowTitle = (expense, cat) => expense.note || expenseSubLabel(expense) || cat.label;
+
+/**
  * Eine Zeile in der Ausgabenliste — antippen zum Bearbeiten, der Knopf rechts
  * trägt dieselbe Ausgabe noch einmal mit dem heutigen Datum ein.
  */
@@ -132,7 +144,7 @@ export function expenseRow(expense, trip, { onEdit, onRepeat = null, me = null }
   const open = h('button.row', { type: 'button', onclick: () => onEdit(expense) },
     h('span.row__icon', icon(cat.icon, 20)),
     h('span.row__main',
-      h('span.row__title', expense.note || cat.label),
+      h('span.row__title', rowTitle(expense, cat)),
       sub.length ? h('span.row__sub', ...sub) : null,
     ),
     h('span.row__amount', money(expense.amount, trip.currency)),
@@ -145,7 +157,7 @@ export function expenseRow(expense, trip, { onEdit, onRepeat = null, me = null }
     h('button.erow__again', {
       type: 'button',
       title: 'Nochmal eintragen',
-      'aria-label': `${expense.note || cat.label} nochmal eintragen`,
+      'aria-label': `${rowTitle(expense, cat)} nochmal eintragen`,
       onclick: () => onRepeat(expense),
     }, icon('repeat', 19)),
   );
@@ -166,7 +178,7 @@ export function plannedRow(expense, trip, today, { onEdit, onPaid, me = null, ma
     h('button.prow__open', { type: 'button', onclick: () => onEdit(expense) },
       h('span.row__icon.row__icon--planned', icon(cat.icon, 20)),
       h('span.row__main',
-        h('span.row__title', expense.note || cat.label),
+        h('span.row__title', rowTitle(expense, cat)),
         h('span.row__sub',
           overdue && markOverdue ? h('span.tag.tag--due', 'fällig') : dayLabel(expense.date, today, { compact: true }),
           privatelyPaid ? h('span.tag', payerLabel(trip, expense.payer)) : null,

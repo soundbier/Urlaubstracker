@@ -1,6 +1,6 @@
 /** Alle Ausgaben, nach Tagen gruppiert — die eigentliche Liste. */
 import { h, icon } from '../dom.js';
-import { computeBudget, groupByDay, paidOnly, plannedOnly, everydayOnly, todayISO, CATEGORY_BY_ID, CATEGORIES } from '../calc.js';
+import { computeBudget, groupByDay, paidOnly, plannedOnly, everydayOnly, todayISO, expenseCategory, CATEGORY_BY_ID, CATEGORIES } from '../calc.js';
 import { money, dayLabel, plural } from '../format.js';
 import { expenseRow, plannedRow, sectionTitle, emptyState } from '../ui/parts.js';
 
@@ -16,9 +16,9 @@ export function renderExpenses(state, actions) {
   // Vorgemerktes steht in einem eigenen Block: es ist noch nichts ausgegeben
   // und gehört deshalb in keine Tagesgruppe.
   const paid = paidOnly(expenses);
-  const inFilter = (e) => filter === 'all' || (CATEGORY_BY_ID[e.category] ? e.category : 'other') === filter;
+  const inFilter = (e) => filter === 'all' || expenseCategory(e) === filter;
 
-  const usedCategories = CATEGORIES.filter((c) => expenses.some((e) => (CATEGORY_BY_ID[e.category] ? e.category : 'other') === c.id));
+  const usedCategories = CATEGORIES.filter((c) => expenses.some((e) => expenseCategory(e) === c.id));
   if (filter !== 'all' && !usedCategories.some((c) => c.id === filter)) filter = 'all';
 
   const shown = paid.filter(inFilter);

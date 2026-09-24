@@ -20,6 +20,111 @@ export const CATEGORIES = [
 
 export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
 
+/**
+ * Die Sorten innerhalb einer Ausgaben-Kategorie.
+ *
+ * Sechs Kategorien reichen zum Eintragen — zum Auswerten reichen sie nicht:
+ * „Essen & Trinken, 940 €“ sagt am Ende der Reise nicht, ob das die Abende im
+ * Restaurant waren oder der Wocheneinkauf. Eine siebte, achte, neunte
+ * Kategorie wäre der falsche Ausweg: die Auswahl beim Eintragen soll ein Blick
+ * bleiben, und wer zwischen zwölf Feldern sucht, trifft am Ende „Sonstiges“.
+ *
+ * Deshalb dieselbe Trennung wie bei Packliste und Reiseplan (siehe
+ * `PACK_SUBCATEGORIES`, `PLAN_SUBCATEGORIES`): die Kategorie entscheidet, wo
+ * die Ausgabe steht, die Sorte ist ein Angebot — freiwillig, in einer zweiten,
+ * leiseren Reihe, und an jedem Eintrag nachtragbar. Wer sie weglässt, hat
+ * dieselbe Kasse wie vorher; wer sie mitnimmt, bekommt unter „Auswertung“ eine
+ * Aufteilung innerhalb der Kategorie (siehe `spentByCategory`).
+ *
+ * Fünf Sorten je Kategorie, keine Feinliste: was hier steht, soll die Frage
+ * „wofür genau“ mit einem Tipp beantworten. Jede weitere Sorte ist eine
+ * Entscheidung mehr an einer Maske, die dreimal am Tag aufgeht.
+ *
+ * „Erleben“ trägt als einzige sechs — es sind genau die Sorten des Reiseplans
+ * (siehe `PLAN_SUBCATEGORIES`), mit denselben Kennungen: so nimmt eine
+ * Vormerkung, die aus einem Programmpunkt entsteht, ihre Sorte mit (siehe
+ * `planExpenseSub`), statt als einzige ohne dazustehen.
+ *
+ * Anders als auf der Packliste bekommt „Sonstiges“ hier Sorten. Beim Gepäck
+ * ist das die Kiste für alles, was sich keiner Sorte fügen wollte — beim Geld
+ * ist es der Posten, der am Ende niemandem mehr erklärt, wo zweihundert Euro
+ * geblieben sind. Trinkgeld, Kontogebühren, Apotheke: gerade dort ist die
+ * Sorte die ganze Auskunft.
+ */
+export const EXPENSE_SUBCATEGORIES = {
+  food: [
+    { id: 'restaurant', label: 'Restaurant' },
+    { id: 'cafe', label: 'Café & Bar' },
+    { id: 'snack', label: 'Imbiss & Snack' },
+    { id: 'groceries', label: 'Supermarkt' },
+    { id: 'drinks', label: 'Getränke' },
+  ],
+  transport: [
+    { id: 'fuel', label: 'Tanken' },
+    { id: 'parking', label: 'Parken & Maut' },
+    { id: 'transit', label: 'Bahn, Bus & Fähre' },
+    { id: 'taxi', label: 'Taxi & Mietwagen' },
+    { id: 'flight', label: 'Flug' },
+  ],
+  stay: [
+    { id: 'hotel', label: 'Hotel' },
+    { id: 'apartment', label: 'Ferienwohnung' },
+    { id: 'hostel', label: 'Hostel & Pension' },
+    { id: 'camping', label: 'Camping' },
+    { id: 'tax', label: 'Kurtaxe & Gebühren' },
+  ],
+  // Dieselben Kennungen wie `PLAN_SUBCATEGORIES.activity` — siehe oben.
+  activity: [
+    { id: 'sightseeing', label: 'Sightseeing' },
+    { id: 'museum', label: 'Museum' },
+    { id: 'nature', label: 'Natur & Wandern' },
+    { id: 'sport', label: 'Sport & Baden' },
+    { id: 'event', label: 'Veranstaltung' },
+    { id: 'nightlife', label: 'Ausgehen' },
+  ],
+  shopping: [
+    { id: 'souvenir', label: 'Souvenir' },
+    { id: 'clothing', label: 'Kleidung' },
+    { id: 'gift', label: 'Geschenke' },
+    { id: 'drugstore', label: 'Drogerie' },
+    { id: 'tech', label: 'Technik' },
+  ],
+  other: [
+    { id: 'fees', label: 'Gebühren & Bank' },
+    { id: 'tip', label: 'Trinkgeld' },
+    { id: 'health', label: 'Arzt & Apotheke' },
+    { id: 'phone', label: 'Telefon & Internet' },
+    { id: 'laundry', label: 'Wäsche & Service' },
+  ],
+};
+
+// Erst die Kategorie, dann die Sorte: dieselbe Kennung kann in zwei
+// Kategorien vorkommen („Gebühren“ unter Sonstiges, „Kurtaxe & Gebühren“
+// unter Übernachtung), ohne dass die eine die andere trifft.
+const EXPENSE_SUB_BY_ID = Object.fromEntries(
+  Object.entries(EXPENSE_SUBCATEGORIES).map(([cat, list]) => [cat, Object.fromEntries(list.map((s) => [s.id, s]))]),
+);
+
+/**
+ * Gelesen wird nie das rohe Feld, sondern immer durch die Helfer hier — wie
+ * bei Packliste und Reiseplan. Aus einer Sicherungskopie, von einem älteren Gerät
+ * oder aus einer künftigen Fassung kann ein Wert kommen, den diese hier nicht
+ * kennt; er landet dann unter „Sonstiges“ statt in keiner Gruppe.
+ */
+export const expenseCategory = (e) => (CATEGORY_BY_ID[e?.category] ? e.category : 'other');
+
+/** Die Sorten, die zu einer Kategorie gehören — leer, wo es keine gibt. */
+export const expenseSubs = (categoryId) => EXPENSE_SUBCATEGORIES[categoryId] || [];
+
+/**
+ * Die Sorte hängt an der *geprüften* Kategorie, nicht an der rohen: wer eine
+ * Ausgabe nachträglich von „Essen“ auf „Einkauf“ umstellt, hat danach keine
+ * Sorte mehr statt einer falschen — „Restaurant“ unter Einkaufen wäre keine
+ * Angabe, sondern ein Fehler mit Etikett.
+ */
+export const expenseSub = (e) => (EXPENSE_SUB_BY_ID[expenseCategory(e)]?.[e?.sub] ? e.sub : '');
+export const expenseSubLabel = (e) => EXPENSE_SUB_BY_ID[expenseCategory(e)]?.[expenseSub(e)]?.label || '';
+
 /** Zahler-Kennung für „aus der gemeinsamen Kasse bezahlt“. */
 export const POT = 'pot';
 
@@ -319,14 +424,38 @@ export function spentByDay(expenses) {
 export function spentByCategory(expenses) {
   const acc = {};
   for (const e of paidOnly(expenses)) {
-    const id = CATEGORY_BY_ID[e.category] ? e.category : 'other';
-    acc[id] = acc[id] || { amount: 0, count: 0 };
+    const id = expenseCategory(e);
+    acc[id] = acc[id] || { amount: 0, count: 0, subs: {} };
     acc[id].amount += e.amount;
     acc[id].count += 1;
+    // Die Sorte zählt in derselben Runde mit — sie ist keine zweite Frage an
+    // die Liste, sondern dieselbe eine Stufe genauer.
+    const sub = expenseSub(e);
+    acc[id].subs[sub] = acc[id].subs[sub] || { amount: 0, count: 0 };
+    acc[id].subs[sub].amount += e.amount;
+    acc[id].subs[sub].count += 1;
   }
   return Object.entries(acc)
-    .map(([id, tally]) => ({ ...CATEGORY_BY_ID[id], ...tally }))
+    .map(([id, { subs, ...tally }]) => ({ ...CATEGORY_BY_ID[id], ...tally, rows: subRows(id, subs) }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * Die Aufteilung einer Kategorie auf ihre Sorten — nach Betrag, wie alles auf
+ * der Auswertung, und „Ohne Angabe“ immer zuletzt: das ist keine Sorte, das
+ * ist der Rest.
+ *
+ * Trägt keine einzige Ausgabe der Kategorie eine Sorte, bleibt die Aufstellung
+ * leer statt einer einzelnen Zeile „Ohne Angabe“ — die wiederholte nur die
+ * Summe, unter der sie steht.
+ */
+function subRows(categoryId, tallies) {
+  const named = expenseSubs(categoryId)
+    .filter((sub) => tallies[sub.id])
+    .map((sub) => ({ id: sub.id, label: sub.label, ...tallies[sub.id] }))
+    .sort((a, b) => b.amount - a.amount);
+  if (!named.length) return [];
+  return tallies[''] ? [...named, { id: '', label: 'Ohne Angabe', ...tallies[''] }] : named;
 }
 
 /** Ausgaben nach Tag gruppiert, neueste zuerst; innerhalb eines Tages neueste Eingabe zuerst. */
@@ -409,6 +538,17 @@ const PLAN_TO_EXPENSE_CATEGORY = {
 };
 export const planExpenseCategory = (planCategoryId) =>
   PLAN_TO_EXPENSE_CATEGORY[PLAN_CATEGORY_BY_ID[planCategoryId] ? planCategoryId : 'other'];
+
+/**
+ * Und welche Sorte sie mitbekommt. Die Sorten unter „Erleben“ heißen auf
+ * beiden Seiten gleich (siehe `EXPENSE_SUBCATEGORIES`), deshalb reist „Museum“
+ * vom Programmpunkt in die Vormerkung mit — und steht am Ende in der
+ * Auswertung, ohne dass jemand sie ein zweites Mal angibt. Wo es die Sorte auf
+ * der Geldseite nicht gibt (ein Flug hat keine), bleibt sie leer, statt
+ * irgendwo hinzupassen.
+ */
+export const planExpenseSub = (planCategoryId, sub) =>
+  expenseSub({ category: planExpenseCategory(planCategoryId), sub });
 
 /** Wie `packCategory`: unbekannt oder fehlt wird zu „Sonstiges“, nie zu nichts. */
 export const planCategory = (item) => (PLAN_CATEGORY_BY_ID[item?.category] ? item.category : 'other');

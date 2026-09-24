@@ -11,7 +11,7 @@ import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.
 import { newId } from './ids.js';
 import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
 import { keepCopy, lastCopy, discardCopy } from './trash.js';
-import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare, packQty, planExpenseCategory } from './calc.js';
+import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare, packQty, expenseSub, planExpenseCategory, planExpenseSub } from './calc.js';
 
 let backend = null;
 const listeners = new Set();
@@ -896,13 +896,19 @@ export async function removePerson(personId) {
 
 // --------------------------------------------------------------- Ausgaben
 
-export async function addExpense({ amount, date, category, note, payer, planned = false, fromPlan = false }) {
+export async function addExpense({ amount, date, category, sub, note, payer, planned = false, fromPlan = false }) {
   const now = Date.now();
+  const cat = category || 'other';
   const row = {
     id: newId(),
     amount,
     date: date || todayISO(),
-    category: category || 'other',
+    category: cat,
+    // Die Sorte („Restaurant“, „Tanken“) ist freiwillig und wird gegen die
+    // Kategorie gehalten, in der sie steht — wie auf der Packliste. Ohne
+    // Angabe bleibt sie leer: sie zu erraten hieße, die Auswertung mit Zahlen
+    // zu füllen, die niemand eingetragen hat.
+    sub: expenseSub({ category: cat, sub }),
     note: (note || '').trim(),
     payer: payer || POT,
     // Vorgemerkt: das Geld ist eingeplant, aber noch nicht ausgegeben.
@@ -977,7 +983,7 @@ export async function addPlanItem({ date, time, endTime, title, category, sub, n
     createdBy: state.myPersonId || null,
   };
   if (amount > 0) {
-    const expense = await addExpense({ amount, date: row.date, category: planExpenseCategory(row.category), note: row.title, payer: row.payer, planned: true });
+    const expense = await addExpense({ amount, date: row.date, category: planExpenseCategory(row.category), sub: planExpenseSub(row.category, row.sub), note: row.title, payer: row.payer, planned: true });
     row.linkedExpenseId = expense.id;
   }
   await backend.putPlanItem(row);
@@ -1004,10 +1010,10 @@ export async function updatePlanItem(id, patch) {
 
   if (stillOpen && patch.amount !== undefined) {
     if (patch.amount > 0 && !linked) {
-      const expense = await addExpense({ amount: patch.amount, date: next.date, category: planExpenseCategory(next.category), note: next.title, payer: next.payer, planned: true });
+      const expense = await addExpense({ amount: patch.amount, date: next.date, category: planExpenseCategory(next.category), sub: planExpenseSub(next.category, next.sub), note: next.title, payer: next.payer, planned: true });
       next.linkedExpenseId = expense.id;
     } else if (patch.amount > 0 && linked) {
-      await updateExpense(linked.id, { amount: patch.amount, date: next.date, category: planExpenseCategory(next.category), note: next.title, payer: next.payer });
+      await updateExpense(linked.id, { amount: patch.amount, date: next.date, category: planExpenseCategory(next.category), sub: planExpenseSub(next.category, next.sub), note: next.title, payer: next.payer });
     } else if (!(patch.amount > 0) && linked) {
       await deleteExpense(linked.id);
       next.linkedExpenseId = null;
@@ -1016,7 +1022,7 @@ export async function updatePlanItem(id, patch) {
     // Kein neuer Betrag im Patch — aber Datum, Kategorie, Titel oder Zahler
     // können sich geändert haben, und die noch offene Vormerkung soll dieselbe
     // Auskunft tragen wie der Programmpunkt selbst.
-    await updateExpense(linked.id, { date: next.date, category: planExpenseCategory(next.category), note: next.title, payer: next.payer });
+    await updateExpense(linked.id, { date: next.date, category: planExpenseCategory(next.category), sub: planExpenseSub(next.category, next.sub), note: next.title, payer: next.payer });
   }
 
   await backend.putPlanItem(next);

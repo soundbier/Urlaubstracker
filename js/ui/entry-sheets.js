@@ -4,6 +4,7 @@ import { openSheet } from './sheet.js';
 import { disclosure } from './parts.js';
 import {
   CATEGORIES, POT, parseAmount, todayISO, addDays, isValidDate, daysInclusive, cashPayerFor, isCashPayer, cashPayerPerson,
+  expenseSub, expenseSubs,
   PACK_CATEGORIES, PACK_STATUSES, PACK_BAGS, PACK_QTY_MAX, PACK_SCOPES,
   packCategory, packStatus, packBag, packSub, packSubs, packQty, packItemShared,
   PLAN_CATEGORIES, planSub, planSubs,
@@ -170,10 +171,10 @@ function categoryGrid(selectedId, onSelect, list = CATEGORIES) {
  * in der Abrechnung neben demselben Namen — fünfmal dasselbe graue Männchen
  * sagt dagegen nur, dass hier Personen stehen, was ohnehin dransteht.
  */
-function chipRow(options, selectedId, onSelect) {
+function chipRow(options, selectedId, onSelect, { cls = '' } = {}) {
   const row = h('div.chips');
   const buttons = options.map((o) => {
-    const b = h('button.chip', { type: 'button', onclick: () => {
+    const b = h('button.chip', { type: 'button', class: cls, onclick: () => {
       selectedId = o.id;
       buttons.forEach((x) => x.classList.toggle('is-active', x.dataset.id === selectedId));
       onSelect(o.id);
@@ -286,6 +287,9 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
   const editing = Boolean(expense);
   const today = todayISO();
   let category = expense?.category || defaults.category || 'food';
+  // Die Sorte gilt nur in ihrer Kategorie — geprüft wird deshalb beides
+  // zusammen, auch bei einer Voreinstellung von außen (siehe `expenseSub`).
+  let sub = expense ? expenseSub(expense) : expenseSub({ category, sub: defaults.sub });
   let date = expense?.date || defaults.date || todayISO();
   // Beim Bearbeiten zählt, was am Eintrag steht; nur beim Neuanlegen springt
   // der zuletzt gewählte Zahler ein.
@@ -321,7 +325,7 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
         close({
           action: 'save',
           values: {
-            amount: cents, date, category, payer, note: note.value, planned,
+            amount: cents, date, category, sub, payer, note: note.value, planned,
             // Wer eine Vormerkung von Hand auf „bezahlt“ stellt, macht dasselbe
             // wie der Haken in der Liste: reserviert bleibt reserviert.
             fromPlan: planned ? false : expense?.planned === true || expense?.fromPlan === true,
@@ -406,9 +410,37 @@ export function expenseSheet({ trip, expense = null, defaults = {} }) {
       // überraschen könnte — eine Vormerkung oder eine Notiz.
       details.open = planned || Boolean(note.value);
 
+      /*
+       * Die Sorten der gewählten Kategorie: „Restaurant“ oder „Supermarkt“
+       * statt nur „Essen“ — die Angabe, an der sich die Reise am Ende
+       * genauer auswerten lässt (siehe `views/insights.js`).
+       *
+       * Eine Chip-Reihe, kein zweites Raster: die Kategorie muss stimmen, die
+       * Sorte ist ein Angebot, und zwei gleich laute Raster übereinander
+       * schöben Datum und Zahler aus dem Bild. Dieselbe leise Reihe wie im
+       * Schnellfeld der Packliste (siehe `views/packing.js`).
+       *
+       * Sie wird neu gesetzt, wenn die Kategorie wechselt — mitsamt der Wahl
+       * selbst: „Restaurant“ unter „Einkauf“ wäre keine Angabe mehr, sondern
+       * ein Fehler mit Etikett.
+       */
+      const subBox = h('div.entry__subs');
+      const renderSubs = () => {
+        const list = expenseSubs(category);
+        subBox.hidden = !list.length;
+        replace(subBox, list.length
+          ? chipRow([{ id: '', label: 'Ohne Angabe' }, ...list], sub, (id) => { sub = id; }, { cls: 'chip--sub' })
+          : null);
+      };
+      renderSubs();
+
       const body = h('form.entry', { id: formId, onsubmit: (e) => { e.preventDefault(); save(); } },
         amount.el,
-        field('Wofür?', categoryGrid(category, (id) => { category = id; })),
+        h('div.field',
+          h('span.field__label', 'Wofür?'),
+          categoryGrid(category, (id) => { category = id; sub = ''; renderSubs(); }),
+          subBox,
+        ),
         h('label.field', dateLabel, when.el),
         h('label.field', payerLabelEl, chipRow(payers, chipFor(payer), (id) => {
           payer = id === POT ? POT : (payKind === 'cash' ? cashPayerFor(id) : id);
