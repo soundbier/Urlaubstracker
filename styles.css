@@ -851,6 +851,17 @@ body.is-onboarding .view { padding-bottom: calc(var(--safe-b) + var(--sp-7)); }
 }
 .tally__count.is-done { color: var(--text); font-weight: 600; }
 
+/*
+ * Dieselbe Aufstellung eine Stufe leiser: die Sorten unter einer Kategorie in
+ * der Auswertung. Sie hängt unter dem Balken ihrer Kategorie und darf ihn
+ * nicht überstimmen — kleinere Schrift, engere Zeilen, keine eigene
+ * Trennlinie nach oben.
+ */
+.tally--sub { margin-top: 3px; }
+.tally--sub .tally__row { padding: 5px 0; }
+.tally--sub .tally__label { font-size: var(--fs-xs); color: var(--text-muted); }
+.tally--sub .tally__count { font-size: var(--fs-xs); font-weight: 500; }
+
 /* --------------------------------------------------------------- Balken */
 
 /*
@@ -1454,6 +1465,43 @@ select.field__input { background-image: none; }
 @media (max-width: 359px) {
   .chip.catgrid__item { font-size: var(--fs-xs); gap: 4px; }
   .chip.catgrid__item .icon { width: 14px; height: 14px; }
+}
+
+/*
+ * Die Sorten unter dem Kategorie-Raster im Ausgaben-Sheet: „Restaurant“,
+ * „Supermarkt“ — dieselbe leise Reihe wie im Schnellfeld der Packliste
+ * (`.chip--sub`). Sie steht eng unter dem Raster, weil sie dazugehört: eine
+ * Kategorie und ihre Sorte, nicht zwei Fragen untereinander.
+ *
+ * Gewählt heißt hier deshalb dasselbe wie im Raster darüber — Tinte und eine
+ * Linie darunter, kein Kasten. Der umrandete Chip aus dem Schnellfeld wäre in
+ * dieser Maske der einzige Rahmen weit und breit und läge ausgerechnet auf
+ * „Ohne Angabe“, also auf der Wahl, die niemand getroffen hat. Die Linie ist
+ * an allen Chips angelegt und nur an einem gefärbt: so springt beim Umschalten
+ * kein Text um ein Haar zur Seite.
+ */
+.entry__subs { margin-top: var(--sp-2); }
+.entry__subs .chip--sub {
+  /* Nur unten eine Kante, wie im Raster darüber: sonst zöge das Überfahren mit
+     der Maus (`.chip:hover` setzt alle vier) einen ganzen Kasten um das Wort. */
+  border-width: 0 0 2px;
+  border-color: transparent;
+  border-radius: 0;
+}
+.entry__subs .chip--sub.is-active {
+  border-color: transparent;
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+/* „Ohne Angabe“ ist keine Sorte, sondern das Fehlen einer — als lautester Ton
+   der Maske stünde ausgerechnet die Nicht-Angabe da, und über der Kategorie
+   sähen zwei farbige Linien übereinander nach zwei gleich wichtigen Wahlen
+   aus. Die Linie bleibt, damit ablesbar ist, wo man steht; die Farbe nicht. */
+.entry__subs .chip--sub.is-active[data-id=""] {
+  border-bottom-color: var(--rule);
+  color: var(--text-muted);
+  font-weight: 500;
 }
 
 /* Die Pfeile zum Verschieben eines Programmpunkts um einen Tag, links und

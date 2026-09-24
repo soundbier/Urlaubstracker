@@ -17,7 +17,7 @@
 import { h, s, icon } from '../dom.js';
 import {
   computeBudget, spendingByDay, spendingStats, spentByCategory, spentByPayer,
-  planItemDone, packProgress, todayISO, CATEGORY_BY_ID,
+  planItemDone, packProgress, todayISO, CATEGORY_BY_ID, expenseSubLabel,
 } from '../calc.js';
 import { money, moneySigned, days, plural, dayMonth, dayMonthShort } from '../format.js';
 import { stat, sectionTitle, bar, payerLabel } from '../ui/parts.js';
@@ -149,7 +149,9 @@ function dayNotes(stats, cur) {
   // Anführungszeichen stehen um eine Notiz, die jemand geschrieben hat — nicht
   // um „Essen & Trinken“: eine Kategorie ist kein Zitat.
   const label = biggest
-    && (biggest.note ? `„${biggest.note}“` : (CATEGORY_BY_ID[biggest.category] || CATEGORY_BY_ID.other).label);
+    && (biggest.note
+      ? `„${biggest.note}“`
+      : expenseSubLabel(biggest) || (CATEGORY_BY_ID[biggest.category] || CATEGORY_BY_ID.other).label);
   // Überall das ausgeschriebene Datum (`dayMonth`), nicht die kurze Form: „am
   // 04.09.“ endet selbst auf einen Punkt und macht aus dem Satzende zwei.
   return [
@@ -182,7 +184,29 @@ function categoryList(rows, total, cur) {
         h('div.cat__top', h('span.cat__label', c.label), h('span.cat__amount', money(c.amount, cur))),
         bar(total > 0 ? c.amount / total : 0, 'neutral'),
         h('p.cat__meta', `${plural(c.count, 'Eintrag', 'Einträge')} · Ø ${money(Math.round(c.amount / c.count), cur)}`),
+        subList(c.rows, cur),
       ),
+    ),
+  ));
+}
+
+/**
+ * Die Aufteilung innerhalb einer Kategorie: „Essen & Trinken“ ist am Ende der
+ * Reise die größte Zahl auf dieser Seite und die am wenigsten auskunftsfreudige
+ * — hier steht, ob das die Abende im Restaurant waren oder der Wocheneinkauf.
+ *
+ * Kein zweiter Balken darunter: die Kategorie hat ihren, und sechs weitere
+ * Striche machten aus einer Aufstellung ein Diagramm. Dieselbe schlichte
+ * Tabelle wie die Gepäckübersicht, nur eine Stufe leiser — was hier steht,
+ * hat niemand eintragen müssen, und wo es niemand getan hat, steht nichts
+ * (siehe `calc.spentByCategory`).
+ */
+function subList(rows, cur) {
+  if (!rows?.length) return null;
+  return h('div.tally.tally--sub', ...rows.map((r) =>
+    h('div.tally__row',
+      h('span.tally__label', r.label),
+      h('span.tally__count', money(r.amount, cur)),
     ),
   ));
 }

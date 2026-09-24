@@ -8,6 +8,7 @@
  */
 import {
   CATEGORY_BY_ID, POT, isValidDate, isCashPayer, cashPayerPerson, MAX_PEOPLE,
+  expenseCategory, expenseSub, expenseSubLabel,
   PACK_CATEGORY_BY_ID, PACK_STATUS_BY_ID, PACK_BAG_BY_ID, packSub, packSubLabel, packQty,
   PLAN_CATEGORY_BY_ID, planSub, planSubLabel,
   contributionTarget, isCashContribution,
@@ -128,14 +129,21 @@ export function parseImport(text) {
   const rows = (list, extra) =>
     (Array.isArray(list) ? list : []).filter((r) => r && typeof r.id === 'string' && usableAmount(r.amount) && isValidDate(r.date) && extra(r));
 
-  const expenses = rows(data.expenses, () => true).map((e) => ({
-    ...e,
-    category: CATEGORY_BY_ID[e.category] ? e.category : 'other',
-    payer: validPayer(e.payer) ? e.payer : POT,
-    // Nur eine echte Marke zählt; alles andere ist eine bezahlte Ausgabe.
-    planned: e.planned === true,
-    fromPlan: e.fromPlan === true && e.planned !== true,
-  }));
+  const expenses = rows(data.expenses, () => true).map((e) => {
+    const category = expenseCategory(e);
+    return {
+      ...e,
+      category,
+      // Die Sorte wird gegen die *geprüfte* Kategorie gehalten, nicht gegen
+      // die rohe: rutscht eine Ausgabe beim Einlesen nach „Sonstiges“, darf
+      // ihre alte Sorte nicht mitrutschen (wie bei Packliste und Reiseplan).
+      sub: expenseSub({ category, sub: e.sub }),
+      payer: validPayer(e.payer) ? e.payer : POT,
+      // Nur eine echte Marke zählt; alles andere ist eine bezahlte Ausgabe.
+      planned: e.planned === true,
+      fromPlan: e.fromPlan === true && e.planned !== true,
+    };
+  });
   const expenseIds = new Set(expenses.map((e) => e.id));
 
   // Programmpunkte brauchen keinen Betrag (der steht, wenn überhaupt, an der
@@ -239,30 +247,36 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
     if (isCashPayer(payer)) return `Bargeld (${personName(cashPayerPerson(payer))})`;
     return personName(payer);
   };
-  const lines = [['Art', 'Datum', 'Zeit', 'Betrag', 'Kategorie', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
+  // Die Sorte steht in einer eigenen Spalte, nicht hinten in der Notiz: genau
+  // dafür exportiert jemand in eine Tabelle — um nach „Restaurant“ zu
+  // gruppieren, ohne vorher Text auseinanderzuschneiden.
+  const lines = [['Art', 'Datum', 'Zeit', 'Betrag', 'Kategorie', 'Sorte', 'Bezahlt von', 'Notiz'].map(esc).join(';')];
 
   for (const c of [...contributions].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     // Die Kategoriespalte steht bei Einzahlungen sonst leer — dort passt die
     // Auskunft hin, in welchen der beiden Töpfe das Geld gegangen ist.
-    lines.push(['Einzahlung', c.date, '', money(c.amount), isCashContribution(c) ? 'Bargeld' : 'Konto', personName(c.personId), c.note].map(esc).join(';'));
+    lines.push(['Einzahlung', c.date, '', money(c.amount), isCashContribution(c) ? 'Bargeld' : 'Konto', '', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const c of [...cashOuts].sort((a, b) => (a.date < b.date ? -1 : 1))) {
-    lines.push(['Bargeld abgehoben', c.date, '', money(c.amount), 'Konto → Bargeld', personName(c.personId), c.note].map(esc).join(';'));
+    lines.push(['Bargeld abgehoben', c.date, '', money(c.amount), 'Konto → Bargeld', '', personName(c.personId), c.note].map(esc).join(';'));
   }
   for (const e of [...expenses].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     // Vorgemerktes steht mit eigener Art da — sonst zählte eine Tabelle Geld
     // mit, das noch gar nicht ausgegeben ist.
-    lines.push([e.planned === true ? 'Verplant' : 'Ausgabe', e.date, '', money(e.amount), categoryLabel(e.category), payerLabel(e.payer), e.note].map(esc).join(';'));
+    lines.push([
+      e.planned === true ? 'Verplant' : 'Ausgabe', e.date, '', money(e.amount),
+      categoryLabel(e.category), expenseSubLabel(e), payerLabel(e.payer), e.note,
+    ].map(esc).join(';'));
   }
   // Der Reiseplan steht als eigene Art dabei: ein Programmpunkt ohne
   // Kostenpunkt hat kein Geld, das in dieser Tabelle sonst fehlen würde.
   for (const p of [...planItems].sort((a, b) => (a.date < b.date ? -1 : 1))) {
     const linked = p.linkedExpenseId ? expenses.find((e) => e.id === p.linkedExpenseId) : null;
     const zeit = p.time && p.endTime ? `${p.time}–${p.endTime}` : p.time || '';
-    const notiz = [p.title, planSubLabel(p), p.location, p.note].filter(Boolean).join(' · ');
+    const notiz = [p.title, p.location, p.note].filter(Boolean).join(' · ');
     lines.push([
       'Programm', p.date, zeit, linked ? money(linked.amount) : '',
-      planCategoryLabel(p.category), linked ? payerLabel(linked.payer) : '', notiz,
+      planCategoryLabel(p.category), planSubLabel(p), linked ? payerLabel(linked.payer) : '', notiz,
     ].map(esc).join(';'));
   }
   // Eine Unterkunft steht mit ihrem Anreisetag in der Datumsspalte — der
@@ -270,7 +284,7 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   for (const s of [...stays].sort((a, b) => (a.startDate < b.startDate ? -1 : 1))) {
     const zeitraum = s.endDate !== s.startDate ? `bis ${s.endDate}` : '';
     const notiz = [s.name, s.address, zeitraum, s.note].filter(Boolean).join(' · ');
-    lines.push(['Unterkunft', s.startDate, '', '', '', '', notiz].map(esc).join(';'));
+    lines.push(['Unterkunft', s.startDate, '', '', '', '', '', notiz].map(esc).join(';'));
   }
   // Die Packliste hat in dieser Tabelle keine Spalte für sich: kein Datum,
   // kein Betrag. Sie steht trotzdem drin, weil genau dafür jemand exportiert —
@@ -278,11 +292,14 @@ export function buildCsv({ trip, expenses, contributions, cashOuts = [], planIte
   // hinten bei der Notiz, wo sie niemandem eine Geldspalte verstellen.
   for (const p of packItems) {
     const qty = packQty(p);
-    const merkmale = [packSubLabel(p), PACK_STATUS_BY_ID[p.status]?.label, PACK_BAG_BY_ID[p.bag]?.short, p.note].filter(Boolean);
+    const merkmale = [PACK_STATUS_BY_ID[p.status]?.label, PACK_BAG_BY_ID[p.bag]?.short, p.note].filter(Boolean);
     // Die Anzahl steht vor dem Namen, so wie in der App: „4 × Hemd“ liest
     // sich auf Papier wie eine Packliste, „Hemd (4)“ wie eine Inventarnummer.
     const name = qty > 1 ? `${qty} \u00d7 ${p.title}` : p.title;
-    lines.push(['Packliste', '', '', '', PACK_CATEGORY_BY_ID[p.category]?.label || 'Sonstiges', '', [name, ...merkmale].join(' \u00b7 ')].map(esc).join(';'));
+    lines.push([
+      'Packliste', '', '', '', PACK_CATEGORY_BY_ID[p.category]?.label || 'Sonstiges', packSubLabel(p), '',
+      [name, ...merkmale].join(' \u00b7 '),
+    ].map(esc).join(';'));
   }
   // BOM, damit Excel die Umlaute richtig liest.
   return '﻿' + lines.join('\r\n') + '\r\n';
