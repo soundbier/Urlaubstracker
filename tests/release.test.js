@@ -58,6 +58,21 @@ test('jedes ausgelieferte Modul steht im Paket', async () => {
   }
 });
 
+test('das Firebase-Bündel steht bewusst nicht im Paket', async () => {
+  const list = /const SHELL = \[([\s\S]*?)\];/.exec(sw)?.[1] || '';
+  // 640 KB — fast die ganze App, und im lokalen Betrieb braucht sie niemand.
+  // Wer sie wieder einträgt, lädt sie jedem beim ersten Öffnen mit herunter,
+  // auch dem, der „Nur auf diesem Gerät“ gewählt hat. Geholt wird sie beim
+  // ersten Gebrauch und landet dabei im selben Cache.
+  assert.ok(
+    !list.includes('vendor/firebase.js'),
+    'vendor/firebase.js gehört nicht in SHELL — siehe den Kommentar an VENDOR in sw.js',
+  );
+  // Dafür muss der Service Worker sie beim Update mitnehmen, sonst steht eine
+  // geteilte Kasse nach jedem Update ohne Empfang wieder ohne Backend da.
+  assert.match(sw, /carryOverVendor/, 'sw.js nimmt das Bündel beim Update mit');
+});
+
 /**
  * `_headers` in seine Blöcke zerlegen: eine Zeile ohne Einrückung ist ein
  * Pfad, die eingerückten darunter sind seine Kopfzeilen. Ein Regex über die

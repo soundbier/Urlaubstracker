@@ -11,6 +11,7 @@ import { getPrefs, setPrefs, clearPrefs, validateFirebaseConfig } from './prefs.
 import { newId } from './ids.js';
 import { joinKeysFor, joinProofFor, checkJoinName, checkNewPassword } from './join.js';
 import { keepCopy, lastCopy, discardCopy } from './trash.js';
+import { keepSame } from './equal.js';
 import { todayISO, POT, MAX_PEOPLE, nextPersonColor, personEntryCount, averageShare, packQty, expenseSub, planExpenseCategory, planExpenseSub } from './calc.js';
 
 let backend = null;
@@ -144,27 +145,35 @@ async function handleChange(data) {
       : state.myPersonId;
   if (myPersonId !== state.myPersonId) setPrefs({ myPersonId });
 
+  // Nur nachsehen, solange es keinen Trip gibt — genau dort, wo der
+  // Anfangsbildschirm die Karte zum Zurückholen zeigen könnte. Bei jeder
+  // Änderung an einer laufenden Kasse wäre das Nachsehen in `trash.js`
+  // reine Verschwendung.
+  const lastDeletedSummary = trip ? null : await lastCopy();
+
+  // `keepSame` hält den alten Stand fest, wo nichts Neues darin steht — bis
+  // `set` läuft, steht in `state` ja noch der von vor dieser Meldung. Das ist
+  // kein Sparen an der falschen Stelle: die Backends reichen bei *jeder*
+  // Meldung frische Felder herein, und ohne diesen Vergleich sähe jede davon
+  // für die Oberfläche nach einer Änderung aus (siehe `equal.js` und
+  // `app.render`).
   set({
-    trip,
+    trip: keepSame(state.trip, trip),
     myPersonId,
-    // Nur nachsehen, solange es keinen Trip gibt — genau dort, wo der
-    // Anfangsbildschirm die Karte zum Zurückholen zeigen könnte. Bei jeder
-    // Änderung an einer laufenden Kasse wäre das Nachsehen in `trash.js`
-    // reine Verschwendung.
-    lastDeletedSummary: trip ? null : await lastCopy(),
-    contributions: sortByDate(data.contributions),
-    expenses: sortByDate(data.expenses),
-    cashOuts: sortByDate(data.cashOuts || []),
+    lastDeletedSummary: keepSame(state.lastDeletedSummary, lastDeletedSummary),
+    contributions: keepSame(state.contributions, sortByDate(data.contributions)),
+    expenses: keepSame(state.expenses, sortByDate(data.expenses)),
+    cashOuts: keepSame(state.cashOuts, sortByDate(data.cashOuts || [])),
     // Nicht mit `sortByDate`: der Reiseplan sortiert Tage aufsteigend und
     // innerhalb eines Tages nach Uhrzeit (siehe `planItemsByDay`), nicht nach
     // „neueste zuerst“ wie die übrigen Listen.
-    planItems: data.planItems || [],
+    planItems: keepSame(state.planItems, data.planItems || []),
     // Die Packliste sortiert sich nach Kategorie und Eingabereihenfolge, nicht
     // nach Datum — sie hat gar keins (siehe `packItemsByCategory`).
-    packItems: data.packItems || [],
+    packItems: keepSame(state.packItems, data.packItems || []),
     // Unsortiert wie der Reiseplan: welcher Tag welche Unterkunft trägt, sagt
     // `stayForDate` anhand des Zeitraums, nicht die Reihenfolge im Feld.
-    stays: data.stays || [],
+    stays: keepSame(state.stays, data.stays || []),
     // Eine offene Einladung hat Vorrang, sonst würde sie beim nächsten
     // Datenereignis unter dem Finger verschwinden.
     phase: state.invite ? 'onboarding' : trip ? 'ready' : 'onboarding',

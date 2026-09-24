@@ -9,6 +9,12 @@
  * und in eine Prüfung darauf.
  */
 
+/**
+ * Das Dokument der laufenden Prüfung — `focus()` muss wissen, wo es
+ * `activeElement` einträgt.
+ */
+let currentDocument = null;
+
 class FakeNode {
   constructor() {
     this.parentNode = null;
@@ -80,6 +86,13 @@ class FakeElement extends FakeNode {
     return this.childNodes[0] || null;
   }
 
+  /** Hängt dieses Element noch am Dokument? `ui/keep.js` entscheidet danach. */
+  get isConnected() {
+    let node = this;
+    while (node.parentNode) node = node.parentNode;
+    return node === currentDocument;
+  }
+
   append(...nodes) {
     for (const node of nodes) {
       node.remove();
@@ -104,6 +117,19 @@ class FakeElement extends FakeNode {
   /** Ein Tipp auf dieses Element — mehr Ereignismodell braucht hier nichts. */
   click() {
     for (const fn of [...(this.listeners.get('click') || [])]) fn({ type: 'click', target: this });
+  }
+
+  /**
+   * Fokus und Schreibmarke: nur so viel davon, wie `ui/keep.js` anfasst — es
+   * setzt beides zurück, nachdem eine Ansicht neu gebaut wurde.
+   */
+  focus() {
+    if (currentDocument) currentDocument.activeElement = this;
+  }
+
+  setSelectionRange(start, end) {
+    this.selectionStart = start;
+    this.selectionEnd = end;
   }
 
   get textContent() {
@@ -149,7 +175,7 @@ class FakeElement extends FakeNode {
  * beim Bauen auf `document` zu.
  */
 export function installFakeDom() {
-  const document = new FakeElement('html');
+  const document = (currentDocument = new FakeElement('html'));
   document.body = new FakeElement('body');
   document.append(document.body);
   document.createElement = (tag) => new FakeElement(tag);

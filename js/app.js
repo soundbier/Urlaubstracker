@@ -3,8 +3,10 @@ import { h, icon, replace, $ } from './dom.js';
 import * as store from './store.js';
 import { computeBudget, todayISO, packStatus } from './calc.js';
 import { applyTheme } from './prefs.js';
-import { onInstallabilityChange } from './install.js';
+import { onInstallabilityChange, canPromptInstall, isInstalled } from './install.js';
 import { money, days, compactDate } from './format.js';
+import { same } from './equal.js';
+import { capture, restore } from './ui/keep.js';
 import { toast, confirmSheet, promptSheet, closeAllSheets, hideToast } from './ui/sheet.js';
 import * as lock from './lock.js';
 import { lockScreen } from './ui/lock-screen.js';
@@ -112,7 +114,10 @@ function undoable(message, undo) {
 
 const actions = {
   goto,
-  rerender: () => render(),
+  // Was eine Ansicht sich selbst merkt — welcher Filter steht, welcher Tag
+  // aufgeschlagen ist —, steht nicht im Zustand und lässt sich deshalb nicht
+  // damit vergleichen. Wer von dort neu aufbauen lässt, meint es auch.
+  rerender: () => render({ force: true }),
 
   setMyPerson(personId) {
     store.setMyPerson(personId).catch((err) => toast(err?.message || 'Ging nicht.', { type: 'error' }));
@@ -416,7 +421,36 @@ const actions = {
 // dahinter ändert sich ja ständig etwas, während jemand davor tippt.
 let lockScreenEl = null;
 
-function render() {
+/**
+ * Was gerade auf dem Schirm steht, solange eine Kasse offen ist — und woraus
+ * es gebaut wurde.
+ *
+ * Bis hierher wurde bei jeder Meldung aus dem Store alles neu gebaut: Kopf,
+ * Ansicht, Navigation, jedes Mal. Das liest sich gut und ist in der Gruppe
+ * teuer. Firestore meldet sich pro Schreibvorgang mehrfach und auf jedem
+ * Gerät — und die allermeisten dieser Meldungen tragen gar keine neue
+ * Nachricht: derselbe Stand, nur in frischen Objekten (siehe `equal.js`).
+ * Wer dabei gerade scrollte oder tippte, verlor trotzdem die Stelle.
+ *
+ * Also wird verglichen, bevor gebaut wird, und zwar für jeden Teil der Hülle
+ * einzeln: die Ansicht hängt an allem, die Navigation nur am Reiter, der Kopf
+ * am Namen, am Zeitraum und am Zustand der Synchronisierung. Der Normalfall
+ * ist, dass nichts davon zu tun ist.
+ */
+let shell = null;
+
+/**
+ * Einen ganzen Bildschirm austauschen und dabei mitnehmen, was am Bild hängt
+ * (siehe `ui/keep.js`): auch der Anmelde- und der Anfangsbildschirm haben
+ * Felder, in die jemand tippt, während im Hintergrund der Store arbeitet.
+ */
+function swap(...children) {
+  const kept = capture(app);
+  replace(app, ...children);
+  restore(app, kept);
+}
+
+function render({ force = false } = {}) {
   // Zugesperrt heißt: nichts von der Kasse steht auf dem Schirm. Kein Kopf,
   // keine Liste, keine Zahl — nur der Code.
   if (lock.isLocked()) {
@@ -425,6 +459,7 @@ function render() {
     // hätte der Name der Kasse hinter der Sperre nichts verloren.
     document.title = 'Urlaubstracker';
     if (!lockScreenEl?.isConnected) {
+      shell = null;
       lockScreenEl = lockScreen({ onUnlocked: () => render() });
       replace(app, lockScreenEl);
     }
@@ -433,7 +468,8 @@ function render() {
   lockScreenEl = null;
 
   if (state.phase === 'loading') {
-    replace(app, h('div.view.view--center', h('div.spinner', { 'aria-label': 'Lädt' })));
+    shell = null;
+    swap(h('div.view.view--center', h('div.spinner', { 'aria-label': 'Lädt' })));
     return;
   }
 
@@ -442,7 +478,8 @@ function render() {
   // „Nur auf diesem Gerät“ als vollwertiger dritter Antwort.
   if (store.needsAccountScreen()) {
     document.body.classList.add('is-onboarding');
-    replace(app, renderAuth(state, actions));
+    shell = null;
+    swap(renderAuth(state, actions));
     return;
   }
 
@@ -450,28 +487,141 @@ function render() {
   // die Übersicht aller Kassen dieses Kontos.
   if (store.needsTripList()) {
     document.body.classList.add('is-onboarding');
-    replace(app, renderTrips(state, actions));
+    shell = null;
+    swap(renderTrips(state, actions));
     return;
   }
 
   if (state.phase === 'onboarding' || !state.trip) {
     document.body.classList.add('is-onboarding');
-    replace(app, renderOnboarding(state, actions));
+    shell = null;
+    swap(renderOnboarding(state, actions));
     return;
   }
 
   document.body.classList.remove('is-onboarding');
-  const route = currentTab();
-  const tab = TABS.find((t) => t.id === route);
-
-  replace(app,
-    header(),
-    deletionBar(),
-    h('main.main', { id: 'main' }, tab.render(state, actions)),
-    fab(route),
-    nav(route),
-  );
+  renderShell(currentTab(), force);
   document.title = `${state.trip.name} — Urlaubstracker`;
+}
+
+/**
+ * Die Kennung jedes Teils der Hülle: woraus ist er gebaut?
+ *
+ * Bewusst eher zu viel als zu wenig — steht hier eine Angabe zu viel, wird
+ * gelegentlich umsonst gebaut; fehlt eine, bleibt etwas Falsches stehen, und
+ * das fällt erst im Urlaub auf. Was im Zustand steht, wird eigens verglichen
+ * (`sameState`); hier steht nur, was *nicht* dort steht.
+ */
+function shellStamps(route) {
+  const { trip, sync } = state;
+  const request = store.deletionRequest();
+  const panes = [financePane(), planningPane(), packingScope()].join('/');
+  return {
+    // Der Kopf zeigt Name und Zeitraum der Kasse (und daraus, mit dem
+    // heutigen Tag, ob sie noch bevorsteht) sowie den Sync-Punkt.
+    head: [trip.name, trip.startDate, trip.endDate, todayISO(), sync.mode, sync.connected, sync.online, sync.error].join('|'),
+    notice: request ? [request.at, request.due, request.person?.name].join('|') : '',
+    fab: [route, panes, state.myPersonId].join('|'),
+    nav: route,
+    // Die Ansicht hängt an allem — hier steht der Teil davon, der nicht im
+    // Zustand steht: welcher Reiter und Unter-Reiter offen ist, welcher Tag
+    // heute ist, und ob sich die App gerade installieren lässt (die
+    // Einstellungen zeigen die Zeile nur dann).
+    view: [route, panes, todayISO(), canPromptInstall(), isInstalled()].join('|'),
+  };
+}
+
+/**
+ * Steht im Zustand etwas anderes als beim letzten Aufbau?
+ *
+ * Verglichen wird Feld für Feld und nur an der Oberfläche: der Store gibt
+ * seine Listen unverändert weiter, wenn nichts Neues darin steht (siehe
+ * `equal.keepSame`), und genau darauf baut dieser Vergleich. Über alle
+ * Schlüssel beider Seiten, nicht über eine Liste hier — ein neues Feld im
+ * Zustand soll nicht stillschweigend unbemerkt bleiben, bloß weil es hier
+ * niemand nachgetragen hat.
+ *
+ * `sync` ist die Ausnahme: das Objekt ist bei jeder Meldung neu, der Inhalt
+ * fast immer derselbe.
+ */
+function sameState(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    if (key === 'sync') {
+      if (!same(a.sync, b.sync)) return false;
+    } else if (a[key] !== b[key]) return false;
+  }
+  return true;
+}
+
+function renderShell(route, force) {
+  const tab = TABS.find((t) => t.id === route);
+  const stamps = shellStamps(route);
+
+  // Erster Aufbau — oder zurück aus Sperre, Anmeldung, Anfangsbildschirm.
+  if (!shell?.main.isConnected) {
+    const parts = {
+      head: header(),
+      notice: deletionBar(),
+      main: h('main.main', { id: 'main' }, tab.render(state, actions)),
+      fab: fab(route),
+      nav: nav(route),
+    };
+    replace(app, parts.head, parts.notice, parts.main, parts.fab, parts.nav);
+    shell = { ...parts, stamps, state };
+    return;
+  }
+
+  const prev = shell.stamps;
+  const viewChanged = force || stamps.view !== prev.view || !sameState(shell.state, state);
+  const changed = viewChanged || Object.keys(stamps).some((k) => stamps[k] !== prev[k]);
+  shell.stamps = stamps;
+  shell.state = state;
+  if (!changed) return;
+
+  const kept = capture(app);
+
+  if (stamps.head !== prev.head) shell.head = swapPart(shell.head, header(), shell.main);
+  if (stamps.notice !== prev.notice) shell.notice = swapPart(shell.notice, deletionBar(), shell.main);
+  if (stamps.fab !== prev.fab) shell.fab = swapPart(shell.fab, fab(route), shell.nav);
+  if (stamps.nav !== prev.nav) markNav(route);
+  if (viewChanged) replace(shell.main, tab.render(state, actions));
+
+  // Beim Reiterwechsel beginnt die neue Ansicht oben — die Stelle, an der man
+  // in der vorigen stand, gehört nicht hierher. Sonst zurück an genau die
+  // Stelle, an der jemand gerade liest.
+  const sameRoute = stamps.nav === prev.nav;
+  restore(app, kept, { page: sameRoute });
+  if (!sameRoute) scrollTo(0, 0);
+}
+
+/**
+ * Der Reiterwechsel in der Navigation: nur die Markierung wandert.
+ *
+ * Die Leiste dafür neu zu bauen hieße, den Knopf wegzuwerfen, den gerade
+ * jemand angetippt hat — wer mit der Tastatur unterwegs ist, stünde danach
+ * wieder am Anfang der Seite.
+ */
+function markNav(activeId) {
+  for (const item of shell.nav.querySelectorAll('.nav__item')) {
+    const active = item.dataset.tab === activeId;
+    item.classList.toggle('is-active', active);
+    if (active) item.setAttribute('aria-current', 'page');
+    else item.removeAttribute('aria-current');
+  }
+}
+
+/**
+ * Einen Teil der Hülle austauschen. Beide Seiten dürfen fehlen — den
+ * Löschbalken und den schwebenden Knopf gibt es nicht immer —, deshalb muss
+ * gesagt sein, wovor der Teil steht, wenn er neu dazukommt.
+ */
+function swapPart(current, next, before) {
+  if (current && next) current.replaceWith(next);
+  else if (current) current.remove();
+  else if (next) before.before(next);
+  return next;
 }
 
 function header() {
@@ -581,6 +731,8 @@ function nav(activeId) {
     ...TABS.map((t) =>
       h('button.nav__item', {
         type: 'button',
+        // Woran `markNav` den Knopf wiederfindet, ohne die Leiste neu zu bauen.
+        dataset: { tab: t.id },
         class: t.id === activeId ? 'is-active' : '',
         'aria-current': t.id === activeId ? 'page' : null,
         onclick: () => goto(t.id),

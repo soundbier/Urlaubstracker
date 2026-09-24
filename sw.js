@@ -14,8 +14,22 @@
  * Beim Veröffentlichen: APP_VERSION hochzählen (und `data-version` in
  * index.html mitziehen, `npm test` prüft das).
  */
-const APP_VERSION = '2.13.0';
+const APP_VERSION = '2.14.0';
 const CACHE = `urlaubstracker-${APP_VERSION}`;
+
+/**
+ * Das Firebase-Bündel steht bewusst *nicht* im Paket — es ist 640 KB groß und
+ * damit fast die ganze App, und wer „Nur auf diesem Gerät“ gewählt hat,
+ * braucht es nie: `store.js` lädt das Firestore-Backend erst, wenn eine Kasse
+ * wirklich in der Cloud liegt. Vorgeladen wurde es trotzdem, für jeden, beim
+ * ersten Öffnen.
+ *
+ * Geholt wird es jetzt beim ersten Gebrauch — und landet dabei über die
+ * Fetch-Behandlung unten im selben Cache, ist also ab dann genauso offline da
+ * wie der Rest. Damit ein Update das nicht wieder zunichtemacht, nimmt eine
+ * neue Fassung es mit, wenn die alte es schon hatte (siehe `carryOverVendor`).
+ */
+const VENDOR = './vendor/firebase.js';
 
 const SHELL = [
   './',
@@ -25,6 +39,7 @@ const SHELL = [
   './js/store.js',
   './js/calc.js',
   './js/dom.js',
+  './js/equal.js',
   './js/format.js',
   './js/travel.js',
   './js/ids.js',
@@ -42,6 +57,7 @@ const SHELL = [
   './js/auth.js',
   './js/account.js',
   './js/ui/sheet.js',
+  './js/ui/keep.js',
   './js/ui/lock-screen.js',
   './js/ui/parts.js',
   './js/ui/join-sheet.js',
@@ -58,7 +74,6 @@ const SHELL = [
   './js/views/plan.js',
   './js/views/planning.js',
   './js/views/packing.js',
-  './vendor/firebase.js',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',
@@ -102,6 +117,36 @@ async function fillCache() {
     if (!response.ok) throw new Error(`${url} kam mit Status ${response.status}`);
     await cache.put(url, await unredirected(response));
   }));
+  await carryOverVendor(cache);
+}
+
+/**
+ * Das Firebase-Bündel gehört nicht zum Paket (siehe `VENDOR`), aber wer eine
+ * geteilte Kasse offen hat, hat es längst geholt — und für den darf ein Update
+ * nicht bedeuten, dass seine Kasse danach ohne Empfang nicht mehr aufgeht. Die
+ * neue Fassung nimmt es deshalb mit, wenn die alte es hatte.
+ *
+ * Bewusst nur dann, und bewusst ohne die Installation daran scheitern zu
+ * lassen: geht es schief, wird es beim nächsten Gebrauch geholt — dann eben
+ * mit Empfang, so wie beim allerersten Mal.
+ *
+ * `ignoreVary`, weil die alte Antwort über die Fetch-Behandlung unten in den
+ * Cache kam und dabei die Kopfzeilen des Hosters mitgebracht hat; ein
+ * `Vary: Accept-Encoding` darin ließe sie hier sonst unauffindbar aussehen.
+ */
+async function carryOverVendor(cache) {
+  const names = (await caches.keys()).filter((n) => n !== CACHE && n.startsWith('urlaubstracker-'));
+  const known = await Promise.all(
+    names.map(async (n) => Boolean(await (await caches.open(n)).match(VENDOR, { ignoreVary: true }))),
+  );
+  if (!known.some(Boolean)) return;
+
+  try {
+    const response = await fetch(VENDOR, { cache: 'reload' });
+    if (response.ok) await cache.put(VENDOR, await unredirected(response));
+  } catch {
+    /* beim nächsten Gebrauch, dann eben mit Empfang */
+  }
 }
 
 /**
