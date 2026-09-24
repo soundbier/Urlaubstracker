@@ -15,6 +15,7 @@ import {
   packCategory, packStatus, packBag, packItemPacked, packProgress, packItemsByCategory, packItemsByStatus,
   packSub, packSubLabel, packSubs, packQty, packOverview,
   packItemShared, packItemsMine, packItemsShared,
+  spendingByDay, spendingStats, spentByPayer,
 } from '../js/calc.js';
 
 // Ein durchgängiges Beispiel: 10 Tage Juli, 1500 € Kasse, heute ist Tag 3.
@@ -846,4 +847,93 @@ test('Meine Liste ist leer, solange niemand gewählt ist', () => {
   assert.deepEqual(packItemsMine(items, undefined), []);
 
   assert.deepEqual(packItemsShared(items).map((i) => i.title), ['Erste-Hilfe-Set', 'Reisepass']);
+});
+
+// ---------------------------------------------------------------- Auswertung
+
+test('Tag für Tag: jeder Reisetag bekommt eine Zeile, auch der leere', () => {
+  const rows = spendingByDay({ trip: TRIP, expenses: EXPENSES, today: TODAY });
+  assert.equal(rows.length, 10, 'eine Zeile je Kalendertag der Reise');
+  assert.deepEqual(rows[0], { date: '2026-07-01', total: 20000, count: 1, isToday: false, isFuture: false });
+  assert.equal(rows[2].isToday, true);
+  // Nach heute steht kein Betrag — und der Tag ist als Zukunft gekennzeichnet,
+  // damit ein noch nicht angebrochener Tag nicht wie ein sparsamer aussieht.
+  assert.equal(rows[3].total, 0);
+  assert.equal(rows[3].isFuture, true);
+  assert.equal(rows.reduce((a, d) => a + d.total, 0), totalSpent(EXPENSES));
+
+  // Vorgemerktes ist noch nicht ausgegeben und trägt keinen Balken.
+  const geplant = [...EXPENSES, { id: 'p1', date: '2026-07-02', amount: 9900, category: 'stay', payer: POT, planned: true }];
+  assert.deepEqual(
+    spendingByDay({ trip: TRIP, expenses: geplant, today: TODAY }).map((d) => d.total),
+    spendingByDay({ trip: TRIP, expenses: EXPENSES, today: TODAY }).map((d) => d.total),
+  );
+});
+
+test('Auswertung: Schnitte, Ausschläge und Lücken', () => {
+  const s = spendingStats({ trip: TRIP, expenses: EXPENSES, today: TODAY });
+  assert.equal(s.spent, 34000);
+  assert.equal(s.entries, 3);
+  assert.equal(s.perEntry, Math.round(34000 / 3));
+  assert.equal(s.elapsedDays, 3);
+  assert.equal(s.perDay, Math.round(34000 / 3));
+  assert.equal(s.activeDays, 3);
+  assert.equal(s.quietDays, 0);
+  assert.deepEqual(s.topDay, { date: '2026-07-01', total: 20000, count: 1 });
+  assert.equal(s.biggest.id, 'e1');
+  assert.equal(s.outside, 0);
+
+  // Vor der Abfahrt gibt es keinen angebrochenen Tag, durch den sich teilen
+  // ließe — und ohne eine einzige Ausgabe keinen teuersten Tag.
+  const vorher = spendingStats({ trip: TRIP, expenses: [], today: '2026-06-28' });
+  assert.equal(vorher.elapsedDays, 0);
+  assert.equal(vorher.perDay, 0);
+  assert.equal(vorher.quietDays, 0, 'ein Tag, der noch nicht war, ist kein ruhiger Tag');
+  assert.equal(vorher.topDay, null);
+  assert.equal(vorher.biggest, null);
+});
+
+test('Auswertung: ruhige Tage, Anzahlungen vor der Reise, Vorgemerktes', () => {
+  const expenses = [
+    ...EXPENSES,
+    { id: 'a0', date: '2026-06-20', amount: 5000, category: 'stay', payer: POT }, // Anzahlung vor der Abfahrt
+    { id: 'p1', date: '2026-07-08', amount: 12000, category: 'activity', payer: POT, planned: true },
+  ];
+  const s = spendingStats({ trip: TRIP, expenses, today: '2026-07-05' });
+
+  assert.equal(s.spent, 39000, 'die Anzahlung zählt mit, die Vormerkung nicht');
+  assert.equal(s.entries, 4);
+  assert.equal(s.elapsedDays, 5);
+  assert.equal(s.quietDays, 2, 'der 4. und der 5. Juli blieben ohne Eintrag');
+  assert.equal(s.activeDays, 3);
+  assert.equal(s.perActiveDay, Math.round(34000 / 3), 'zählt nur, was im Reisezeitraum liegt');
+  assert.equal(s.perDay, Math.round(39000 / 5), 'teilt alles durch die angebrochenen Tage');
+  assert.equal(s.outside, 5000);
+  assert.equal(s.outsideCount, 1);
+
+  // Nach der Reise sind alle Tage angebrochen.
+  const danach = spendingStats({ trip: TRIP, expenses, today: '2026-07-20' });
+  assert.equal(danach.elapsedDays, 10);
+  assert.equal(danach.quietDays, 7);
+});
+
+test('Womit bezahlt: Konto, Bargeld und privat bleiben auseinander', () => {
+  const expenses = [
+    ...EXPENSES,
+    { id: 'e4', date: '2026-07-02', amount: 2500, category: 'food', payer: cashPayerFor('marie') },
+    { id: 'e5', date: '2026-07-02', amount: 700, category: 'other' }, // ohne Angabe: aus der Kasse
+    { id: 'p1', date: '2026-07-09', amount: 9000, category: 'stay', payer: POT, planned: true },
+  ];
+  const rows = spentByPayer(expenses);
+
+  assert.deepEqual(rows.map((r) => r.kind), ['pot', 'private', 'cash'], 'nach Betrag sortiert');
+  assert.deepEqual(rows[0], { payer: POT, kind: 'pot', personId: null, amount: 30700, count: 3 });
+  assert.equal(rows[1].personId, 'lukas');
+  assert.equal(rows[2].personId, 'marie', 'Bargeld bleibt an der Person, die es dabeihat');
+  assert.equal(rows.reduce((a, r) => a + r.amount, 0), totalSpent(expenses), 'zusammen ist es die Summe');
+});
+
+test('Kategorien zählen auch ihre Einträge', () => {
+  const cats = spentByCategory(EXPENSES);
+  assert.deepEqual(cats.map((c) => [c.id, c.amount, c.count]), [['stay', 20000, 1], ['food', 14000, 2]]);
 });

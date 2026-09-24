@@ -1,6 +1,6 @@
 /** Die Kasse: was reinkam, wie es sich verteilt, und wer am Ende was bekommt. */
 import { h, s, icon } from '../dom.js';
-import { computeBudget, dailySeries, settleUp, spentByCategory, cashBalances, accountBalance, isCashContribution, todayISO } from '../calc.js';
+import { computeBudget, dailySeries, settleUp, cashBalances, accountBalance, isCashContribution, todayISO } from '../calc.js';
 import { money, moneySigned, days, dayMonthShort } from '../format.js';
 import { stat, sectionTitle, contributionRow, cashOutRow, emptyState, bar, bufferLabel } from '../ui/parts.js';
 
@@ -43,8 +43,10 @@ export function renderBudget(state, actions) {
     accountSection(trip, contributions, expenses, cashOuts, cur, actions),
 
     cashSection(trip, contributions, cashOuts, expenses, cur, actions),
-
-    expenses.length ? h('section.section', sectionTitle('Wofür'), categoryList(expenses, b.spent, cur)) : null,
+    // „Wofür ging das Geld“ stand hier als letzter Abschnitt und war der
+    // einzige, der nicht vom Kassenstand handelte. Er steht jetzt im Reiter
+    // „Auswertung“ — dort, wo die übrigen Aufteilungen stehen, und mit der
+    // Anzahl der Einträge daneben, für die hier nie Platz war.
   );
 }
 
@@ -206,27 +208,6 @@ function trendChart(trip, contributions, expenses, today, budget) {
     ),
     h('div.chart__axisLabels', h('span', dayMonthShort(trip.startDate)), h('span', dayMonthShort(trip.endDate))),
   );
-}
-
-// --------------------------------------------------------------- Kategorien
-
-/**
- * Der Balken ist der Anteil — daneben stand er bis eben noch einmal als
- * Prozentzahl. Die dritte Spalte hat außerdem die Beträge von der rechten
- * Kante weggeschoben, an der sie sich sonst untereinander vergleichen lassen.
- */
-function categoryList(expenses, total, cur) {
-  const rows = spentByCategory(expenses);
-  return h('div.catlist', ...rows.map((c) => {
-    const share = total > 0 ? c.amount / total : 0;
-    return h('div.cat',
-      h('span.cat__icon', icon(c.icon, 19)),
-      h('div.cat__main',
-        h('div.cat__top', h('span.cat__label', c.label), h('span.cat__amount', money(c.amount, cur))),
-        bar(share, 'neutral'),
-      ),
-    );
-  }));
 }
 
 // -------------------------------------------------------------- Abrechnung
